@@ -2,6 +2,7 @@ import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
 import { CheckCircle, Lock, Rocket } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { CONDENSED, AMBER_TEXT } from "@/lib/premium-theme";
+import { displayCriterionName } from "./helpers";
 import type { ConformityEvalForm } from "./types";
 
 interface CriteriaScoreProps {
@@ -50,7 +51,7 @@ export function ConfirmLaunchDialog({
                 return (
                   <div key={c.criterionId} className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[11px] font-bold uppercase text-foreground truncate">{c.criterionName}</span>
+                      <span className="text-[11px] font-bold uppercase text-foreground truncate">{displayCriterionName(c.criterionName)}</span>
                       {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
                       {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
                     </div>
@@ -157,7 +158,7 @@ export function EvaluationSummaryPanel({
                   <div key={c.criterionId} className="space-y-0.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-bold uppercase text-foreground truncate">{c.criterionName}</span>
+                        <span className="text-[11px] font-bold uppercase text-foreground truncate">{displayCriterionName(c.criterionName)}</span>
                         {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
                         {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
                       </div>

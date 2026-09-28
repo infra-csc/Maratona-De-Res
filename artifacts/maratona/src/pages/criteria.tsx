@@ -10,11 +10,11 @@ import { useAllCriterionRoutings } from "@/lib/routing-api";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { BODY } from "@/lib/premium-theme";
 import { useCriteriaMaintenance } from "./criteria/use-criteria-maintenance";
-import { useCreateCriterionForm, useDuplicateCriterion } from "./criteria/use-criterion-forms";
+import { useCreateCriterionForm, useCriterionAreasEditor, useDuplicateCriterion } from "./criteria/use-criterion-forms";
 import { CriteriaHeader } from "./criteria/criteria-header";
 import { CriteriaTable } from "./criteria/criteria-table";
 import { ConformityRoutingCard } from "./criteria/conformity-routing-card";
-import { CreateCriterionDialog, DuplicateCriterionDialog, ResyncSummaryDialog } from "./criteria/criterion-dialogs";
+import { CreateCriterionDialog, CriterionAreasDialog, DuplicateCriterionDialog, ResyncSummaryDialog } from "./criteria/criterion-dialogs";
 import { CriterionRoutingDialog } from "./criteria/routing-config-dialog";
 
 export default function CriteriaPage() {
@@ -73,6 +73,7 @@ export default function CriteriaPage() {
   const routingCriterion = routingDialogId != null ? (criteria ?? []).find(c => c.id === routingDialogId) : null;
 
   const duplicate = useDuplicateCriterion(qKey, criteria, areas);
+  const areasEditor = useCriterionAreasEditor(qKey);
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
@@ -105,6 +106,8 @@ export default function CriteriaPage() {
             onDuplicate={duplicate.startDuplicate}
             onOpenRouting={setRoutingDialogId}
             onRoutingSaved={() => qc.invalidateQueries()}
+            canEdit={canEdit}
+            onEditAreas={areasEditor.start}
           />
         )}
 
@@ -127,6 +130,9 @@ export default function CriteriaPage() {
 
       {/* Duplicate criterion dialog */}
       <DuplicateCriterionDialog state={duplicate} areas={areas} />
+
+      {/* Áreas que avaliam (padrão do catálogo) */}
+      <CriterionAreasDialog editor={areasEditor} areas={areas} />
 
       {/* Resync summary dialog */}
       <ResyncSummaryDialog summary={maintenance.resyncSummary} onClose={() => maintenance.setResyncSummary(null)} />

@@ -5,6 +5,7 @@ import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { CONDENSED, AMBER } from "@/lib/premium-theme";
 import { AMBER_TINT, INFO_TINT, SCORE_LABELS as labels } from "./constants";
 import { ScoreButton } from "./score-button";
+import { displayCriterionName } from "./helpers";
 import type { CriterionAssignmentRow } from "./types";
 
 export interface CriterionCardHandlers {
@@ -25,11 +26,13 @@ interface CriterionCardProps extends CriterionCardHandlers {
   // Registro de roteamento do critério (mostra o selo "De Fulano" quando redirecionado).
   assignment: CriterionAssignmentRow | undefined;
   isSaving: boolean;
+  // Outras áreas também respondem este critério no evento (nota = média das áreas).
+  sharedWithOtherAreas?: boolean;
 }
 
 // Cartão de um critério: selos, escala 0–10, justificativa, áudio e rascunho.
 export function CriterionCard({
-  criterion: c, index, total, ev, score, comment, audio, assignment, isSaving,
+  criterion: c, index, total, ev, score, comment, audio, assignment, isSaving, sharedWithOtherAreas,
   onScoreClick, onCommentChange, onAudioChange, onSaveDraft,
 }: CriterionCardProps) {
   const submitted = ev?.status === "submitted";
@@ -44,8 +47,10 @@ export function CriterionCard({
             {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
               <span className="bg-destructive/10 border border-destructive rounded-lg text-destructive px-2 py-0.5 text-[11px] font-black uppercase">Peso 0 — não conta na média</span>
             )}
-            {c.eventScoped && (
-              <span className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Entra na média do critério pai</span>
+            {sharedWithOtherAreas ? (
+              <span title="Outras áreas também avaliam este critério; a nota dele no evento é a média das áreas." className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Avaliado também por outras áreas</span>
+            ) : c.eventScoped && (
+              <span className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Entra na média do critério</span>
             )}
             {c.responsibleAreaName && (
               <span className="bg-secondary text-foreground border border-border rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
@@ -83,7 +88,7 @@ export function CriterionCard({
           <p className="text-[11px] font-black uppercase text-muted-foreground tracking-wider mb-0.5">
             Critério {index + 1} de {total}
           </p>
-          <h4 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{index + 1}. {c.criterionName}</h4>
+          <h4 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{index + 1}. {displayCriterionName(c.criterionName)}</h4>
           <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
             {c.criterionDescription && c.criterionDescription.trim().length > 0
               ? c.criterionDescription

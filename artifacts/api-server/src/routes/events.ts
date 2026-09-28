@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable, publicEvalTokensTable, publicEvalTokenCriteriaTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -11,6 +11,7 @@ import { getCurrentCycle } from "../lib/cycle.js";
 import { participantCountsForScore } from "../lib/participation.js";
 import { pgNum, affectedRows } from "../lib/pg-num.js";
 import { loadEventCriteria } from "../lib/event-console-data.js";
+import { applyAreaDefaults, setEventCriterionAreas, deleteEventCopyTx, AreaCopyError } from "../lib/area-copies.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -438,6 +439,7 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
+      sourceCriterionId: criteriaTable.sourceCriterionId,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
       partialPublishedByUserName: partialPublisherAlias.name,
@@ -480,14 +482,22 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
   const allEvals = await db.select({ criterionId: evaluationsTable.criterionId, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
   const submittedEvals = allEvals.filter(e => e.status === "submitted");
   const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments.map(a => ({ areaId: a.areaId, evaluatorUserId: a.evaluatorUserId })));
-  const evaluatedCriteriaCount = activeCriteria.filter(c => {
+  const isDone = (c: (typeof activeCriteria)[number]) => {
     const submittedIds = submittedEvals.filter(e => e.criterionId === c.criterionId).map(e => e.evaluatorUserId as number);
     return getCriterionEvaluationStatus(c.responsibleAreaId, submittedIds, assignedByArea).isEvaluated;
-  }).length;
+  };
+  // Cópias por área contam dentro do critério de origem (uma área concluída
+  // basta — conta só quem avaliou); antes cada cópia contava como critério.
+  const presentIds = new Set(activeCriteria.map(c => c.criterionId));
+  const isAbsorbedCopy = (c: (typeof activeCriteria)[number]) => c.eventScoped && c.sourceCriterionId != null && presentIds.has(c.sourceCriterionId);
+  const progressCriteria = activeCriteria.filter(c => !isAbsorbedCopy(c));
+  const evaluatedCriteriaCount = progressCriteria.filter(c =>
+    isDone(c) || activeCriteria.some(k => isAbsorbedCopy(k) && k.sourceCriterionId === c.criterionId && isDone(k)),
+  ).length;
 
   // Evento histórico importado: nota já pronta, sem critérios/avaliações a
   // acompanhar — trata como 100% avaliado (mesma lógica do enriquecimento em GET /events).
-  const evaluationProgress = ev.isHistorical ? 1 : (activeCriteria.length > 0 ? evaluatedCriteriaCount / activeCriteria.length : 0);
+  const evaluationProgress = ev.isHistorical ? 1 : (progressCriteria.length > 0 ? evaluatedCriteriaCount / progressCriteria.length : 0);
 
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
 
@@ -604,6 +614,8 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
     }
     if (toAdd.length > 0) {
       await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
+      // Só os recém-vinculados: áreas tiradas à mão dos outros não voltam.
+      await applyAreaDefaults(eventId, tx, toAdd);
     }
   });
 
@@ -646,6 +658,8 @@ router.post("/events", requireRole("admin", "rh", "operador"), async (req, res) 
     if (allCriteria.length > 0) {
       await tx.insert(eventCriteriaTable).values(allCriteria.map(c => ({ eventId: created.id, criterionId: c.id, active: true })));
     }
+    // Critérios respondidos por várias áreas já nascem com a cópia de cada área.
+    await applyAreaDefaults(created.id, tx);
     return created;
   });
 
@@ -1622,6 +1636,55 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
 });
 
 /**
+ * PUT /events/:id/criteria/:criterionId/areas  { areaIds: number[] }
+ * Ajuste por evento das áreas que respondem o critério, ALÉM da responsável:
+ * cria a cópia das áreas novas e remove as que saíram. Nota = média das áreas.
+ */
+router.put("/events/:id/criteria/:criterionId/areas", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const criterionId = parseInt(req.params.criterionId as string);
+  const raw = req.body?.areaIds;
+  if (!Array.isArray(raw) || raw.some(a => !Number.isInteger(Number(a)) || Number(a) <= 0)) {
+    res.status(400).json({ error: "Envie areaIds: lista de áreas (números)" });
+    return;
+  }
+  try {
+    const result = await setEventCriterionAreas(eventId, criterionId, raw.map(Number));
+    if (result.created > 0) {
+      const [ev] = await db.select({ criteriaConfirmed: eventsTable.criteriaConfirmed }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+      if (ev?.criteriaConfirmed) await generateCriterionAssignments(eventId);
+    }
+    await audit(req.user!.userId, "set_event_criterion_areas", "events", eventId, null, { criterionId, areaIds: raw.map(Number), ...result });
+    res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
+  } catch (err) {
+    if (err instanceof AreaCopyError) { res.status(err.status).json({ error: err.message }); return; }
+    throw err;
+  }
+});
+
+/**
+ * POST /events/:id/criteria/area-defaults
+ * Aplica no evento o padrão do catálogo (áreas que respondem cada critério):
+ * cria as cópias que faltam, sem remover nenhuma. Para eventos criados antes
+ * de o padrão ser configurado.
+ */
+router.post("/events/:id/criteria/area-defaults", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const [ev] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem mais ser alterados." });
+    return;
+  }
+  const { created } = await applyAreaDefaults(eventId);
+  // Evento já liberado: as cópias novas ganham atribuição (avaliador principal da área).
+  const [after] = await db.select({ criteriaConfirmed: eventsTable.criteriaConfirmed }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (created > 0 && after?.criteriaConfirmed) await generateCriterionAssignments(eventId);
+  await audit(req.user!.userId, "apply_area_defaults", "events", eventId, null, { created });
+  res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
+});
+
+/**
  * DELETE /events/:id/criteria/:eventCriterionId
  * Exclui um quesito DUPLICADO (eventScoped) de um evento. Critérios padrão não
  * podem ser excluídos — apenas desativados pela tela de configuração.
@@ -1658,31 +1721,9 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
   // apontam para o critério SEM cascade (o DELETE do critério estourava FK
   // depois de o vínculo com o evento já ter sumido). Duplicatas feitas a partir
   // deste quesito herdam a origem dele, para continuarem somando no pai.
-  await db.transaction(async (tx) => {
-    await tx.delete(eventCriterionAssignmentsTable).where(and(
-      eq(eventCriterionAssignmentsTable.eventId, eventId),
-      eq(eventCriterionAssignmentsTable.criterionId, link.criterionId),
-    ));
-    const eventTokens = tx.select({ id: publicEvalTokensTable.id })
-      .from(publicEvalTokensTable)
-      .where(eq(publicEvalTokensTable.eventId, eventId));
-    await tx.delete(publicEvalTokenCriteriaTable).where(and(
-      eq(publicEvalTokenCriteriaTable.criterionId, link.criterionId),
-      inArray(publicEvalTokenCriteriaTable.tokenId, eventTokens),
-    ));
-    await tx.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
-
-    // Só apaga o critério em si se nenhum outro evento o usa (ex.: após mesclagem).
-    const [{ otherLinks }] = await tx.select({ otherLinks: sql<number>`count(*)` })
-      .from(eventCriteriaTable)
-      .where(eq(eventCriteriaTable.criterionId, link.criterionId));
-    if (Number(otherLinks) === 0) {
-      await tx.update(criteriaTable)
-        .set({ sourceCriterionId: crit.sourceCriterionId })
-        .where(eq(criteriaTable.sourceCriterionId, link.criterionId));
-      await tx.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
-    }
-  });
+  // Duplicatas feitas a partir deste quesito herdam a origem dele, para
+  // continuarem somando no pai (deleteEventCopyTx).
+  await db.transaction(tx => deleteEventCopyTx(tx, eventId, ecId, link.criterionId));
   await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
   res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });

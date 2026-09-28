@@ -5,7 +5,7 @@ import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import type { PublicToken } from "@/lib/routing-api";
 import { cn } from "@/lib/utils";
 import { CONDENSED } from "@/lib/premium-theme";
-import { fmtDT } from "./helpers";
+import { displayCriterionName, fmtDT } from "./helpers";
 import type { PublicLinkEligibleCriterion, ToastFn } from "./types";
 
 interface PublicLinkDialogProps {
@@ -67,7 +67,7 @@ export function PublicLinkDialog({
             const dialogEligible = requestedIds.flatMap(id => { const c = eligibleById.get(id); return c ? [c] : []; });
             const excluded = requestedIds
               .filter(id => !eligibleById.has(id))
-              .map(id => activeCriteria.find(c => c.criterionId === id)?.criterionName ?? `critério #${id}`);
+              .map(id => displayCriterionName(activeCriteria.find(c => c.criterionId === id)?.criterionName) || `critério #${id}`);
             if (eligibleCriteria === undefined) return null;
             if (dialogEligible.length === 0) {
               return (
@@ -90,7 +90,7 @@ export function PublicLinkDialog({
                   </p>
                   <ul className="space-y-0.5">
                     {dialogEligible.map(c => (
-                      <li key={c.criterionId} className="text-sm font-black uppercase">{c.criterionName}</li>
+                      <li key={c.criterionId} className="text-sm font-black uppercase">{displayCriterionName(c.criterionName)}</li>
                     ))}
                   </ul>
                 </div>

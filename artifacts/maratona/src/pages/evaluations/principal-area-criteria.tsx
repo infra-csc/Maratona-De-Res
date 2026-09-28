@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import type { useUsersByArea } from "@/lib/routing-api";
 import { CONDENSED } from "@/lib/premium-theme";
+import { displayCriterionName } from "./helpers";
 import type { AreaAssignTarget, CriterionAssignmentRow, PrincipalAreaRow } from "./types";
 
 type AreaUser = NonNullable<ReturnType<typeof useUsersByArea>["data"]>[number];
@@ -35,7 +36,7 @@ export function PrincipalAreaCriteriaSection({
       const a = assignmentByCriterionId.get(c.criterionId);
       return {
         criterionId: c.criterionId,
-        criterionName: c.criterionName,
+        criterionName: displayCriterionName(c.criterionName),
         criterionAreaId: c.responsibleAreaId as number,
         assignedToId: a?.assignedToId ?? null,
         assignedToName: a?.assignedToName ?? null,

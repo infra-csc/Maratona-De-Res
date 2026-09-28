@@ -10,6 +10,8 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
   myAreaGroups: AreaGroup[];
   publicLinkEligibleCriteria: PublicLinkEligibleCriterion[] | undefined;
   criterionAssignments: CriterionAssignmentRow[] | undefined;
+  // Critérios respondidos por mais de uma área neste evento.
+  sharedCriterionIds?: Set<number>;
   comments: Record<number, string>;
   getEval: (criterionId: number) => Evaluation | undefined;
   currentScore: (criterionId: number) => number | null;
@@ -23,7 +25,7 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
 // Coluna "Critérios de Avaliação": formulários por área com os cartões de
 // critério e a meta de progresso no rodapé.
 export function CriteriaColumn({
-  criteriaLocked, myCriteria, myAreaGroups, publicLinkEligibleCriteria, criterionAssignments, comments,
+  criteriaLocked, myCriteria, myAreaGroups, publicLinkEligibleCriteria, criterionAssignments, sharedCriterionIds, comments,
   getEval, currentScore, currentAudio, isSaving, progressPct, onRedirectArea, onOpenPublicLink,
   onScoreClick, onCommentChange, onAudioChange, onSaveDraft,
 }: CriteriaColumnProps) {
@@ -100,6 +102,7 @@ export function CriteriaColumn({
                         audio={currentAudio(c.criterionId)}
                         assignment={criterionAssignments?.find(x => x.criterionId === c.criterionId)}
                         isSaving={isSaving}
+                        sharedWithOtherAreas={sharedCriterionIds?.has(c.criterionId) ?? false}
                         onScoreClick={onScoreClick}
                         onCommentChange={onCommentChange}
                         onAudioChange={onAudioChange}

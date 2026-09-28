@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import type { QueryClient } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { fmtNum } from "@/lib/utils";
 import {
   useGetAreas,
   useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria,
   useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useUpdateEventAssignments,
-  getGetEventsQueryKey, getGetEventQueryKey,
+  useSetEventCriterionAreas, useApplyEventCriteriaAreaDefaults,
+  getGetEventsQueryKey, getGetEventQueryKey, getEventCriteria,
   type Evaluation, type EventDetail, type User,
 } from "@workspace/api-client-react";
 import { eventCriterionAssignmentsKey, useAllCriterionRoutings } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
 import type { ToastFn } from "./use-event-mutations";
+import { areaCopiesByParent, serverMessage } from "./helpers";
 import type { CriterionConfigItem, EnrichedEvent } from "./types";
 
 /**
@@ -43,6 +45,9 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
   const [swapDialog, setSwapDialog] = useState<{ ecId: number; currentName: string } | null>(null);
   const [swapSourceId, setSwapSourceId] = useState("");
   const [swapPending, setSwapPending] = useState(false);
+  // Diálogo "Áreas que avaliam" de um critério ORIGINAL do evento.
+  const [areasDialog, setAreasDialog] = useState<{ criterionId: number; name: string; responsibleAreaId: number | null; responsibleAreaName: string | null } | null>(null);
+  const [areasSelection, setAreasSelection] = useState<number[]>([]);
 
   const { data: areasList } = useGetAreas({ query: { enabled: canManage, queryKey: ["areas"] as unknown[] } });
   const { data: allRoutings } = useAllCriterionRoutings();
@@ -165,6 +170,42 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
       },
     },
   });
+  // Mudar as áreas de um critério cria/remove cópias: mesmas chaves que a
+  // duplicação de quesito + fila (/evaluation-console), atribuições e /events.
+  const invalidateEventStructure = (eventId: number) => {
+    qc.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+    qc.invalidateQueries({ queryKey: ["event-criteria", eventId] });
+    qc.invalidateQueries({ queryKey: eventCriterionAssignmentsKey(eventId) });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    qc.invalidateQueries({ queryKey: ["/evaluation-console"] });
+  };
+  const setCriterionAreas = useSetEventCriterionAreas({
+    mutation: {
+      onSuccess: (_d, vars) => {
+        invalidateEventStructure(vars.id);
+        toast({ title: "Áreas atualizadas", description: "A nota do critério neste evento é a média das áreas que avaliam." });
+        setAreasDialog(null);
+      },
+      onError: (e: unknown, vars) => {
+        toast({ title: "Não foi possível alterar as áreas", description: serverMessage(e), variant: "destructive" });
+        invalidateEventStructure(vars.id);
+      },
+    },
+  });
+  const applyAreaDefaults = useApplyEventCriteriaAreaDefaults({
+    mutation: {
+      onSuccess: (data, vars) => {
+        invalidateEventStructure(vars.id);
+        const before = (selectedDetail?.criteria ?? []).filter(c => c.eventScoped).length;
+        const after = (data.criteria ?? []).filter(c => c.eventScoped).length;
+        const created = Math.max(0, after - before);
+        toast(created > 0
+          ? { title: "Áreas do padrão aplicadas", description: `${created} área${created !== 1 ? "s" : ""} adicionada${created !== 1 ? "s" : ""} aos critérios deste evento.` }
+          : { title: "Nada a aplicar", description: "Este evento já tem todas as áreas definidas no padrão do catálogo." });
+      },
+      onError: (e: unknown) => toast({ title: "Não foi possível aplicar o padrão", description: serverMessage(e), variant: "destructive" }),
+    },
+  });
   const renameCriterion = useUpdateCriterion({
     mutation: {
       // vars.id aqui é o CRITÉRIO, não o evento — usa o evento selecionado com guarda.
@@ -185,6 +226,18 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
     },
   });
 
+  // GET /events/:id não traz sourceCriterionId das cópias; GET /events/:id/criteria
+  // traz. Mesma chave/consulta da Central (use-console-data): sai do cache.
+  const { data: eventCriteriaRows } = useQuery({
+    queryKey: ["event-criteria", selectedEventId] as unknown[],
+    queryFn: () => getEventCriteria(selectedEventId as number),
+    enabled: selectedEventId != null,
+  });
+  const eventCriteria = useMemo(() => {
+    const sourceById = new Map((eventCriteriaRows ?? []).map(r => [r.criterionId, r.sourceCriterionId ?? null]));
+    return (selectedDetail?.criteria ?? []).map(c => ({ ...c, sourceCriterionId: c.sourceCriterionId ?? sourceById.get(c.criterionId) ?? null }));
+  }, [selectedDetail?.criteria, eventCriteriaRows]);
+  const areaCopies = useMemo(() => areaCopiesByParent(eventCriteria), [eventCriteria]);
   const critMeta = new Map((selectedDetail?.criteria ?? []).map(c => [c.criterionId, c]));
   const targetWeightSum = (selectedDetail?.criteria ?? []).reduce((s, c) => s + (Number(c.originalWeight) || 0), 0);
   const criteriaConfirmed = selectedDetail?.criteriaConfirmed ?? false;
@@ -309,6 +362,35 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
       // erros já exibidos via toasts de onError de cada mutation
     }
   };
+  const areasLockedReason = hasEvaluations
+    ? "Este evento já possui avaliações: as áreas que avaliam não podem mais ser alteradas."
+    : null;
+  const openAreasDialog = (criterionId: number) => {
+    const meta = critMeta.get(criterionId);
+    if (!meta || meta.eventScoped) return;
+    setAreasSelection((areaCopies.get(criterionId) ?? []).map(c => c.areaId));
+    setAreasDialog({
+      criterionId,
+      name: meta.criterionName ?? `Critério ${criterionId}`,
+      responsibleAreaId: meta.responsibleAreaId ?? null,
+      responsibleAreaName: meta.responsibleAreaName ?? null,
+    });
+  };
+  /** Cópias do critério que NÃO são de outra área (feitas à mão na mesma área): somem ao salvar as áreas. */
+  const sameAreaCopiesOf = (criterionId: number) => {
+    const parentArea = critMeta.get(criterionId)?.responsibleAreaId ?? null;
+    return eventCriteria.filter(c =>
+      c.eventScoped && c.sourceCriterionId === criterionId && (c.responsibleAreaId == null || c.responsibleAreaId === parentArea));
+  };
+  const handleSaveAreas = () => {
+    if (!areasDialog || !selected) return;
+    const areaIds = [...new Set(areasSelection)].filter(a => a !== areasDialog.responsibleAreaId);
+    setCriterionAreas.mutate({ id: selected.id, criterionId: areasDialog.criterionId, data: { areaIds } });
+  };
+  const handleApplyAreaDefaults = () => {
+    if (!selected) return;
+    applyAreaDefaults.mutate({ id: selected.id });
+  };
   const confirmBusy = updateCriteria.isPending || updateAssignments.isPending || confirmCriteriaMutation.isPending;
   const fmtW = (v: number) => fmtNum(v, 1);
 
@@ -321,16 +403,19 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
     redirectExpanded, setRedirectExpanded, redirectSearch, setRedirectSearch,
     duplicateDialog, setDuplicateDialog, duplicateName, setDuplicateName, duplicateAreaId, setDuplicateAreaId,
     swapDialog, setSwapDialog, swapSourceId, setSwapSourceId, swapPending,
+    areasDialog, setAreasDialog, areasSelection, setAreasSelection,
     // dados
     areasList, evaluatorsForArea,
     // mutações
     updateCriteria, confirmCriteriaMutation, resyncCriteria, duplicateCriterion, deleteCriterion, updateAssignments,
+    setCriterionAreas, applyAreaDefaults,
     // derivados e ações
     critMeta, targetWeightSum, criteriaConfirmed, hasEvaluations, editLocked, weightsDirty,
     setCriterionActive, criterionHasEvals, setCriterionWeight,
     handleSaveCriteria, handleConfirmCriteria, handleDuplicate, handleConfirmDuplicate, handleRename, handleSwapSource,
     assignAreas, allAssigned, assignmentsDirty, toggleBackupEvaluator,
     handleSaveAssignments, handleSaveAllCriteria, handleConfirmAndRelease, confirmBusy, fmtW,
+    areaCopies, areasLockedReason, openAreasDialog, sameAreaCopiesOf, handleSaveAreas, handleApplyAreaDefaults,
   };
 }
 

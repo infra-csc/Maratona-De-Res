@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, criteriaTable, areasTable, eventCriteriaTable, eventsTable } from "@workspace/db";
+import { db, criteriaTable, areasTable, eventCriteriaTable, eventsTable, criterionEvaluatingAreasTable } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -7,6 +7,31 @@ import { pgNum, affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * "Áreas que avaliam" (padrão do catálogo): `evaluateAllAreas` = todas as
+ * áreas ativas; senão `evaluatingAreaIds` = áreas ALÉM da responsável.
+ * Valida e normaliza o que veio no corpo; undefined = não mexer.
+ */
+function parseAreasInput(body: Record<string, unknown>): { all?: boolean; ids?: number[]; error?: string } {
+  const out: { all?: boolean; ids?: number[]; error?: string } = {};
+  if (body.evaluateAllAreas !== undefined) {
+    if (typeof body.evaluateAllAreas !== "boolean") return { error: "evaluateAllAreas deve ser verdadeiro ou falso" };
+    out.all = body.evaluateAllAreas;
+  }
+  if (body.evaluatingAreaIds !== undefined) {
+    const raw = body.evaluatingAreaIds;
+    if (!Array.isArray(raw) || raw.some(a => !Number.isInteger(Number(a)) || Number(a) <= 0)) return { error: "evaluatingAreaIds deve ser uma lista de áreas" };
+    out.ids = [...new Set(raw.map(Number))];
+  }
+  return out;
+}
+
+async function saveEvaluatingAreas(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], criterionId: number, responsibleAreaId: number | null, ids: number[]) {
+  await tx.delete(criterionEvaluatingAreasTable).where(eq(criterionEvaluatingAreasTable.criterionId, criterionId));
+  const extra = ids.filter(a => a !== responsibleAreaId);
+  if (extra.length > 0) await tx.insert(criterionEvaluatingAreasTable).values(extra.map(areaId => ({ criterionId, areaId })));
+}
 
 router.get("/criteria", async (_req, res) => {
   const criteria = await db
@@ -19,25 +44,40 @@ router.get("/criteria", async (_req, res) => {
       defaultWeight: criteriaTable.defaultWeight,
       active: criteriaTable.active,
       displayOrder: criteriaTable.displayOrder,
+      evaluateAllAreas: criteriaTable.evaluateAllAreas,
       eventCount: sql<number>`(SELECT COUNT(DISTINCT ec.event_id) FROM event_criteria ec WHERE ec.criterion_id = ${criteriaTable.id} AND ec.active = true)`,
     })
     .from(criteriaTable)
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(criteriaTable.eventScoped, false))
     .orderBy(criteriaTable.displayOrder, criteriaTable.name);
-  res.json(criteria.map(c => ({ ...c, defaultWeight: pgNum(c.defaultWeight), eventCount: Number(c.eventCount) })));
+  const extra = await db.select({ criterionId: criterionEvaluatingAreasTable.criterionId, areaId: criterionEvaluatingAreasTable.areaId })
+    .from(criterionEvaluatingAreasTable);
+  const extraByCriterion = new Map<number, number[]>();
+  for (const e of extra) extraByCriterion.set(e.criterionId, [...(extraByCriterion.get(e.criterionId) ?? []), e.areaId]);
+  res.json(criteria.map(c => ({
+    ...c, defaultWeight: pgNum(c.defaultWeight), eventCount: Number(c.eventCount),
+    evaluatingAreaIds: (extraByCriterion.get(c.id) ?? []).sort((a, b) => a - b),
+  })));
 });
 
 router.post("/criteria", requireRole("admin", "rh"), async (req, res) => {
   const { name, description, responsibleAreaId, defaultWeight, displayOrder } = req.body;
   if (!name) { res.status(400).json({ error: "Nome obrigatório" }); return; }
-  const [criterion] = await db.insert(criteriaTable).values({
-    name,
-    description: description ?? null,
-    responsibleAreaId: responsibleAreaId ?? null,
-    defaultWeight: String(defaultWeight ?? 1),
-    displayOrder: displayOrder ?? 0,
-  }).returning();
+  const areas = parseAreasInput(req.body ?? {});
+  if (areas.error) { res.status(400).json({ error: areas.error }); return; }
+  const criterion = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(criteriaTable).values({
+      name,
+      description: description ?? null,
+      responsibleAreaId: responsibleAreaId ?? null,
+      defaultWeight: String(defaultWeight ?? 1),
+      displayOrder: displayOrder ?? 0,
+      evaluateAllAreas: areas.all ?? false,
+    }).returning();
+    if (areas.ids) await saveEvaluatingAreas(tx, created.id, created.responsibleAreaId, areas.ids);
+    return created;
+  });
   await audit(req.user!.userId, "create", "criteria", criterion.id, null, criterion);
   res.status(201).json(criterion);
 });
@@ -47,6 +87,8 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
   const { name, description, responsibleAreaId, defaultWeight, active, displayOrder } = req.body;
   const [before] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  const areas = parseAreasInput(req.body ?? {});
+  if (areas.error) { res.status(400).json({ error: areas.error }); return; }
 
   // Quando a área é alterada, sincroniza responsibleAreaLabel automaticamente.
   let newAreaLabel: string | null | undefined;
@@ -62,7 +104,7 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
   // Critério e vínculos dos eventos abertos na mesma transação: se a
   // desativação nos eventos falhar, o catálogo não fica desativado sozinho.
   const criterion = await db.transaction(async (tx) => {
-    const [updatedCriterion] = await tx.update(criteriaTable).set({
+    const patch = {
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
       ...(responsibleAreaId !== undefined && { responsibleAreaId }),
@@ -70,7 +112,15 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
       ...(defaultWeight !== undefined && { defaultWeight: String(defaultWeight) }),
       ...(active !== undefined && { active }),
       ...(displayOrder !== undefined && { displayOrder }),
-    }).where(eq(criteriaTable.id, id)).returning();
+      ...(areas.all !== undefined && { evaluateAllAreas: areas.all }),
+    };
+    // Só as áreas mudaram: nada a gravar em criteria (set({}) é erro no Drizzle).
+    const [updatedCriterion] = Object.keys(patch).length > 0
+      ? await tx.update(criteriaTable).set(patch).where(eq(criteriaTable.id, id)).returning()
+      : await tx.select().from(criteriaTable).where(eq(criteriaTable.id, id)).limit(1);
+    // O padrão vale para eventos NOVOS (e para o botão "Aplicar áreas do padrão"
+    // no evento); eventos já montados não mudam sozinhos.
+    if (areas.ids) await saveEvaluatingAreas(tx, id, updatedCriterion.responsibleAreaId, areas.ids);
 
     // Se um critério global for desativado, ele não deve continuar aparecendo
     // como pendente de peso/avaliador em eventos que ainda não travaram os

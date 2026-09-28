@@ -12,6 +12,7 @@ import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import type { DbOrTx, Tx } from "../lib/db-tx.js";
 import { loadEventCriteria, loadCriterionAssignments } from "../lib/event-console-data.js";
+import { areaPrincipalEvaluators } from "../lib/area-copies.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -300,6 +301,15 @@ async function generateCriterionAssignmentsTx(eventId: number, tx: Tx) {
     .where(inArray(criterionRoutingTable.criterionId, criterionIds));
   const routingMap = new Map(routings.map(r => [r.criterionId, r]));
 
+  // Cópia por área (critério respondido por várias áreas) não tem roteamento
+  // próprio: sugere o avaliador principal da área dela.
+  const copies = await tx.select({ id: criteriaTable.id, areaId: criteriaTable.responsibleAreaId })
+    .from(criteriaTable)
+    .where(and(inArray(criteriaTable.id, criterionIds), eq(criteriaTable.eventScoped, true)));
+  const principals = copies.length > 0 ? await areaPrincipalEvaluators(tx) : new Map<number, number>();
+  const copyDefault = new Map(copies.filter(c => c.areaId != null && principals.has(c.areaId)).map(c => [c.id, principals.get(c.areaId!)!]));
+  const defaultFor = (criterionId: number) => routingMap.get(criterionId)?.defaultEvaluatorId ?? copyDefault.get(criterionId) ?? null;
+
   const existing = await tx.select({ id: eventCriterionAssignmentsTable.id, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
     .from(eventCriterionAssignmentsTable)
     .where(eq(eventCriterionAssignmentsTable.eventId, eventId));
@@ -307,15 +317,15 @@ async function generateCriterionAssignmentsTx(eventId: number, tx: Tx) {
 
   let generated = 0; let skipped = 0;
   for (const { criterionId } of eventCriteria) {
-    const r = routingMap.get(criterionId);
+    const def = defaultFor(criterionId);
     const current = existingByCriterion.get(criterionId);
     if (current) {
       // Linha existente mas VAZIA (assignedToId null) também é reparada — o
       // botão "Aplicar avaliadores padrão" só criava linhas novas e deixava
       // as vazias travadas para sempre.
-      if (current.assignedToId == null && r?.defaultEvaluatorId != null) {
+      if (current.assignedToId == null && def != null) {
         await tx.update(eventCriterionAssignmentsTable)
-          .set({ assignedToId: r.defaultEvaluatorId, status: "suggested", updatedAt: new Date() })
+          .set({ assignedToId: def, status: "suggested", updatedAt: new Date() })
           .where(eq(eventCriterionAssignmentsTable.id, current.id));
         generated++;
       } else {
@@ -326,8 +336,8 @@ async function generateCriterionAssignmentsTx(eventId: number, tx: Tx) {
     await tx.insert(eventCriterionAssignmentsTable).values({
       eventId,
       criterionId,
-      assignedToId: r?.defaultEvaluatorId ?? null,
-      status: r?.defaultEvaluatorId ? "suggested" : "pending",
+      assignedToId: def,
+      status: def != null ? "suggested" : "pending",
     }).onConflictDoNothing();
     generated++;
   }

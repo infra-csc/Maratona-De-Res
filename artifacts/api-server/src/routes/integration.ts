@@ -9,6 +9,7 @@ import {
 import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { applyAreaDefaults } from "../lib/area-copies.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
 import { isSyncableFunction } from "../lib/participation.js";
@@ -386,6 +387,8 @@ router.post("/integration/sync", async (req, res) => {
                 activeCriteria.map(c => ({ eventId, criterionId: c.id, active: true })),
               ),
             );
+            // Critérios respondidos por várias áreas: cópia de cada área, como na criação manual.
+            for (const eventId of toSeed) await applyAreaDefaults(eventId, tx);
             log(`Critérios padrão vinculados a ${toSeed.length} novo(s) evento(s).`);
           }
         }

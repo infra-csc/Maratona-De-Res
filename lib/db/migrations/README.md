@@ -46,3 +46,13 @@ passos o app funciona normalmente.
 Nas migrações, prefira SQL idempotente (`IF NOT EXISTS`, blocos `DO` que
 conferem o estado): o mesmo arquivo roda no banco do Shell pelo pós-merge e
 depois, à mão, no de produção.
+
+## Critério respondido por várias áreas (migração 0003)
+
+`criteria.evaluate_all_areas` e a tabela `criterion_evaluating_areas` guardam o
+padrão do catálogo ("Áreas que avaliam"). No evento, cada área extra vira uma
+cópia do critério (`event_scoped`, `source_criterion_id`, peso 0) — criada ao
+criar/sincronizar o evento, pelo botão "Aplicar áreas do padrão" ou pelo ajuste
+por evento — e a nota do critério é a média das áreas que avaliaram
+(`mergeEventScopedCriteria`). A 0003 só acrescenta tabela e coluna com padrão:
+aqui a ordem publicar/migrar não importa.

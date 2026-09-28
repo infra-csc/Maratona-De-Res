@@ -22,7 +22,21 @@ export const criteriaTable = pgTable("criteria", {
   // Critério de origem do qual este foi duplicado (preenchido somente quando
   // eventScoped=true). Permite agrupar cópias com o original na calibração.
   sourceCriterionId: integer("source_criterion_id").references((): AnyPgColumn => criteriaTable.id),
+  // Padrão do catálogo: além da área responsável, TODAS as áreas ativas
+  // respondem este critério. Cada área vira uma cópia no evento e a nota do
+  // critério é a média das áreas (mergeEventScopedCriteria).
+  evaluateAllAreas: boolean("evaluate_all_areas").notNull().default(false),
 });
+
+// Padrão do catálogo: áreas que respondem o critério ALÉM da responsável
+// (ignorado quando evaluate_all_areas = true). Ajuste por evento = cópias.
+export const criterionEvaluatingAreasTable = pgTable("criterion_evaluating_areas", {
+  id: serial("id").primaryKey(),
+  criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id, { onDelete: "cascade" }),
+  areaId: integer("area_id").notNull().references(() => areasTable.id, { onDelete: "cascade" }),
+}, (t) => ({
+  criterionAreaUq: uniqueIndex("criterion_evaluating_areas_uq").on(t.criterionId, t.areaId),
+}));
 
 export const eventCriteriaTable = pgTable("event_criteria", {
   id: serial("id").primaryKey(),

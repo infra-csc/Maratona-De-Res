@@ -60,3 +60,28 @@ export function conformityFormFromData(data: EventConformity): ConformityEvalFor
     standoutJustification: data.standoutJustification ?? '',
   };
 }
+
+// Nome que o avaliador vê: sem o sufixo " (2)", " (3)", " (cópia)" das cópias
+// de área — ele responde "o critério", não "a cópia 3".
+const COPY_SUFFIX = /\s*\((\d+|c[óo]pia)\)\s*$/i;
+export function displayCriterionName(name: string | null | undefined): string {
+  return (name ?? "").replace(COPY_SUFFIX, "");
+}
+
+// Critérios do evento respondidos por mais de uma área: o original e as cópias
+// (eventScoped, sourceCriterionId = original) com áreas diferentes.
+export function multiAreaCriterionIds(criteria: EventCriterion[]): Set<number> {
+  const groups = new Map<number, EventCriterion[]>();
+  for (const c of criteria) {
+    const key = c.eventScoped && c.sourceCriterionId != null ? c.sourceCriterionId : c.criterionId;
+    const list = groups.get(key) ?? [];
+    list.push(c);
+    groups.set(key, list);
+  }
+  const out = new Set<number>();
+  for (const list of groups.values()) {
+    const areas = new Set(list.map(c => c.responsibleAreaId ?? null));
+    if (areas.size > 1) for (const c of list) out.add(c.criterionId);
+  }
+  return out;
+}

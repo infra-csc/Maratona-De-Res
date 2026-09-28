@@ -11,6 +11,7 @@ export function CriteriaTable({
   displayedCriteria, baseCount, inactiveCount, showInactive, onToggleInactive,
   searchQuery, onSearchChange, filterAreaId, onFilterAreaChange, areas,
   routingMap, evaluators, updateMutation, onDuplicate, onOpenRouting, onRoutingSaved,
+  canEdit, onEditAreas,
 }: {
   displayedCriteria: Criterion[];
   baseCount: number;
@@ -28,6 +29,8 @@ export function CriteriaTable({
   onDuplicate: (c: Criterion) => void;
   onOpenRouting: (id: number) => void;
   onRoutingSaved: () => void;
+  canEdit: boolean;
+  onEditAreas: (c: Criterion) => void;
 }) {
   return (
     <PremiumCard className="overflow-hidden">
@@ -106,6 +109,9 @@ export function CriteriaTable({
                 onDuplicate={onDuplicate}
                 onOpenRouting={onOpenRouting}
                 onRoutingSaved={onRoutingSaved}
+                areas={areas ?? []}
+                canEdit={canEdit}
+                onEditAreas={onEditAreas}
               />
             ))}
           </tbody>

@@ -1,4 +1,4 @@
-import { Search, Copy, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check } from "lucide-react";
+import { Search, Copy, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, Users } from "lucide-react";
 import { DANGER_TEXT } from "@/lib/premium-theme";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +14,11 @@ export function CriteriaTable({ mgmt, isAdmin }: { mgmt: CriteriaManagement; isA
     setSwapDialog, setSwapSourceId, evaluatorsForArea, duplicateCriterion, deleteCriterion,
     critMeta, hasEvaluations, editLocked, setCriterionActive, criterionHasEvals, setCriterionWeight,
     handleDuplicate, handleRename, toggleBackupEvaluator,
+    areaCopies, areasLockedReason, openAreasDialog, setCriterionAreas,
   } = mgmt;
+  // Cópia de área (criada por "Áreas" ou pelo padrão) → id do critério original.
+  const areaCopyParent = new Map<number, number>();
+  for (const [parentId, copies] of areaCopies) for (const c of copies) areaCopyParent.set(c.criterionId, parentId);
   return (
     <>
       <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
@@ -62,14 +66,35 @@ export function CriteriaTable({ mgmt, isAdmin }: { mgmt: CriteriaManagement; isA
                       ) : (
                         <div className="flex items-center gap-2">
                           <span className="font-black uppercase text-sm">{meta?.criterionName ?? item.name}</span>
-                          {item.eventScoped && (
+                          {item.eventScoped && (areaCopyParent.has(item.criterionId) ? (
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[11px] font-black uppercase whitespace-nowrap"
+                              title={`Área extra de "${critMeta.get(areaCopyParent.get(item.criterionId)!)?.criterionName ?? "critério original"}": a nota do critério é a média das áreas`}
+                              style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+                            >
+                              Área extra
+                            </span>
+                          ) : (
                             <span className="px-1.5 py-0.5 rounded text-[11px] font-black uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Duplicado</span>
-                          )}
+                          ))}
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{meta?.responsibleAreaName ?? "—"}</span>
+                      {!item.eventScoped && (areaCopies.get(item.criterionId)?.length ?? 0) > 0 && (() => {
+                        const extras = areaCopies.get(item.criterionId)!;
+                        return (
+                          <div className="mt-1 flex flex-wrap gap-1" data-testid={`event-criterion-areas-${item.criterionId}`} title={`Também avaliam neste evento: ${extras.map(x => x.areaName).join(", ")}. A nota é a média das áreas.`}>
+                            <span className="sr-only">Também avaliam neste evento:</span>
+                            {extras.map(x => (
+                              <span key={x.areaId} className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase whitespace-nowrap" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
+                                + {x.areaName}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <Input
@@ -195,6 +220,20 @@ export function CriteriaTable({ mgmt, isAdmin }: { mgmt: CriteriaManagement; isA
                         {hasEvaluations && item.eventScoped && isAdmin && !isEditingName && (
                           <button type="button" onClick={() => { setSwapDialog({ ecId: item.id, currentName: item.name }); setSwapSourceId(""); }} title="Corrigir critério de origem" className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)", color: DANGER_TEXT }}>
                             <RefreshCw size={13} /> Corrigir
+                          </button>
+                        )}
+                        {!item.eventScoped && item.active && (
+                          <button
+                            type="button"
+                            data-testid={`button-event-criterion-areas-${item.criterionId}`}
+                            disabled={areasLockedReason != null || setCriterionAreas.isPending}
+                            onClick={() => openAreasDialog(item.criterionId)}
+                            title={areasLockedReason ?? "Escolher as áreas que avaliam este critério neste evento"}
+                            aria-label={`Áreas que avaliam ${meta?.criterionName ?? item.name}`}
+                            className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+                            style={{ border: "1px solid var(--border)" }}
+                          >
+                            <Users size={14} aria-hidden="true" /> Áreas
                           </button>
                         )}
                         <button

@@ -1494,6 +1494,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventDetail"
 
+  /events/{id}/criteria/{criterionId}/areas:
+    put:
+      operationId: setEventCriterionAreas
+      tags: [events]
+      summary: Áreas que respondem o critério neste evento, além da responsável (cria/remove as cópias por área)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: criterionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCriterionAreasInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "400":
+          description: Lista inválida ou critério que é cópia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Evento já tem avaliações, ou cópia já calibrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/criteria/area-defaults:
+    post:
+      operationId: applyEventCriteriaAreaDefaults
+      tags: [events]
+      summary: Aplica no evento o padrão do catálogo de áreas que respondem cada critério (só cria cópias que faltam)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "409":
+          description: Evento já tem avaliações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /events/{id}/criteria/{eventCriterionId}:
     delete:
       operationId: deleteEventCriterion
@@ -4936,6 +5003,14 @@ components:
           type: boolean
         displayOrder:
           type: integer
+        evaluateAllAreas:
+          type: boolean
+          description: Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas
+        evaluatingAreaIds:
+          type: array
+          description: Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)
+          items:
+            type: integer
 
     CriterionInput:
       type: object
@@ -4951,6 +5026,14 @@ components:
           type: number
         displayOrder:
           type: integer
+        evaluateAllAreas:
+          type: boolean
+          description: Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas
+        evaluatingAreaIds:
+          type: array
+          description: Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)
+          items:
+            type: integer
 
     CriterionUpdate:
       type: object
@@ -4967,6 +5050,23 @@ components:
           type: boolean
         displayOrder:
           type: integer
+        evaluateAllAreas:
+          type: boolean
+          description: Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas
+        evaluatingAreaIds:
+          type: array
+          description: Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)
+          items:
+            type: integer
+
+    EventCriterionAreasInput:
+      type: object
+      required: [areaIds]
+      properties:
+        areaIds:
+          type: array
+          items:
+            type: integer
 
     EventCriterion:
       type: object

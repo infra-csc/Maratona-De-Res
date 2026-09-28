@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { EventDetail } from "@workspace/api-client-react";
-import { CheckCircle2, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, UserCheck } from "lucide-react";
+import { CheckCircle2, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, UserCheck, Users } from "lucide-react";
 import { CONDENSED, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { EventCombobox } from "./pickers";
 import { CriteriaTable } from "./criteria-table";
@@ -21,6 +21,7 @@ export function CriteriaView({ selected, selectedDetail, enrichedEvents, setSele
     primaryEvaluator, updateCriteria, confirmCriteriaMutation, resyncCriteria, updateAssignments,
     criteriaConfirmed, hasEvaluations, handleSaveCriteria, handleConfirmCriteria, weightsDirty,
     assignAreas, allAssigned, assignmentsDirty, handleSaveAssignments, handleSaveAllCriteria, handleConfirmAndRelease, confirmBusy,
+    applyAreaDefaults, areasLockedReason, handleApplyAreaDefaults,
   } = mgmt;
   return (
     <div className="space-y-4">
@@ -80,6 +81,28 @@ export function CriteriaView({ selected, selectedDetail, enrichedEvents, setSele
             <div data-testid="notice-criteria-locked" className="flex items-center gap-2 rounded-lg px-4 py-3 text-xs font-bold uppercase" style={{ backgroundColor: "rgba(232,162,61,0.10)", color: AMBER_TEXT }}>
               <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Critérios e avaliadores estão bloqueados, mas os pesos continuam editáveis — ao salvar, o resultado é recalculado.
             </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p id="area-defaults-help" className="text-xs max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
+              <Users size={13} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />
+              Um critério pode ser respondido por várias áreas; a nota dele no evento é a média das áreas. Use <strong>Áreas</strong> em cada critério ou aplique o padrão do catálogo.
+            </p>
+            <button
+              type="button"
+              data-testid="button-apply-area-defaults"
+              onClick={handleApplyAreaDefaults}
+              disabled={areasLockedReason != null || applyAreaDefaults.isPending}
+              title={areasLockedReason ?? "Cria as áreas que faltam neste evento conforme o padrão do catálogo de Critérios (não remove nenhuma)"}
+              aria-describedby="area-defaults-help"
+              className="rounded-lg px-4 py-2 font-bold text-xs uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+              style={{ border: "1px solid var(--border)" }}
+            >
+              <Users size={14} aria-hidden="true" /> {applyAreaDefaults.isPending ? "Aplicando..." : "Aplicar áreas do padrão"}
+            </button>
+          </div>
+          {areasLockedReason && (
+            <p className="text-[11px] -mt-2 text-right" style={{ color: "var(--muted-foreground)" }}>{areasLockedReason}</p>
           )}
 
           <CriteriaTable mgmt={mgmt} isAdmin={isAdmin} />

@@ -810,6 +810,10 @@ export interface Criterion {
   defaultWeight: number;
   active: boolean;
   displayOrder: number;
+  /** Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas */
+  evaluateAllAreas?: boolean;
+  /** Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas) */
+  evaluatingAreaIds?: number[];
 }
 
 export interface CriterionInput {
@@ -818,6 +822,10 @@ export interface CriterionInput {
   responsibleAreaId?: number;
   defaultWeight: number;
   displayOrder?: number;
+  /** Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas */
+  evaluateAllAreas?: boolean;
+  /** Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas) */
+  evaluatingAreaIds?: number[];
 }
 
 export interface CriterionUpdate {
@@ -828,6 +836,14 @@ export interface CriterionUpdate {
   defaultWeight?: number;
   active?: boolean;
   displayOrder?: number;
+  /** Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas */
+  evaluateAllAreas?: boolean;
+  /** Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas) */
+  evaluatingAreaIds?: number[];
+}
+
+export interface EventCriterionAreasInput {
+  areaIds: number[];
 }
 
 export type EventCriteriaUpdateCriteriaItem = {

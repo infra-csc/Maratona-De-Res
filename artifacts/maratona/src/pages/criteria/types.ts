@@ -2,7 +2,7 @@
 export type EvaluatorOption = { id: number; name: string };
 
 /** Opção de área nos seletores. */
-export type AreaOption = { id: number; name: string };
+export type AreaOption = { id: number; name: string; active?: boolean };
 
 /** Área da matriz de conformidade com o resumo das perguntas. */
 export type ConformityArea = AreaOption & { description: string };
