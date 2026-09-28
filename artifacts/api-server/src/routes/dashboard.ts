@@ -40,7 +40,11 @@ router.get("/dashboard/summary", async (req, res) => {
   // Fix (3): Progresso de Avaliações conta EVENTOS com pendências,
   // não linhas individuais de avaliação. Assim 0 rascunhos existentes
   // não infla o percentual para 100% enganosamente.
-  const eventsWithDraft = new Set(allEvals.filter(e => e.status === "draft").map(e => e.eventId));
+  // Rascunho em evento com resultado JÁ confirmado não é pendência: a nota
+  // oficial está fechada e o rascunho não entra nela (caso real: rascunho
+  // esquecido em 07/07 num evento confirmado mantinha o card em "1 pendente").
+  const confirmedIds = new Set(confirmedEvts.map(e => e.id));
+  const eventsWithDraft = new Set(allEvals.filter(e => e.status === "draft" && !confirmedIds.has(e.eventId)).map(e => e.eventId));
   const eventsWithAnyEval = new Set(allEvals.map(e => e.eventId));
   const pendingEvaluations = eventsWithDraft.size;
   const submittedEvaluations = eventsWithAnyEval.size - eventsWithDraft.size;
