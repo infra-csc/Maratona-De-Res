@@ -56,3 +56,21 @@ criar/sincronizar o evento, pelo botão "Aplicar áreas do padrão" ou pelo ajus
 por evento — e a nota do critério é a média das áreas que avaliaram
 (`mergeEventScopedCriteria`). A 0003 só acrescenta tabela e coluna com padrão:
 aqui a ordem publicar/migrar não importa.
+
+## Publicar no Replit copia a estrutura do banco do Shell (incidente 30/09)
+
+Ao publicar, o Replit aplica na produção a estrutura do banco de
+DESENVOLVIMENTO (o do Shell). Se o banco do Shell está atrasado, a publicação
+desfaz na produção o que as migrações criaram — e o histórico
+`drizzle.__drizzle_migrations` continua dizendo "aplicada", então o
+`migrate:deploy` não percebe. Em 30/09 isso tirou 3 índices únicos da produção
+(salvar calibração dava 500) e voltou as datas para sem fuso.
+
+- `pnpm --filter @workspace/db run schema:check` compara o banco de
+  `DATABASE_URL` com a estrutura que as migrações definem (monta a referência
+  em memória) e lista as diferenças.
+- `pnpm --filter @workspace/db run schema:repair` reaplica as migrações
+  idempotentes e recria índices que faltam (único só sem duplicatas). Não apaga nada.
+
+**Antes de publicar:** rodar `schema:repair` no Shell (o pós-merge já roda).
+Depois de publicar: `schema:check` com o `DATABASE_URL` de produção.
