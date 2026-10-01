@@ -5,7 +5,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { getPlatoonByScore, calculateQuarterFinalResult } from "../lib/calculations.js";
+import { getPlatoonByScore, calculateQuarterFinalResult, roundFinalResult } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResultsBatch } from "./results.js";
@@ -271,14 +271,16 @@ router.get("/ranking-detail", async (req, res) => {
   // (confirmed === false) não conta para nota — mesma regra dos dois lados.
   const scored = events.filter(e => e.hasScore && e.countsForScore && e.resultsConfirmed && e.participationConfirmed !== false);
   const scoreSum = Math.round(scored.reduce((s, e) => s + e.eventScore, 0) * 100) / 100;
-  const grossAverage = scored.length > 0 ? Math.round(scoreSum / scored.length * 100) / 100 : null;
+  // Média real (para a nota final) e média exibida (1 casa, arredondada uma vez).
+  const rawAverage = scored.length > 0 ? scored.reduce((s, e) => s + e.eventScore, 0) / scored.length : null;
+  const grossAverage = rawAverage !== null ? roundFinalResult(rawAverage) : null;
 
   // Nota Final sempre calculada ao vivo (grossAverage live − penaltyPoints live + meritPoints live)
   // para refletir penalidades adicionadas após o último fechamento/recompute.
   // O snapshot (quarterResult.finalResult) pode estar desatualizado se uma penalidade
   // foi lançada depois do fechamento sem um novo recompute.
-  const liveFinalResult = grossAverage !== null
-    ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scored.length)
+  const liveFinalResult = rawAverage !== null
+    ? calculateQuarterFinalResult(rawAverage, penaltyPoints - meritPoints, scored.length)
     : (quarterResult ? pgNum(quarterResult.finalResult) : null);
 
   // Composição do bônus (só gestores — é dado financeiro). Replica a regra de

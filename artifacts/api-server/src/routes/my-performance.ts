@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
+import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, roundFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
@@ -525,7 +525,7 @@ router.get("/my-performance", async (req, res) => {
   // "Média dos Eventos" na tela do colaborador.
   const responseGrossAverage = quarterResult
     ? pgNum(quarterResult.grossAverage)
-    : grossAverage;
+    : (grossAverage !== null ? roundFinalResult(grossAverage) : null);
   const responseEventsCount = quarterResult
     ? quarterResult.eventsCount
     : scoredEvents.length;

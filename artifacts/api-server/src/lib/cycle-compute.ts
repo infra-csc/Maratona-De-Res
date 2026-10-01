@@ -452,8 +452,11 @@ export function buildCycleResults<TConformity extends ConformityLike>(input: Cyc
     const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
     const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
     const absencePenalty = penaltyPoints;
-    // finalResult = (scoreSum − netPenalty) / N = grossAverage − netPenalty / N (travado entre 0 e 100).
-    const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, eventScores.length);
+    // finalResult = (scoreSum − netPenalty) / N (travado entre 0 e 100), arredondado
+    // UMA vez para 1 casa a partir da média real — passar grossAverage (já com 2
+    // casas) arredondava duas vezes: 1.049,22 ÷ 15 = 69,948 virava 69,95 e depois 70,0.
+    const rawAverage = eventScores.length > 0 ? eventScores.reduce((a, b) => a + b, 0) / eventScores.length : 0;
+    const finalResult = calculateQuarterFinalResult(rawAverage, penaltyPoints - meritPoints, eventScores.length);
     const platoon = getPlatoonByScore(finalResult, platoonRules);
 
     const cycleElig = input.eligibilityByEmployee.get(employeeId);
