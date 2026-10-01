@@ -1,15 +1,16 @@
 import { Link } from "wouter";
 import { CONDENSED } from "@/lib/premium-theme";
 
-/** Troca entre o painel de gestão e a apresentação para a equipe (duas rotas, links compartilháveis). */
-export function AnalyticsTabs({ current }: { current: "gestao" | "equipe" }) {
+/** Troca entre o painel de gestão, a apresentação para a equipe e a análise por colaborador (rotas próprias, links compartilháveis). */
+export function AnalyticsTabs({ current }: { current: "gestao" | "equipe" | "colaborador" }) {
   const tabs = [
     { key: "gestao", href: "/analytics", label: "Painel de gestão" },
     { key: "equipe", href: "/analytics/apresentacao", label: "Apresentação para a equipe" },
+    { key: "colaborador", href: "/analytics/colaborador", label: "Por colaborador" },
   ] as const;
   return (
     <nav aria-label="Visões de Análises" className="no-print">
-      <ul className="inline-flex rounded-lg p-1 gap-1" style={{ backgroundColor: "var(--secondary)" }}>
+      <ul className="inline-flex flex-wrap rounded-lg p-1 gap-1" style={{ backgroundColor: "var(--secondary)" }}>
         {tabs.map(t => {
           const active = t.key === current;
           return (
