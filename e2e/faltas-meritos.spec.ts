@@ -121,5 +121,20 @@ test("falta e mérito lançados em /absences mudam a nota final, a faixa e o bô
     await expect(detalhe.locator('[data-testid^="detail-merit-"]')).toContainText(MERITO.label);
   });
 
+  await test.step("atalho do detalhe abre a Linha do tempo filtrada: falta 90,0 → 83,8 e mérito 83,8 → 86,9", async () => {
+    await page.getByRole("dialog").getByTestId("link-score-timeline").click();
+    await expect(page).toHaveURL(new RegExp(`/linha-do-tempo\\?colaborador=${DIEGO.id}`));
+    await expect(page.getByRole("heading", { level: 1, name: "Linha do tempo" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: DIEGO.name })).toBeVisible();
+    const falta = page.locator('[data-testid^="happening-"]').filter({ hasText: `Penalidade · ${FALTA.label}` });
+    await expect(falta).toHaveCount(1);
+    await expect(falta).toContainText("90,0");
+    await expect(falta).toContainText("83,8");
+    const merito = page.locator('[data-testid^="happening-"]').filter({ hasText: `Mérito · ${MERITO.label}` });
+    await expect(merito).toHaveCount(1);
+    await expect(merito).toContainText("86,9");
+    await checkA11y(page, "linha-do-tempo", testInfo);
+  });
+
   expect(errosDePagina, "Erros de JavaScript não tratados nas páginas").toEqual([]);
 });

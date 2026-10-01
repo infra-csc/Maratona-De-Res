@@ -4683,6 +4683,73 @@ export const GetRankingDetailResponse = zod.object({
 
 
 /**
+ * Passado remontado (eventos confirmados e penalidades/méritos em ordem),
+ * calibrações e publicações da auditoria e, a partir de quando passou a
+ * existir, o registro exato de cada recálculo (antes → depois e motivo).
+ * @summary Linha do tempo das notas do ciclo — todos ou um colaborador (admin/RH)
+ */
+export const GetScoreTimelineQueryParams = zod.object({
+  "employeeId": zod.coerce.number().int().optional().describe('Sem informar = todos os colaboradores do ranking'),
+  "cycleId": zod.coerce.number().int().optional()
+})
+
+export const GetScoreTimelineResponse = zod.object({
+  "cycle": zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish()
+}),
+  "employeeId": zod.int().nullable().describe('Filtro aplicado (null = todos)'),
+  "people": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "name": zod.string(),
+  "functionName": zod.string().nullish(),
+  "finalResult": zod.number(),
+  "platoon": zod.string().nullable(),
+  "platoonColor": zod.string().nullable(),
+  "bonusValue": zod.number(),
+  "eventsCount": zod.int(),
+  "eligible": zod.boolean()
+})).describe('Situação atual de cada colaborador do ranking (nota, faixa, bônus)'),
+  "recordedSince": zod.string().nullable(),
+  "platoons": zod.array(zod.object({
+  "name": zod.string(),
+  "color": zod.string().nullable(),
+  "minScore": zod.number()
+})),
+  "entries": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.string().describe('Data-hora ISO'),
+  "kind": zod.enum(['recorded', 'reconstructed', 'info']),
+  "type": zod.string().describe('event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…)'),
+  "employeeId": zod.int().nullish(),
+  "employeeName": zod.string().nullish(),
+  "eventId": zod.int().nullish(),
+  "eventName": zod.string().nullish(),
+  "criterionName": zod.string().nullish(),
+  "label": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "by": zod.string().nullish(),
+  "eventScore": zod.number().nullish(),
+  "points": zod.number().nullish(),
+  "scoreBefore": zod.number().nullish(),
+  "scoreAfter": zod.number().nullish(),
+  "finalBefore": zod.number().nullish(),
+  "finalAfter": zod.number().nullish(),
+  "platoonBefore": zod.string().nullish(),
+  "platoonAfter": zod.string().nullish(),
+  "bonusBefore": zod.number().nullish(),
+  "bonusAfter": zod.number().nullish(),
+  "eventsBefore": zod.int().nullish(),
+  "eventsAfter": zod.int().nullish(),
+  "eligibleBefore": zod.boolean().nullish(),
+  "eligibleAfter": zod.boolean().nullish()
+}))
+})
+
+
+/**
  * @summary Trilha de auditoria (admin/rh), com nomes resolvidos e segredos ocultos
  */
 export const GetAuditLogsQueryParams = zod.object({

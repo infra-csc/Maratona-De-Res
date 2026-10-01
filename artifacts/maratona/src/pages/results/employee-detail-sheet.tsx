@@ -1,6 +1,8 @@
 import { useGetRankingDetail, getGetRankingDetailQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trophy, Award, AlertTriangle, MapPin } from "lucide-react";
+import { Trophy, Award, AlertTriangle, MapPin, History } from "lucide-react";
+import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
 import { cn, fmtDate, fmtNum } from "@/lib/utils";
 import { CONDENSED, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { contrastingTextColor, fmtBRL } from "./helpers";
@@ -14,6 +16,9 @@ export function EmployeeDetailSheet({
   onClose: () => void;
 }) {
   const detailParams = { employeeId: employeeId ?? 0 };
+  // Linha do tempo da nota: só admin e RH (a rota também barra).
+  const { user } = useAuth();
+  const canSeeTimeline = user?.role === "admin" || user?.role === "rh";
   const { data: detail, isLoading: detailLoading } = useGetRankingDetail(detailParams, {
     query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: !!employeeId },
   });
@@ -43,6 +48,16 @@ export function EmployeeDetailSheet({
                 <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
                   {detail.employee.name}
                 </DialogTitle>
+                {canSeeTimeline && (
+                  <Link
+                    href={`/linha-do-tempo?colaborador=${detail.employee.id}`}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold uppercase hover:underline underline-offset-2"
+                    style={{ fontFamily: CONDENSED, letterSpacing: "0.04em", color: "var(--accent-text)" }}
+                    data-testid="link-score-timeline"
+                  >
+                    <History size={14} aria-hidden /> Ver linha do tempo da nota
+                  </Link>
+                )}
                 {/* Platoon badge — shown prominently below the name */}
                 {(detail.summary as any).platoon && (
                   <div className="mt-2.5">

@@ -2433,6 +2433,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/RankingDetail"
 
+  /results/timeline:
+    get:
+      operationId: getScoreTimeline
+      tags: [results]
+      summary: Linha do tempo das notas do ciclo — todos ou um colaborador (admin/RH)
+      description: |
+        Passado remontado (eventos confirmados e penalidades/méritos em ordem),
+        calibrações e publicações da auditoria e, a partir de quando passou a
+        existir, o registro exato de cada recálculo (antes → depois e motivo).
+      parameters:
+        - name: employeeId
+          in: query
+          description: Sem informar = todos os colaboradores do ranking
+          schema:
+            type: integer
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreTimeline"
+        "400":
+          description: employeeId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Colaborador ou ciclo não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /audit-logs:
     get:
       operationId: getAuditLogs
@@ -6660,6 +6699,84 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RankingDetailBonusExtraEvent"
+
+    ScoreTimelineEntry:
+      type: object
+      required: [id, at, kind, type]
+      properties:
+        id: { type: string }
+        at: { type: string, description: Data-hora ISO }
+        kind: { type: string, enum: [recorded, reconstructed, info] }
+        type: { type: string, description: "event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…)" }
+        employeeId: { type: ["integer", "null"] }
+        employeeName: { type: ["string", "null"] }
+        eventId: { type: ["integer", "null"] }
+        eventName: { type: ["string", "null"] }
+        criterionName: { type: ["string", "null"] }
+        label: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        by: { type: ["string", "null"] }
+        eventScore: { type: ["number", "null"] }
+        points: { type: ["number", "null"] }
+        scoreBefore: { type: ["number", "null"] }
+        scoreAfter: { type: ["number", "null"] }
+        finalBefore: { type: ["number", "null"] }
+        finalAfter: { type: ["number", "null"] }
+        platoonBefore: { type: ["string", "null"] }
+        platoonAfter: { type: ["string", "null"] }
+        bonusBefore: { type: ["number", "null"] }
+        bonusAfter: { type: ["number", "null"] }
+        eventsBefore: { type: ["integer", "null"] }
+        eventsAfter: { type: ["integer", "null"] }
+        eligibleBefore: { type: ["boolean", "null"] }
+        eligibleAfter: { type: ["boolean", "null"] }
+
+    ScoreTimelinePerson:
+      type: object
+      required: [employeeId, name, finalResult, platoon, platoonColor, bonusValue, eventsCount, eligible]
+      properties:
+        employeeId: { type: integer }
+        name: { type: string }
+        functionName: { type: ["string", "null"] }
+        finalResult: { type: number }
+        platoon: { type: ["string", "null"] }
+        platoonColor: { type: ["string", "null"] }
+        bonusValue: { type: number }
+        eventsCount: { type: integer }
+        eligible: { type: boolean }
+
+    ScoreTimeline:
+      type: object
+      required: [cycle, employeeId, people, recordedSince, platoons, entries]
+      properties:
+        cycle:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            startDate: { type: ["string", "null"] }
+            endDate: { type: ["string", "null"] }
+        employeeId: { type: ["integer", "null"], description: Filtro aplicado (null = todos) }
+        people:
+          type: array
+          description: Situação atual de cada colaborador do ranking (nota, faixa, bônus)
+          items:
+            $ref: "#/components/schemas/ScoreTimelinePerson"
+        recordedSince: { type: ["string", "null"] }
+        platoons:
+          type: array
+          items:
+            type: object
+            required: [name, color, minScore]
+            properties:
+              name: { type: string }
+              color: { type: ["string", "null"] }
+              minScore: { type: number }
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreTimelineEntry"
 
     AuditLog:
       type: object

@@ -1803,6 +1803,114 @@ export interface RankingDetail {
   merits: RankingDetailRow[];
 }
 
+export type ScoreTimelineEntryKind = typeof ScoreTimelineEntryKind[keyof typeof ScoreTimelineEntryKind];
+
+
+export const ScoreTimelineEntryKind = {
+  recorded: 'recorded',
+  reconstructed: 'reconstructed',
+  info: 'info',
+} as const;
+
+export interface ScoreTimelineEntry {
+  id: string;
+  /** Data-hora ISO */
+  at: string;
+  kind: ScoreTimelineEntryKind;
+  /** event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…) */
+  type: string;
+  /** @nullable */
+  employeeId?: number | null;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  eventName?: string | null;
+  /** @nullable */
+  criterionName?: string | null;
+  /** @nullable */
+  label?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  by?: string | null;
+  /** @nullable */
+  eventScore?: number | null;
+  /** @nullable */
+  points?: number | null;
+  /** @nullable */
+  scoreBefore?: number | null;
+  /** @nullable */
+  scoreAfter?: number | null;
+  /** @nullable */
+  finalBefore?: number | null;
+  /** @nullable */
+  finalAfter?: number | null;
+  /** @nullable */
+  platoonBefore?: string | null;
+  /** @nullable */
+  platoonAfter?: string | null;
+  /** @nullable */
+  bonusBefore?: number | null;
+  /** @nullable */
+  bonusAfter?: number | null;
+  /** @nullable */
+  eventsBefore?: number | null;
+  /** @nullable */
+  eventsAfter?: number | null;
+  /** @nullable */
+  eligibleBefore?: boolean | null;
+  /** @nullable */
+  eligibleAfter?: boolean | null;
+}
+
+export interface ScoreTimelinePerson {
+  employeeId: number;
+  name: string;
+  /** @nullable */
+  functionName?: string | null;
+  finalResult: number;
+  /** @nullable */
+  platoon: string | null;
+  /** @nullable */
+  platoonColor: string | null;
+  bonusValue: number;
+  eventsCount: number;
+  eligible: boolean;
+}
+
+export type ScoreTimelineCycle = {
+  id: number;
+  name: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+};
+
+export type ScoreTimelinePlatoonsItem = {
+  name: string;
+  /** @nullable */
+  color: string | null;
+  minScore: number;
+};
+
+export interface ScoreTimeline {
+  cycle: ScoreTimelineCycle;
+  /**
+     * Filtro aplicado (null = todos)
+     * @nullable
+     */
+  employeeId: number | null;
+  /** Situação atual de cada colaborador do ranking (nota, faixa, bônus) */
+  people: ScoreTimelinePerson[];
+  /** @nullable */
+  recordedSince: string | null;
+  platoons: ScoreTimelinePlatoonsItem[];
+  entries: ScoreTimelineEntry[];
+}
+
 export interface AuditLog {
   id: number;
   /** @nullable */
@@ -2966,6 +3074,14 @@ search?: string;
 
 export type GetRankingDetailParams = {
 employeeId: number;
+};
+
+export type GetScoreTimelineParams = {
+/**
+ * Sem informar = todos os colaboradores do ranking
+ */
+employeeId?: number;
+cycleId?: number;
 };
 
 export type GetAuditLogsParams = {

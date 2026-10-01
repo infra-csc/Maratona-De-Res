@@ -3,13 +3,14 @@ import {
   db, eventsTable, eventParticipantsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, employeeEventResultsTable,
-  cyclesTable, type EventConformity,
+  cyclesTable, type EventConformity, scoreChangesTable,
 } from "@workspace/db";
 import { eq, and, inArray, exists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, validateCalculationExample, validateConformityCalculationExample } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
-import { audit } from "../lib/audit.js";
+import { audit, currentLastAction } from "../lib/audit.js";
+import { diffScoreSnapshots } from "../lib/score-history.js";
 import { participantCountsForScore } from "../lib/participation.js";
 import { buildCycleResults, computeEventTeamResultFromData, emptyEventTeamData } from "../lib/cycle-compute.js";
 import { loadCycleRecomputeInput, loadEventTeamData, loadPlatoonRules } from "../lib/cycle-data.js";
@@ -90,6 +91,12 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   // sem ela os dois delete+insert se entrelaçavam.
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${cycleId})`);
+    // Linha do tempo: o retrato de ANTES, lido sob a mesma trava.
+    const previous = await tx.select({
+      employeeId: quarterlyResultsTable.employeeId, finalResult: quarterlyResultsTable.finalResult,
+      platoon: quarterlyResultsTable.platoon, bonusValue: quarterlyResultsTable.bonusValue,
+      eventsCount: quarterlyResultsTable.eventsCount, eligible: quarterlyResultsTable.eligible,
+    }).from(quarterlyResultsTable).where(eq(quarterlyResultsTable.cycleId, cycleId));
     if (allCycleEventIdsUnfiltered.length > 0) {
       await tx.delete(employeeEventResultsTable)
         .where(inArray(employeeEventResultsTable.eventId, allCycleEventIdsUnfiltered));
@@ -102,6 +109,8 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     if (quarterlyInserts.length > 0) {
       await tx.insert(quarterlyResultsTable).values(quarterlyInserts);
     }
+    const changes = diffScoreSnapshots(cycleId, previous, quarterlyInserts, userId, currentLastAction() ?? null);
+    if (changes.length > 0) await tx.insert(scoreChangesTable).values(changes);
   });
 
   return { processed: quarterlyInserts.length, warnings };
