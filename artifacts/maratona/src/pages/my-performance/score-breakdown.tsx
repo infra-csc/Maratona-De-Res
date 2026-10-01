@@ -36,7 +36,8 @@ export function ScoreBreakdown({ events, summary, result }: {
   const penPerEvent = N > 0 ? netPenalty / N : 0;
   const rawFinal = displayAvg - penPerEvent;
   const isClamped = rawFinal < 0 || rawFinal > 100;
-  const finalVal = result ?? Math.min(100, Math.max(0, Math.round(rawFinal * 100) / 100));
+  // Mesma regra da nota final oficial: 1 casa, arredondada uma vez.
+  const finalVal = result ?? Math.min(100, Math.max(0, Math.round(rawFinal * 10 + 1e-7) / 10));
   return (
     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
       <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>

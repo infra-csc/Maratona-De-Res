@@ -217,9 +217,15 @@ export function validateConformityCalculationExample(): boolean {
   return final === 60;
 }
 
+/**
+ * Média bruta do ciclo PARA EXIBIR e gravar: 1 casa, arredondada uma vez a
+ * partir da média real (mesma regra da nota final). A nota final NÃO deve ser
+ * calculada a partir deste valor — use a média real (soma ÷ N) e
+ * calculateQuarterFinalResult, senão arredonda duas vezes.
+ */
 export function calculateQuarterGrossAverage(eventScores: number[]): number {
   if (eventScores.length === 0) return 0;
-  return Math.round((eventScores.reduce((a, b) => a + b, 0) / eventScores.length) * 100) / 100;
+  return roundFinalResult(eventScores.reduce((a, b) => a + b, 0) / eventScores.length);
 }
 
 export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence: number): number {
@@ -241,8 +247,9 @@ export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence
  */
 /**
  * Nota final do ciclo, ARREDONDADA PARA 1 CASA (meio para cima) — é ela que
- * define a faixa e o bônus. Decisão do dono em 01/10/2026: 69,95 aparecia como
- * "70,0" na tela e ficava sem bônus; agora vale 70,0 e entra na faixa de 70.
+ * define a faixa e o bônus, e é a mesma que a tela mostra (decisão do dono em
+ * 01/10/2026). Recebe a média REAL (sem arredondar antes): 1.049,22 ÷ 15 =
+ * 69,948 → 69,9, sem bônus; 69,95 exatos → 70,0, com bônus.
  * Um arredondamento só (arredondar para 2 casas antes levaria 69,949 a 70,0);
  * a folga de 1e-7 cobre o ruído do ponto flutuante (69,95 é guardado como
  * 69,9499999…).

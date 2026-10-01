@@ -137,4 +137,7 @@ test("nota final: arredonda para 1 casa antes da faixa (69,95 → 70,0 entra em 
   assert.equal(roundFinalResult(70.33), 70.3);
   // (139,9) ÷ 2 = 69,95 → 70,0
   assert.equal(calculateQuarterFinalResult(calculateQuarterGrossAverage([69.9, 70]), 0, 2), 70);
+  // Caso real do Matheus: 1.049,22 ÷ 15 = 69,948 → 69,9 (não 70: um arredondamento só).
+  const matheus = [72.5, 65, 80, 62, 70, 66, 70, 77.5, 72, 70, 52.22, 72, 73.33, 76.67, 70];
+  assert.equal(calculateQuarterFinalResult(matheus.reduce((a, b) => a + b, 0) / matheus.length, 0, matheus.length), 69.9);
 });
