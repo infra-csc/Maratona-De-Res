@@ -27,6 +27,8 @@ router.get("/calibrations", async (req, res) => {
     calibratedByUserId: calibrationsTable.calibratedByUserId,
     calibratedByName: usersTable.name,
     calibratedAt: calibrationsTable.calibratedAt,
+    // Salva e ainda não publicada: não vale na nota até publicar.
+    pendingPublish: calibrationsTable.pendingPublish,
   })
   .from(calibrationsTable)
   .leftJoin(criteriaTable, eq(calibrationsTable.criterionId, criteriaTable.id))
@@ -91,6 +93,8 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
       originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : existing.originalAverageScore,
       calibratedByUserId: req.user!.userId,
       calibratedAt: new Date(),
+      // Só conta na nota depois de publicar (ver feedback.ts publishSnapshot).
+      pendingPublish: true,
     }).where(eq(calibrationsTable.id, existing.id)).returning();
   } else {
     // Duas calibrações do mesmo critério ao mesmo tempo: o UNIQUE barra a
@@ -101,6 +105,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
       calibrationReason: reason,
       originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : null,
       calibratedByUserId: req.user!.userId,
+      pendingPublish: true,
     }).onConflictDoUpdate({
       target: [calibrationsTable.eventId, calibrationsTable.criterionId],
       set: {
@@ -108,6 +113,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
         calibrationReason: reason,
         calibratedByUserId: req.user!.userId,
         calibratedAt: new Date(),
+        pendingPublish: true,
       },
     }).returning();
   }

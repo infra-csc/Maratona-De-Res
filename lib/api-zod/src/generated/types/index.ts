@@ -92,6 +92,8 @@ export * from './criterionUpdate';
 export * from './csvExport';
 export * from './csvImportInput';
 export * from './cycle';
+export * from './cycleExclusionInput';
+export * from './cycleExclusionResult';
 export * from './cycleHistory';
 export * from './cycleHistoryEntry';
 export * from './cycleHistoryEvent';

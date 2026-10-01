@@ -14,6 +14,7 @@ import {
   bulkGenerateCasaPins,
   generateEmployeePin,
   bulkEmploymentReset,
+  useSetEmployeeCycleExclusion,
 } from "@workspace/api-client-react";
 import type { EmployeeInput, BulkGenerateAccessResult, MergeEmployeeResult, BulkSetCpfResult, CasaPin, SkippedPin } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,8 +22,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { BODY } from "@/lib/premium-theme";
+import { ConfirmDialog } from "@/components/shared";
+import { Textarea } from "@/components/ui/textarea";
+import { invalidateCycleResults } from "@/lib/invalidate-results";
 import type { BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
-import { getEligibilityStatus, parseCpfRows, serverErrorMessage } from "./employees/utils";
+import { cycleStatus, getEligibilityStatus, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
 import { EmployeesFilters, EmployeesHeader, EmployeesKpis } from "./employees/employees-header";
 import { CreateEmployeeDialog, EditEmployeeDialog } from "./employees/employee-form-dialogs";
 import { EmployeesTable } from "./employees/employees-table";
@@ -59,8 +63,11 @@ export default function EmployeesPage() {
   }, [impersonate, toast]);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filterActive, setFilterActive] = useState<"true" | "false">("true");
-  const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
+  // Só quem tem nota no ciclo atual ("No ciclo") e quem o admin tirou dele
+  // ("Fora do ciclo", para poder devolver). Quem não tem nota não aparece.
+  const [filterCycle, setFilterCycle] = useState<"in" | "out">("in");
+  const [cycleTarget, setCycleTarget] = useState<EmployeeWithCycle | null>(null);
+  const [cycleReason, setCycleReason] = useState("");
   const [open, setOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -164,9 +171,9 @@ export default function EmployeesPage() {
   const [casaSelection, setCasaSelection] = useState<Set<number>>(new Set());
   const [resetTypeSearch, setResetTypeSearch] = useState("");
 
-  const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
+  const qKey = getGetEmployeesQueryKey();
   const { data: employeesRaw, isLoading } = useGetEmployees(
-    { active: filterActive === "true" },
+    undefined,
     { query: { queryKey: qKey } }
   );
   const employees = employeesRaw as EmployeeWithCycle[] | undefined;
@@ -217,8 +224,7 @@ export default function EmployeesPage() {
   const mergeMutation = useMergeEmployee({
     mutation: {
       onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: true }) });
-        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: false }) });
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
         setMergeResult(data);
         setMergeMode(false);
         setMergeConfirmOpen(false);
@@ -282,8 +288,9 @@ export default function EmployeesPage() {
   const isAdmin = hasRole(user, "admin");
   const canBulk = isAdmin || hasRole(user, "rh");
   const canEdit = canBulk || hasRole(user, "operador");
-  const filtered = (employees ?? []).filter(e =>
-    (filterType === "all" || (e.employmentType ?? "casa") === filterType) &&
+  const inCycle = (employees ?? []).filter(e => cycleStatus(e) === "in");
+  const outOfCycle = (employees ?? []).filter(e => cycleStatus(e) === "out");
+  const filtered = (filterCycle === "in" ? inCycle : outOfCycle).filter(e =>
     (e.name.toLowerCase().includes(search.toLowerCase()) ||
       e.department.toLowerCase().includes(search.toLowerCase()) ||
       e.functionName.toLowerCase().includes(search.toLowerCase()))
@@ -314,10 +321,30 @@ export default function EmployeesPage() {
   }
 
   const stats = {
-    total: employees?.length ?? 0,
-    ativos: employees?.filter(e => e.active).length ?? 0,
-    elegiveis: employees?.filter(e => getEligibilityStatus(e) === "eligible").length ?? 0,
+    noCiclo: inCycle.length,
+    elegiveis: inCycle.filter(e => getEligibilityStatus(e) === "eligible").length,
+    foraDoCiclo: outOfCycle.length,
   };
+
+  const cycleMutation = useSetEmployeeCycleExclusion();
+  function confirmCycleToggle() {
+    if (!cycleTarget) return;
+    const excluded = cycleStatus(cycleTarget) !== "out";
+    const name = toTitleCase(cycleTarget.name);
+    cycleMutation.mutate({ id: cycleTarget.id, data: { excluded, reason: excluded ? cycleReason.trim() || null : null } }, {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+        invalidateCycleResults(qc);
+        toast({
+          title: excluded ? `${name} saiu do ciclo` : `${name} voltou ao ciclo`,
+          description: excluded ? "Sem nota, ranking e bônus neste ciclo. Dá para devolver em \"Fora do ciclo\"." : "Entrou de novo no ranking, nas análises e no bônus. Ciclo recalculado.",
+        });
+        setCycleTarget(null);
+        setCycleReason("");
+      },
+      onError: e => toast({ title: "Não foi possível alterar", description: serverErrorMessage(e, "Tente novamente."), variant: "destructive" }),
+    });
+  }
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
@@ -369,17 +396,16 @@ export default function EmployeesPage() {
         <EmployeesFilters
           search={search}
           onSearchChange={setSearch}
-          filterActive={filterActive}
-          onFilterActiveChange={setFilterActive}
-          filterType={filterType}
-          onFilterTypeChange={setFilterType}
+          filterCycle={filterCycle}
+          onFilterCycleChange={setFilterCycle}
+          counts={{ in: inCycle.length, out: outOfCycle.length }}
         />
 
         {/* Table */}
         <EmployeesTable
           isLoading={isLoading}
           filtered={filtered}
-          total={stats.total}
+          total={filterCycle === "in" ? inCycle.length : outOfCycle.length}
           mergeMode={mergeMode}
           selectedIds={selectedIds}
           canonicalId={canonicalId}
@@ -392,7 +418,28 @@ export default function EmployeesPage() {
           onPreviewAs={handlePreviewAs}
           onGeneratePin={handleGeneratePin}
           onEdit={setEditingEmployee}
+          onToggleCycle={isAdmin ? emp => { setCycleTarget(emp); setCycleReason(""); } : undefined}
         />
+
+        <ConfirmDialog
+          open={!!cycleTarget}
+          onOpenChange={o => { if (!o && !cycleMutation.isPending) setCycleTarget(null); }}
+          title={cycleTarget && cycleStatus(cycleTarget) === "out" ? `Devolver ${toTitleCase(cycleTarget.name)} ao ciclo?` : `Tirar ${cycleTarget ? toTitleCase(cycleTarget.name) : ""} do ciclo?`}
+          description={cycleTarget && cycleStatus(cycleTarget) === "out"
+            ? "Volta a ter nota, entrar no ranking, nas análises e no bônus deste ciclo. O ciclo é recalculado na hora."
+            : "Fica sem nota, fora do ranking, das análises e do bônus deste ciclo. O histórico dos eventos continua guardado e dá para devolver depois em \"Fora do ciclo\". O ciclo é recalculado na hora."}
+          confirmLabel={cycleTarget && cycleStatus(cycleTarget) === "out" ? "Devolver ao ciclo" : "Tirar do ciclo"}
+          destructive={!!cycleTarget && cycleStatus(cycleTarget) !== "out"}
+          isPending={cycleMutation.isPending}
+          onConfirm={confirmCycleToggle}
+        >
+          {cycleTarget && cycleStatus(cycleTarget) !== "out" && (
+            <div className="space-y-1.5">
+              <label htmlFor="cycle-reason" className="text-sm font-semibold">Motivo <span className="font-normal" style={{ color: "var(--muted-foreground)" }}>(opcional)</span></label>
+              <Textarea id="cycle-reason" value={cycleReason} onChange={e => setCycleReason(e.target.value)} maxLength={300} rows={3} placeholder="Ex.: desligado em setembro, afastado…" />
+            </div>
+          )}
+        </ConfirmDialog>
 
         {/* Merge action bar */}
         {mergeMode && selectedIds.size >= 2 && (

@@ -1,11 +1,11 @@
-import { CheckCircle2, XCircle, Filter, Pencil, Eye, Wifi, WifiOff, Hash } from "lucide-react";
+import { CheckCircle2, XCircle, Filter, Pencil, Eye, Wifi, WifiOff, Hash, UserMinus, UserPlus } from "lucide-react";
 import { CONDENSED, GOOD, PremiumCard, GOOD_TEXT } from "@/lib/premium-theme";
-import { employmentTypeLabel, getEligibilityStatus, initials, toTitleCase } from "./utils";
+import { cycleStatus, employmentTypeLabel, getEligibilityStatus, initials, toTitleCase } from "./utils";
 import type { EmployeeWithCycle } from "./types";
 
 type EmployeesTableProps = {
   isLoading: boolean;
-  /** Lista já filtrada por busca e tipo. */
+  /** Lista já filtrada por situação no ciclo e busca. */
   filtered: EmployeeWithCycle[];
   total: number;
   mergeMode: boolean;
@@ -20,6 +20,8 @@ type EmployeesTableProps = {
   onPreviewAs: (emp: EmployeeWithCycle) => void;
   onGeneratePin: (emp: EmployeeWithCycle) => void;
   onEdit: (emp: EmployeeWithCycle) => void;
+  /** Só admin: tirar do ciclo / devolver ao ciclo. */
+  onToggleCycle?: (emp: EmployeeWithCycle) => void;
 };
 
 /** Grid de colaboradores (com coluna de seleção no modo mesclagem, acesso e ações). */
@@ -39,6 +41,7 @@ export function EmployeesTable({
   onPreviewAs,
   onGeneratePin,
   onEdit,
+  onToggleCycle,
 }: EmployeesTableProps) {
   if (isLoading) {
     return <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando colaboradores...</div>;
@@ -58,7 +61,7 @@ export function EmployeesTable({
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
+              <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>No ciclo</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
               {canBulk && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
               {canEdit && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
@@ -113,11 +116,7 @@ export function EmployeesTable({
                   </span>
                 </td>
                 <td className="px-5 py-3.5 text-center">
-                  {emp.active ? (
-                    <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativo</span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativo</span>
-                  )}
+                  <CycleCell emp={emp} />
                 </td>
                 <td className="px-5 py-3.5">
                   <EligibilityCell emp={emp} />
@@ -136,6 +135,7 @@ export function EmployeesTable({
                 )}
                 {canEdit && !mergeMode && (
                   <td className="px-5 py-3.5 text-center">
+                    <div className="inline-flex flex-col items-stretch gap-1.5">
                     <button
                       type="button"
                       data-testid={`button-edit-employee-${emp.id}`}
@@ -146,13 +146,27 @@ export function EmployeesTable({
                     >
                       <Pencil size={13} /> Editar
                     </button>
+                    {onToggleCycle && (
+                      <button
+                        type="button"
+                        data-testid={`button-cycle-${cycleStatus(emp) === "out" ? "include" : "exclude"}-${emp.id}`}
+                        onClick={() => onToggleCycle(emp)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors hover:opacity-80"
+                        style={cycleStatus(emp) === "out"
+                          ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }
+                          : { border: "1px solid var(--border)", color: "var(--status-danger-text)" }}
+                      >
+                        {cycleStatus(emp) === "out" ? <><UserPlus size={13} aria-hidden /> Devolver ao ciclo</> : <><UserMinus size={13} aria-hidden /> Tirar do ciclo</>}
+                      </button>
+                    )}
+                    </div>
                   </td>
                 )}
               </tr>
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={6 + (mergeMode ? 1 : 0) + (!mergeMode && canBulk ? 1 : 0) + (!mergeMode && canEdit ? 1 : 0)} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+              <tr><td colSpan={6 + (mergeMode ? 1 : 0) + (!mergeMode && canBulk ? 1 : 0) + (!mergeMode && canEdit ? 1 : 0)} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Ninguém aqui com os filtros atuais.</td></tr>
             )}
           </tbody>
         </table>
@@ -161,6 +175,26 @@ export function EmployeesTable({
         <span className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Mostrando {filtered.length} de {total} colaboradores</span>
       </div>
     </PremiumCard>
+  );
+}
+
+/** Coluna "No ciclo": eventos com nota, ou "Fora do ciclo" com o motivo. */
+function CycleCell({ emp }: { emp: EmployeeWithCycle }) {
+  if (cycleStatus(emp) === "out") {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--status-danger-bg)", color: "var(--status-danger-text)" }}>Fora do ciclo</span>
+        {emp.cycleExcludedReason && <span className="text-[11px] max-w-[180px] truncate" title={emp.cycleExcludedReason} style={{ color: "var(--muted-foreground)" }}>{emp.cycleExcludedReason}</span>}
+      </div>
+    );
+  }
+  const n = emp.cycleEventsCount ?? 0;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Com nota</span>
+      <span className="text-[11px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>{n} {n === 1 ? "evento" : "eventos"} com nota</span>
+      {!emp.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cadastro inativo</span>}
+    </div>
   );
 }
 

@@ -167,6 +167,8 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       }
     }
     setPublishingAll(false);
+    // Publicar tira a marca "falta publicar" das calibrações.
+    qc.invalidateQueries({ queryKey: calQKey });
     qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
     qc.invalidateQueries({ queryKey: fbQKey });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });

@@ -242,6 +242,40 @@ export interface Employee {
   eligibilityReason?: string | null;
   sourceType?: string;
   createdAt?: string;
+  /**
+     * Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEligible?: boolean | null;
+  /** @nullable */
+  participatedEventsCount?: number | null;
+  /**
+     * Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEventsCount?: number | null;
+  /** O admin tirou o colaborador do ciclo atual */
+  cycleExcluded?: boolean;
+  /** @nullable */
+  cycleExcludedReason?: string | null;
+  /** @nullable */
+  linkedUserId?: number | null;
+  hasAccess?: boolean;
+}
+
+export interface CycleExclusionInput {
+  excluded: boolean;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface CycleExclusionResult {
+  employeeId: number;
+  cycleId: number;
+  excluded: boolean;
+  /** @nullable */
+  excludedReason: string | null;
+  warnings: string[];
 }
 
 /**
@@ -333,6 +367,8 @@ export interface Event {
   finalCalibratedCriteria?: number;
   /** Nº de critérios ativos com pelo menos uma publicação parcial. */
   partialPublishedCount?: number;
+  /** Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar). */
+  pendingPublishCount?: number;
   /** @nullable */
   averageScore?: number | null;
   /** @nullable */
@@ -933,6 +969,8 @@ export interface Calibration {
   /** @nullable */
   calibratedByName?: string | null;
   calibratedAt?: string;
+  /** Salva e ainda não publicada — não vale na nota até publicar. */
+  pendingPublish?: boolean;
   /** @nullable */
   warnings?: string[] | null;
 }

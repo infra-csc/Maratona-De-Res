@@ -7,9 +7,17 @@ export type EmploymentType = "casa" | "freela";
 export type EmployeeWithCycle = Employee & {
   cycleEligible: boolean | null;
   participatedEventsCount: number | null;
+  /** Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo). */
+  cycleEventsCount: number | null;
+  /** O admin tirou o colaborador do ciclo atual. */
+  cycleExcluded: boolean;
+  cycleExcludedReason: string | null;
   linkedUserId: number | null;
   hasAccess: boolean;
 };
+
+/** Situação no ciclo atual: com nota, fora do ciclo (admin) ou sem nota (não aparece na tela). */
+export type CycleStatus = "in" | "out" | "none";
 
 export type EligibilityStatus = "eligible" | "not_eligible" | "freela" | "pending";
 

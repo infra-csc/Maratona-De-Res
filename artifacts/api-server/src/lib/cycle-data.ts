@@ -102,7 +102,22 @@ export async function loadEventTeamData(eventIds: number[]): Promise<Map<number,
     .orderBy(eventCriteriaTable.eventId, eventCriteriaTable.criterionId);
   const evaluations = await db.select().from(evaluationsTable).where(inArray(evaluationsTable.eventId, ids))
     .orderBy(evaluationsTable.eventId, heapOrder(evaluationsTable));
-  const calibrations = await db.select().from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids));
+  const savedCalibrations = await db.select().from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids));
+  // Regra do dono (só daqui pra frente): calibração salva e NÃO publicada não
+  // entra na nota — vale a última versão publicada do critério ou, se nunca
+  // publicou, a média dos avaliadores. Sem isso, qualquer recálculo (uma falta
+  // de outra pessoa, uma confirmação) aplicava a calibração só salva.
+  const pendingEventIds = [...new Set(savedCalibrations.filter(c => c.pendingPublish).map(c => c.eventId))];
+  const publishedRows = pendingEventIds.length > 0
+    ? await db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, publishedScore: eventCriteriaTable.publishedScore, publishedReason: eventCriteriaTable.publishedReason })
+        .from(eventCriteriaTable).where(inArray(eventCriteriaTable.eventId, pendingEventIds))
+    : [];
+  const publishedBy = new Map(publishedRows.map(p => [`${p.eventId}:${p.criterionId}`, p]));
+  const calibrations = savedCalibrations.flatMap(c => {
+    if (!c.pendingPublish) return [c];
+    const p = publishedBy.get(`${c.eventId}:${c.criterionId}`);
+    return p?.publishedScore != null ? [{ ...c, calibratedScore: p.publishedScore, calibrationReason: p.publishedReason }] : [];
+  });
   const assignments = await db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
     .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, ids));
   const conformities = await db.select().from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, ids));
@@ -189,7 +204,7 @@ export async function loadCycleRecomputeInput(cycleId: number, userId: number): 
   const eligibilityRows = await db.select().from(employeeCycleEligibilityTable)
     .where(eq(employeeCycleEligibilityTable.cycleId, cycleId));
   // Índice único (employee_id, cycle_id); a consulta antiga usava limit(1).
-  const eligibilityByEmployee = new Map<number, { eligible: boolean; reason: string | null }>();
+  const eligibilityByEmployee = new Map<number, { eligible: boolean; reason: string | null; excluded: boolean }>();
   for (const r of eligibilityRows) if (!eligibilityByEmployee.has(r.employeeId)) eligibilityByEmployee.set(r.employeeId, r);
 
   return {

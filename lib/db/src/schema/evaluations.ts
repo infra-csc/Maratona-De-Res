@@ -39,6 +39,12 @@ export const calibrationsTable = pgTable("calibrations", {
   calibrationReason: text("calibration_reason"),
   calibratedByUserId: integer("calibrated_by_user_id").notNull().references(() => usersTable.id),
   calibratedAt: timestamptz("calibrated_at").notNull().default(sql`now()`),
+  // Salva e ainda NÃO publicada (regra de 01/10/2026, só daqui pra frente):
+  // enquanto true, a nota oficial usa a última versão publicada
+  // (event_criteria.published_score) ou, sem publicação, a média dos
+  // avaliadores. Publicar volta para false. Calibrações anteriores à regra
+  // ficam false e continuam contando como antes.
+  pendingPublish: boolean("pending_publish").notNull().default(false),
 }, (t) => ({
   // Uma calibração por (evento, critério): duas linhas tornavam a nota
   // oficial dependente da ordem em que o Postgres devolvia as linhas.

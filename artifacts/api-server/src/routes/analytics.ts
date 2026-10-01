@@ -2,9 +2,9 @@ import { Router } from "express";
 import {
   db, eventsTable, employeeEventResultsTable, quarterlyResultsTable, employeesTable, platoonRulesTable,
   evaluationsTable, calibrationsTable, eventCriteriaTable, criteriaTable, areasTable, eventConformitiesTable,
-  absencesTable, usersTable,
+  absencesTable, usersTable, employeeCycleEligibilityTable,
 } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { computeAnalytics } from "../lib/analytics.js";
@@ -74,7 +74,8 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       points: absencesTable.points, quantity: absencesTable.quantity,
     }).from(absencesTable)
       .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
-      .where(and(eq(absencesTable.cycleId, cycle.id))),
+      // Quem o admin tirou do ciclo não entra (nem nos rankings de penalidade/mérito).
+      .where(and(eq(absencesTable.cycleId, cycle.id), sql`NOT EXISTS (SELECT 1 FROM ${employeeCycleEligibilityTable} x WHERE x.employee_id = ${absencesTable.employeeId} AND x.cycle_id = ${absencesTable.cycleId} AND x.excluded)`)),
     loadPenaltyLabels(),
     // Catálogo inteiro (poucas dezenas de linhas): liga cópias por evento à origem.
     db.select({ id: criteriaTable.id, name: criteriaTable.name, eventScoped: criteriaTable.eventScoped, sourceCriterionId: criteriaTable.sourceCriterionId }).from(criteriaTable),

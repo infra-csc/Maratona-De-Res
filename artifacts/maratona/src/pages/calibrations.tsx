@@ -60,7 +60,7 @@ export default function CalibrationsPage() {
   // Intenção de publicação por critério: "partial" | "final"
   const [publishIntents, setPublishIntents] = useState<Record<number, "partial" | "final">>({});
   const [publishingAll, setPublishingAll] = useState(false);
-  const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
+  const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated" | "pendingPub">("all");
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [newCommentTexts, setNewCommentTexts] = useState<Record<number, string>>({});
   const [expandedEvalComments, setExpandedEvalComments] = useState<Set<string>>(new Set());
@@ -194,8 +194,13 @@ export default function CalibrationsPage() {
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
   const allCriteriaFinalPublished = scorableActiveCriteria.length > 0 && finalPublishedCount === scorableActiveCriteria.length;
 
+  // Salvos e ainda não publicados: só valem na nota depois de publicar.
+  const pendingPublishCount = displayActiveCriteria.filter(c => getCalibration(c.criterionId)?.pendingPublish).length;
+
   // Critérios filtrados por criterionFilter
-  const filteredActiveCriteria = criterionFilter === "uncalibrated"
+  const filteredActiveCriteria = criterionFilter === "pendingPub"
+    ? displayActiveCriteria.filter(c => getCalibration(c.criterionId)?.pendingPublish)
+    : criterionFilter === "uncalibrated"
     ? displayActiveCriteria.filter(c => !getCalibration(c.criterionId))
     : criterionFilter === "calibrated"
     ? displayActiveCriteria.filter(c => !!getCalibration(c.criterionId))
@@ -330,6 +335,7 @@ export default function CalibrationsPage() {
                 partialPublishedAtDate={partialPublishedAtDate}
                 totalDirtyCount={totalDirtyCount}
                 unsavedEditsCount={unsavedEditsCount}
+                pendingPublishCount={pendingPublishCount}
                 handleSaveAll={handleSaveAll}
                 handlePublishAll={handlePublishAll}
               />

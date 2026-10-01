@@ -52,8 +52,10 @@ router.get("/results/timeline", requireRole("admin", "rh"), async (req, res) => 
     db.select({ q: quarterlyResultsTable, name: employeesTable.name, functionName: employeesTable.functionName })
       .from(quarterlyResultsTable).innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
       .where(eq(quarterlyResultsTable.cycleId, cycle.id)),
-    db.select({ c: scoreChangesTable, by: usersTable.name }).from(scoreChangesTable)
+    db.select({ c: scoreChangesTable, by: usersTable.name, employeeName: employeesTable.name }).from(scoreChangesTable)
       .leftJoin(usersTable, eq(scoreChangesTable.userId, usersTable.id))
+      // Nome mesmo de quem saiu do ciclo (não está mais em quarterly_results).
+      .leftJoin(employeesTable, eq(scoreChangesTable.employeeId, employeesTable.id))
       .where(and(eq(scoreChangesTable.cycleId, cycle.id), ...onlyEmp(scoreChangesTable.employeeId)))
       .orderBy(asc(scoreChangesTable.changedAt), asc(scoreChangesTable.id)),
     // Eventos que entram na nota de cada um hoje, com a data em que passaram a contar.
@@ -138,19 +140,22 @@ router.get("/results/timeline", requireRole("admin", "rh"), async (req, res) => 
   }
 
   // 3. Registro exato (daqui pra frente).
-  const recordedEntries: TimelineEntry[] = recorded.map(({ c, by }) => {
+  const recordedEntries: TimelineEntry[] = recorded.map(({ c, by, employeeName }) => {
     const d = parse(c.causeDetail);
     const eventId = Number(d?.eventId ?? (c.causeEntity === "events" ? c.causeEntityId : NaN));
     // Falta/mérito: o "porquê" vem do próprio lançamento gravado no motivo.
     const isAdj = c.causeEntity === "absences" && d != null;
     const adjKind = isAdj ? (d!.kind === "merit" ? "merit" : "penalty") : null;
     const adjType = isAdj ? (c.causeAction === "delete" ? `${adjKind}_removed` : adjKind) : null;
+    // Admin tirou/devolveu a pessoa ao ciclo (Colaboradores).
+    const exclusion = c.causeAction === "set_cycle_exclusion" && d != null && d.employeeId === c.employeeId;
+    const exclusionType = exclusion ? (d!.excluded ? "cycle_excluded" : "cycle_included") : null;
     return {
-      id: `rec-${c.id}`, at: iso(c.changedAt)!, kind: "recorded", type: adjType ?? c.causeAction ?? "recompute",
-      employeeId: c.employeeId, employeeName: nameOf.get(c.employeeId) ?? null,
+      id: `rec-${c.id}`, at: iso(c.changedAt)!, kind: "recorded", type: adjType ?? exclusionType ?? c.causeAction ?? "recompute",
+      employeeId: c.employeeId, employeeName: nameOf.get(c.employeeId) ?? employeeName ?? null,
       label: isAdj ? labels.get(String(d!.penaltyType)) ?? String(d!.penaltyType ?? "") : null,
       points: isAdj ? Number(d!.points ?? 0) * Number(d!.quantity ?? 1) : null,
-      reason: isAdj ? (d!.reason as string | null) ?? null : null,
+      reason: isAdj || exclusion ? (d!.reason as string | null) ?? null : null,
       eventId: Number.isInteger(eventId) ? eventId : null,
       eventName: Number.isInteger(eventId) ? eventNames.get(eventId) ?? null : null,
       by: by ?? null,

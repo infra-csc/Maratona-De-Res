@@ -33,6 +33,11 @@ test("salvar calibração não muda o colaborador; publicar muda; recalibrar sem
   assert.equal(r.status, 201, JSON.stringify(r.data));
   assert.equal(await finalOf(), 60);
   assert.equal(await myScore(), null);
+  // …nem quando OUTRA ação recalcula o ciclo (falta, confirmação, recálculo):
+  // a calibração salva fica aguardando publicação (achado em 01/10: uma
+  // falta de outra pessoa aplicava calibrações não publicadas).
+  await h.api("POST", "/results/quarterly/recompute", { role: "admin", body: {} });
+  assert.equal(await finalOf(), 60);
 
   // 2. Publicar (parcial): agora muda.
   r = await h.api("POST", `/events/${eventId}/criteria/${c}/publish-partial`, { role: "rh" });
@@ -44,10 +49,27 @@ test("salvar calibração não muda o colaborador; publicar muda; recalibrar sem
   await h.api("POST", "/calibrations", { role: "rh", body: { eventId, criterionId: c, calibratedScore: 7 } });
   assert.equal(await finalOf(), 90);
   assert.equal(await myScore(), 9);
+  await h.api("POST", "/results/quarterly/recompute", { role: "admin", body: {} });
+  assert.equal(await finalOf(), 90, "recálculo não pode aplicar recalibração não publicada");
 
   // 4. Publicar de novo (final): passa a 7.
   r = await h.api("POST", `/events/${eventId}/criteria/${c}/publish-final`, { role: "rh" });
   assert.equal(r.status, 200, JSON.stringify(r.data));
   assert.equal(await finalOf(), 70);
   assert.equal(await myScore(), 7);
+});
+
+test("calibração antiga (sem a marca de pendente) continua contando como antes", async () => {
+  const cycleId = await h.fx.cycle();
+  const c = await h.fx.criterion({ name: "Crit antiga" });
+  const emp = await h.fx.employee({ name: "Colab antiga" });
+  const aval = await h.ensureUser("avaliador");
+  const eventId = await h.fx.event({ cycleId, criteria: [c], participants: [emp], name: "Evento antigo" });
+  await h.fx.evaluation({ eventId, criterionId: c, evaluatorUserId: aval, score: 6 });
+  // Gravada antes da regra: sem pending_publish e sem publicação.
+  const rh = await h.ensureUser("rh");
+  await h.sql("insert into calibrations (event_id, criterion_id, calibrated_score, calibrated_by_user_id) values ($1, $2, 8, $3)", [eventId, c, rh]);
+  await h.api("POST", "/results/quarterly/recompute", { role: "admin", body: {} });
+  const row = await h.one("select final_result from quarterly_results where employee_id = $1 and cycle_id = $2", [emp, cycleId]);
+  assert.equal(Number(row.final_result), 80);
 });

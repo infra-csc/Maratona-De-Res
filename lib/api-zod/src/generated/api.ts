@@ -448,7 +448,14 @@ export const GetEmployeesResponseItem = zod.object({
   "eligibilityStatus": zod.string().nullish(),
   "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "cycleEligible": zod.boolean().nullish().describe('Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)'),
+  "participatedEventsCount": zod.int().nullish(),
+  "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
+  "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
+  "cycleExcludedReason": zod.string().nullish(),
+  "linkedUserId": zod.int().nullish(),
+  "hasAccess": zod.boolean().optional()
 })
 export const GetEmployeesResponse = zod.array(GetEmployeesResponseItem)
 
@@ -481,7 +488,14 @@ export const CreateEmployeeResponse = zod.object({
   "eligibilityStatus": zod.string().nullish(),
   "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "cycleEligible": zod.boolean().nullish().describe('Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)'),
+  "participatedEventsCount": zod.int().nullish(),
+  "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
+  "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
+  "cycleExcludedReason": zod.string().nullish(),
+  "linkedUserId": zod.int().nullish(),
+  "hasAccess": zod.boolean().optional()
 }).and(zod.object({
   "generatedAccess": zod.object({
   "cpfLogin": zod.string().optional(),
@@ -512,7 +526,14 @@ export const GetEmployeeResponse = zod.object({
   "eligibilityStatus": zod.string().nullish(),
   "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "cycleEligible": zod.boolean().nullish().describe('Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)'),
+  "participatedEventsCount": zod.int().nullish(),
+  "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
+  "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
+  "cycleExcludedReason": zod.string().nullish(),
+  "linkedUserId": zod.int().nullish(),
+  "hasAccess": zod.boolean().optional()
 })
 
 
@@ -552,7 +573,14 @@ export const UpdateEmployeeResponse = zod.object({
   "eligibilityStatus": zod.string().nullish(),
   "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "cycleEligible": zod.boolean().nullish().describe('Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)'),
+  "participatedEventsCount": zod.int().nullish(),
+  "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
+  "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
+  "cycleExcludedReason": zod.string().nullish(),
+  "linkedUserId": zod.int().nullish(),
+  "hasAccess": zod.boolean().optional()
 })
 
 
@@ -576,6 +604,27 @@ export const MergeEmployeeResponse = zod.object({
   "movedReviews": zod.int().optional(),
   "movedEvaluatorEvals": zod.int().optional(),
   "removedUsers": zod.int().optional()
+})
+
+
+/**
+ * @summary Tira o colaborador do ciclo atual (ou devolve). Só admin; recalcula o ciclo.
+ */
+export const SetEmployeeCycleExclusionParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const SetEmployeeCycleExclusionBody = zod.object({
+  "excluded": zod.boolean(),
+  "reason": zod.string().nullish()
+})
+
+export const SetEmployeeCycleExclusionResponse = zod.object({
+  "employeeId": zod.int(),
+  "cycleId": zod.int(),
+  "excluded": zod.boolean(),
+  "excludedReason": zod.string().nullable(),
+  "warnings": zod.array(zod.string())
 })
 
 
@@ -653,6 +702,7 @@ export const GetEventsResponseItem = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -720,6 +770,7 @@ export const CreateEventResponse = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -926,6 +977,7 @@ export const UpdateEventResponse = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -1044,6 +1096,7 @@ export const MergeEventResponse = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -1111,6 +1164,7 @@ export const CloseEventResponse = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -1171,6 +1225,7 @@ export const ReopenEventResponse = zod.object({
   "calibratedCriteriaCount": zod.int().optional().describe('Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).'),
   "finalCalibratedCriteria": zod.int().optional().describe('Nº de critérios ativos com calibração final publicada.'),
   "partialPublishedCount": zod.int().optional().describe('Nº de critérios ativos com pelo menos uma publicação parcial.'),
+  "pendingPublishCount": zod.int().optional().describe('Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).'),
   "averageScore": zod.number().nullish(),
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
@@ -3576,6 +3631,7 @@ export const GetCalibrationsResponseItem = zod.object({
   "calibratedByUserId": zod.int().optional(),
   "calibratedByName": zod.string().nullish(),
   "calibratedAt": zod.string().optional(),
+  "pendingPublish": zod.boolean().optional().describe('Salva e ainda não publicada — não vale na nota até publicar.'),
   "warnings": zod.array(zod.string()).nullish()
 })
 export const GetCalibrationsResponse = zod.array(GetCalibrationsResponseItem)
@@ -3604,6 +3660,7 @@ export const CreateCalibrationResponse = zod.object({
   "calibratedByUserId": zod.int().optional(),
   "calibratedByName": zod.string().nullish(),
   "calibratedAt": zod.string().optional(),
+  "pendingPublish": zod.boolean().optional().describe('Salva e ainda não publicada — não vale na nota até publicar.'),
   "warnings": zod.array(zod.string()).nullish()
 })
 

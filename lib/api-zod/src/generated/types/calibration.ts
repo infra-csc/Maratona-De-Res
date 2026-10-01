@@ -23,6 +23,8 @@ export interface Calibration {
   /** @nullable */
   calibratedByName?: string | null;
   calibratedAt?: string;
+  /** Salva e ainda não publicada — não vale na nota até publicar. */
+  pendingPublish?: boolean;
   /** @nullable */
   warnings?: string[] | null;
 }

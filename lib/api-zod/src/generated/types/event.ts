@@ -42,6 +42,8 @@ export interface Event {
   finalCalibratedCriteria?: number;
   /** Nº de critérios ativos com pelo menos uma publicação parcial. */
   partialPublishedCount?: number;
+  /** Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar). */
+  pendingPublishCount?: number;
   /** @nullable */
   averageScore?: number | null;
   /** @nullable */

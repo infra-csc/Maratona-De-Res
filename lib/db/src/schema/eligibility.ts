@@ -16,6 +16,10 @@ export const employeeCycleEligibilityTable = pgTable("employee_cycle_eligibility
   cycleId: integer("cycle_id").notNull().references(() => cyclesTable.id),
   eligible: boolean("eligible").notNull().default(true),
   reason: text("reason"),
+  // FORA do ciclo (decisão do admin): não entra no recálculo — sem nota,
+  // ranking, análises nem bônus neste ciclo. Reversível.
+  excluded: boolean("excluded").notNull().default(false),
+  excludedReason: text("excluded_reason"),
   createdByUserId: integer("created_by_user_id").references(() => usersTable.id),
   createdAt: timestamptz("created_at").notNull().default(sql`now()`),
   updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),

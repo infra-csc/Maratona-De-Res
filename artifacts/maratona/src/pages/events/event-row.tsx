@@ -87,6 +87,13 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete }: Even
         ) : (
           <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
         )}
+        {(ev.pendingPublishCount ?? 0) > 0 && (
+          <span data-testid={`badge-pending-publish-${ev.id}`} title="Calibração salva e ainda não publicada: só vale na nota depois de publicar"
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase"
+            style={{ fontFamily: CONDENSED, letterSpacing: "0.03em", backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT }}>
+            {ev.pendingPublishCount} a publicar
+          </span>
+        )}
       </div>
 
       {/* Matriz de Conformidade mini bar */}

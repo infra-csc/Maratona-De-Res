@@ -1,6 +1,6 @@
 import { ApiError } from "@workspace/api-client-react";
 import type { GeneratedCredential } from "@workspace/api-client-react";
-import type { EligibilityStatus, EmployeeWithCycle } from "./types";
+import type { EligibilityStatus, EmployeeWithCycle, CycleStatus } from "./types";
 
 export const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -52,6 +52,12 @@ export function initials(name: string) {
 const LOWER_WORDS = new Set(["da","de","do","das","dos","dos","e","em","na","no","nas","nos","a","o","as","os"]);
 export function toTitleCase(str: string) {
   return str.toLowerCase().split(/\s+/).map((w, i) => i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
+}
+
+/** Com nota no ciclo = "in"; tirado do ciclo pelo admin = "out"; o resto = "none". */
+export function cycleStatus(e: EmployeeWithCycle): CycleStatus {
+  if (e.cycleExcluded) return "out";
+  return (e.cycleEventsCount ?? 0) > 0 ? "in" : "none";
 }
 
 // cycleEligible = computed quarterly eligibility (8-event rule); null = no cycle data yet

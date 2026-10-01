@@ -225,6 +225,8 @@ export interface AbsenceLike {
 export interface CycleEligibilityLike {
   eligible: boolean;
   reason: string | null;
+  /** Fora do ciclo (decisão do admin): não gera resultado neste ciclo. */
+  excluded?: boolean;
 }
 
 /** Linha atual de quarterly_results (snapshot de pagamento a preservar). */
@@ -425,6 +427,9 @@ export function buildCycleResults<TConformity extends ConformityLike>(input: Cyc
   for (const [employeeId, eventSet] of participatedByEmployee) {
     const employee = input.employeesById.get(employeeId);
     if (!employee) continue;
+    // Fora do ciclo: sem nota, ranking, análises nem bônus (as linhas por
+    // evento continuam, são o histórico do evento).
+    if (input.eligibilityByEmployee.get(employeeId)?.excluded) continue;
 
     const participatedCount = eventSet.size;
 

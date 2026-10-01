@@ -1,0 +1,11 @@
+-- Calibração salva e ainda não publicada (regra do dono, só daqui pra frente):
+-- enquanto pending_publish = true, a nota oficial usa a última versão
+-- PUBLICADA do critério (ou a média dos avaliadores, se nunca publicou).
+-- Publicar (parcial, final ou liberar o feedback) volta para false.
+--
+-- As calibrações que já existem entram com false e continuam contando
+-- exatamente como antes — nada antigo é recalculado de outro jeito.
+--
+-- Só ACRESCENTA (coluna com padrão): o app antigo continua funcionando.
+-- Idempotente: roda no Shell (pós-merge) e, à mão, na produção.
+ALTER TABLE "calibrations" ADD COLUMN IF NOT EXISTS "pending_publish" boolean DEFAULT false NOT NULL;

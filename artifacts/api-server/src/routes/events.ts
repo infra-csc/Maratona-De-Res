@@ -37,7 +37,7 @@ router.get("/events", async (req, res) => {
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
     db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active, criterionEventScoped: criteriaTable.eventScoped, criterionSourceCriterionId: criteriaTable.sourceCriterionId })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
-    db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
+    db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore, pendingPublish: calibrationsTable.pendingPublish })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
     db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
       .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, eventIds)),
@@ -168,6 +168,7 @@ router.get("/events", async (req, res) => {
         calibratedCriteriaCount,
         finalCalibratedCriteria,
         partialPublishedCount,
+        pendingPublishCount: calibrations.filter(c => c.eventId === ev.id && c.pendingPublish).length,
         partialPublishedAt,
         criteriaConfirmed: true,
         unassignedAreaNames: [],
@@ -380,7 +381,10 @@ router.get("/events", async (req, res) => {
       ? (conformityEvalNameById.get(ev.conformityEvaluatorUserId) ?? null) : null;
     const conformityEvaluatorFerramentasName = ev.conformityEvaluatorFerramentasUserId != null
       ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone, conformityEvaluatorName, conformityEvaluatorFerramentasName };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount,
+      // Calibrações salvas que ainda não foram publicadas (filtro "Falta publicar").
+      pendingPublishCount: calibrations.filter(c => c.eventId === ev.id && c.pendingPublish).length,
+      averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)

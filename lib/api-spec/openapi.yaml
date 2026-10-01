@@ -512,6 +512,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/MergeEmployeeResult"
 
+  /employees/{id}/cycle-exclusion:
+    put:
+      operationId: setEmployeeCycleExclusion
+      tags: [employees]
+      summary: Tira o colaborador do ciclo atual (ou devolve). Só admin; recalcula o ciclo.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CycleExclusionInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleExclusionResult"
+
   /employees/{id}/history:
     get:
       operationId: getEmployeeHistory
@@ -4351,6 +4376,49 @@ components:
           type: string
         createdAt:
           type: string
+        cycleEligible:
+          type: ["boolean", "null"]
+          description: Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)
+        participatedEventsCount:
+          type: ["integer", "null"]
+        cycleEventsCount:
+          type: ["integer", "null"]
+          description: Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)
+        cycleExcluded:
+          type: boolean
+          description: O admin tirou o colaborador do ciclo atual
+        cycleExcludedReason:
+          type: ["string", "null"]
+        linkedUserId:
+          type: ["integer", "null"]
+        hasAccess:
+          type: boolean
+
+    CycleExclusionInput:
+      type: object
+      required: [excluded]
+      properties:
+        excluded:
+          type: boolean
+        reason:
+          type: ["string", "null"]
+
+    CycleExclusionResult:
+      type: object
+      required: [employeeId, cycleId, excluded, excludedReason, warnings]
+      properties:
+        employeeId:
+          type: integer
+        cycleId:
+          type: integer
+        excluded:
+          type: boolean
+        excludedReason:
+          type: ["string", "null"]
+        warnings:
+          type: array
+          items:
+            type: string
 
     EmployeeCreateResponse:
       allOf:
@@ -4470,6 +4538,9 @@ components:
         partialPublishedCount:
           type: integer
           description: Nº de critérios ativos com pelo menos uma publicação parcial.
+        pendingPublishCount:
+          type: integer
+          description: Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar).
         averageScore:
           type: ["number", "null"]
         teamScore:
@@ -5335,6 +5406,9 @@ components:
           type: ["string", "null"]
         calibratedAt:
           type: string
+        pendingPublish:
+          type: boolean
+          description: Salva e ainda não publicada — não vale na nota até publicar.
         warnings:
           type: ["array", "null"]
           items:

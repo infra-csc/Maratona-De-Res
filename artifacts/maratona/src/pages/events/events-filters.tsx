@@ -14,6 +14,7 @@ const chipFilters: { key: string | null; label: string; title: string }[] = [
   { key: "unconfirmed", label: "Não Confirmados", title: "Resultados não confirmados: ainda não contam na elegibilidade nem na nota" },
   { key: "inEval",      label: "Em Avaliação",    title: "Avaliações em andamento, sem calibração salva" },
   { key: "pendingCal",  label: "Falta calibrar",  title: "Eventos encerrados sem nenhuma calibração ou publicação" },
+  { key: "pendingPub",  label: "Falta publicar",  title: "Calibração salva e ainda não publicada: só vale na nota depois de publicar" },
   { key: "partialPub",  label: "Pub. Parcial",    title: "Publicação parcial: nem todos os critérios têm publicação final" },
   { key: "fullyEval",   label: "Pub. Final",      title: "Publicação final: todos os critérios publicados" },
 ];

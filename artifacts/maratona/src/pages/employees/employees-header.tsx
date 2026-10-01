@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import { KeyRound, GitMerge, X, RefreshCw, Hash, CreditCard, Search } from "lucide-react";
 import { CONDENSED, WARNING, GOOD, GOOD_TEXT } from "@/lib/premium-theme";
-import { employmentTypeLabel, fieldStyle } from "./utils";
-import type { EmploymentType } from "./types";
+import { fieldStyle } from "./utils";
 
 /** Título da página + botões de ações em massa. O diálogo "Novo Colaborador" entra pelo slot `createDialog`. */
 export function EmployeesHeader({
@@ -89,47 +88,45 @@ export function EmployeesHeader({
   );
 }
 
-export type EmployeeStats = { total: number; ativos: number; elegiveis: number };
+export type EmployeeStats = { noCiclo: number; elegiveis: number; foraDoCiclo: number };
 
-/** Cartões de KPI: total, ativos e elegíveis (com barra proporcional ao total). */
+/** Cartões de KPI do ciclo atual: com nota, elegíveis (barra sobre quem tem nota) e fora do ciclo. */
 export function EmployeesKpis({ stats }: { stats: EmployeeStats }) {
-  const pct = (n: number) => (stats.total > 0 ? Math.round((n / stats.total) * 100) : 0);
+  const pct = (n: number) => (stats.noCiclo > 0 ? Math.round((n / stats.noCiclo) * 100) : 0);
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Total de Registros</span>
-        <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{stats.total}</p>
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Com nota no ciclo</span>
+        <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{stats.noCiclo}</p>
         <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
-      </div>
-      <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos</span>
-        <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{stats.ativos}</p>
-        <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
       </div>
       <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Elegíveis para Bônus</span>
         <p data-testid="stat-elegiveis" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>{stats.elegiveis}</p>
         <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.elegiveis)}%`, backgroundColor: GOOD }} /></div>
       </div>
+      <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Fora do ciclo</span>
+        <p data-testid="stat-fora-do-ciclo" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: stats.foraDoCiclo > 0 ? "var(--foreground)" : "var(--muted-foreground)" }}>{stats.foraDoCiclo}</p>
+        <p className="text-xs mt-3" style={{ color: "var(--muted-foreground)" }}>Tirados pelo admin: sem nota, ranking e bônus neste ciclo.</p>
+      </div>
     </section>
   );
 }
 
-/** Busca + filtros Ativos/Inativos e tipo de contratação. */
+/** Busca + "No ciclo" (com nota) × "Fora do ciclo" (tirados pelo admin). */
 export function EmployeesFilters({
   search,
   onSearchChange,
-  filterActive,
-  onFilterActiveChange,
-  filterType,
-  onFilterTypeChange,
+  filterCycle,
+  onFilterCycleChange,
+  counts,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
-  filterActive: "true" | "false";
-  onFilterActiveChange: (v: "true" | "false") => void;
-  filterType: "all" | EmploymentType;
-  onFilterTypeChange: (v: "all" | EmploymentType) => void;
+  filterCycle: "in" | "out";
+  onFilterCycleChange: (v: "in" | "out") => void;
+  counts: { in: number; out: number };
 }) {
   return (
     <section className="flex flex-col md:flex-row gap-3 items-center flex-wrap">
@@ -145,34 +142,20 @@ export function EmployeesFilters({
           placeholder="Buscar por nome, função ou departamento..."
         />
       </div>
-      <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-        {(["true", "false"] as const).map(v => {
-          const active = filterActive === v;
+      <div role="group" aria-label="Situação no ciclo" className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+        {(["in", "out"] as const).map(v => {
+          const active = filterCycle === v;
           return (
             <button
               key={v}
-              data-testid={`filter-active-${v}`}
-              onClick={() => onFilterActiveChange(v)}
+              type="button"
+              aria-pressed={active}
+              data-testid={`filter-cycle-${v}`}
+              onClick={() => onFilterCycleChange(v)}
               className="px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors"
               style={{ fontFamily: CONDENSED, backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
             >
-              {v === "true" ? "Ativos" : "Inativos"}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-        {(["all", "casa", "freela"] as const).map(v => {
-          const active = filterType === v;
-          return (
-            <button
-              key={v}
-              data-testid={`filter-type-${v}`}
-              onClick={() => onFilterTypeChange(v)}
-              className="px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors"
-              style={{ fontFamily: CONDENSED, backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
-            >
-              {v === "all" ? "Todos os Tipos" : employmentTypeLabel(v)}
+              {v === "in" ? "No ciclo" : "Fora do ciclo"} <span className="tabular-nums opacity-70">({counts[v]})</span>
             </button>
           );
         })}

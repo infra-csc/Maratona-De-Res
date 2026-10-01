@@ -96,6 +96,10 @@ export function sentenceOf(e: ScoreTimelineEntry): { title: string; detail: stri
     case "penalty_removed":
     case "merit_removed":
       return { title: `${e.type === "merit_removed" ? "Mérito" : "Penalidade"} excluído · ${e.label ?? "lançamento"}`, detail: join(e.eventName, e.reason) };
+    case "cycle_excluded":
+      return { title: "Retirado do ciclo", detail: join("sem nota, ranking e bônus neste ciclo", e.reason ? `“${e.reason}”` : null) };
+    case "cycle_included":
+      return { title: "Devolvido ao ciclo", detail: join(e.reason ? `“${e.reason}”` : null) };
     case "calibrate":
     case "recalibrate_released":
       return {

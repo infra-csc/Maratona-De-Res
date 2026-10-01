@@ -21,6 +21,7 @@ export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, 
                             <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
                               {cal && canFinalize ? (
                                 <div className="flex flex-col items-center gap-1">
+                                  {cal.pendingPublish && <PendingPublishBadge />}
                                   {/* Estado de publicação atual — badge prominente */}
                                   {isFinalPublished ? (
                                     <div className="flex flex-col items-center gap-0.5">
@@ -76,6 +77,8 @@ export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, 
                                     </button>
                                   </div>
                                 </div>
+                              ) : cal?.pendingPublish ? (
+                                <PendingPublishBadge />
                               ) : cal ? (
                                 <span className="inline-flex items-center gap-0.5 text-[11px] font-bold uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT, border: `1px solid ${GOOD}` }}>
                                   <CheckCircle size={9} /> Cal.
@@ -86,5 +89,16 @@ export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, 
                                 </span>
                               )}
                             </td>
+  );
+}
+
+/** Calibração salva e ainda não publicada: não vale na nota até publicar. */
+function PendingPublishBadge() {
+  return (
+    <span data-testid="badge-criterion-pending-publish" title="Salva e ainda não publicada: o colaborador e a nota oficial só mudam depois de publicar"
+      className="inline-flex items-center text-[11px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap"
+      style={{ backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT, border: `1px solid ${AMBER}` }}>
+      Falta publicar
+    </span>
   );
 }

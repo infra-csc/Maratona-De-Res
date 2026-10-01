@@ -35,22 +35,34 @@ router.get("/employees", async (req, res) => {
   const employees = await query.orderBy(employeesTable.name);
 
   // Join quarterly_results for current cycle (if exists) to expose computed eligibility
-  const cycleResults: Record<number, { cycleEligible: boolean; participatedEventsCount: number }> = {};
+  const cycleResults: Record<number, { cycleEligible: boolean; participatedEventsCount: number; eventsCount: number }> = {};
+  // Fora do ciclo (decisão do admin): a tela Colaboradores lista quem tem nota
+  // no ciclo + quem foi tirado dele (para poder reativar).
+  const exclusions = new Map<number, string | null>();
   if (cycle) {
-    const rows = await db
-      .select({
-        employeeId: quarterlyResultsTable.employeeId,
-        eligible: quarterlyResultsTable.eligible,
-        participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
-      })
-      .from(quarterlyResultsTable)
-      .where(eq(quarterlyResultsTable.cycleId, cycle.id));
+    const [rows, excludedRows] = await Promise.all([
+      db
+        .select({
+          employeeId: quarterlyResultsTable.employeeId,
+          eligible: quarterlyResultsTable.eligible,
+          participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+          eventsCount: quarterlyResultsTable.eventsCount,
+        })
+        .from(quarterlyResultsTable)
+        .where(eq(quarterlyResultsTable.cycleId, cycle.id)),
+      db
+        .select({ employeeId: employeeCycleEligibilityTable.employeeId, reason: employeeCycleEligibilityTable.excludedReason })
+        .from(employeeCycleEligibilityTable)
+        .where(and(eq(employeeCycleEligibilityTable.cycleId, cycle.id), eq(employeeCycleEligibilityTable.excluded, true))),
+    ]);
     for (const r of rows) {
       cycleResults[r.employeeId] = {
         cycleEligible: r.eligible,
         participatedEventsCount: r.participatedEventsCount,
+        eventsCount: r.eventsCount,
       };
     }
+    for (const r of excludedRows) exclusions.set(r.employeeId, r.reason ?? null);
   }
 
   // Map linked user accounts so the UI can offer "view as employee" and show access status
@@ -71,6 +83,9 @@ router.get("/employees", async (req, res) => {
       ...e,
       cycleEligible: cycleResults[e.id]?.cycleEligible ?? null,
       participatedEventsCount: cycleResults[e.id]?.participatedEventsCount ?? null,
+      cycleEventsCount: cycleResults[e.id]?.eventsCount ?? null,
+      cycleExcluded: exclusions.has(e.id),
+      cycleExcludedReason: exclusions.get(e.id) ?? null,
       linkedUserId: linked?.id ?? null,
       hasAccess: linked != null && linked.active,
     };
@@ -163,6 +178,35 @@ router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (re
     if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
   }
   res.json(employee);
+});
+
+/**
+ * PUT /employees/:id/cycle-exclusion — tira (ou devolve) o colaborador do
+ * ciclo atual. Fora do ciclo ele não entra no recálculo: sem nota, ranking,
+ * análises nem bônus. Só admin. Recalcula o ciclo na hora.
+ */
+router.put("/employees/:id/cycle-exclusion", requireRole("admin"), async (req, res) => {
+  const employeeId = Number(req.params.id);
+  if (!Number.isInteger(employeeId) || employeeId <= 0) { res.status(400).json({ error: "Colaborador inválido" }); return; }
+  const { excluded, reason } = req.body ?? {};
+  if (typeof excluded !== "boolean") { res.status(400).json({ error: "Informe excluded (true ou false)" }); return; }
+  if (reason != null && typeof reason !== "string") { res.status(400).json({ error: "Motivo inválido" }); return; }
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+  const [employee] = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+  if (!employee) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
+
+  const excludedReason = excluded ? (reason?.trim() || null) : null;
+  const [record] = await db.insert(employeeCycleEligibilityTable).values({
+    employeeId, cycleId: cycle.id, excluded, excludedReason, createdByUserId: req.user!.userId,
+  }).onConflictDoUpdate({
+    target: [employeeCycleEligibilityTable.employeeId, employeeCycleEligibilityTable.cycleId],
+    set: { excluded, excludedReason, updatedAt: new Date() },
+  }).returning();
+  await audit(req.user!.userId, "set_cycle_exclusion", "employee_cycle_eligibility", record.id, null,
+    { employeeId, employeeName: employee.name, cycleId: cycle.id, excluded, reason: excludedReason });
+  const { warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
+  res.json({ employeeId, cycleId: cycle.id, excluded, excludedReason, warnings });
 });
 
 router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res) => {

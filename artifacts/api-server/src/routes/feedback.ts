@@ -4,7 +4,7 @@ import {
   eventCriteriaTable, criteriaTable, employeesTable, platoonRulesTable,
   eventAreaAssignmentsTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
@@ -225,6 +225,12 @@ async function publishSnapshot(eventId: number, criterionIds: number[] | "all", 
       await tx.update(eventCriteriaTable)
         .set({ publishedScore: cal?.score ?? null, publishedReason: cal?.reason ?? null })
         .where(eq(eventCriteriaTable.id, l.id));
+    }
+    // Publicada: a calibração salva passa a valer na nota oficial.
+    const ids = targets.map(t => t.criterionId);
+    if (ids.length > 0) {
+      await tx.update(calibrationsTable).set({ pendingPublish: false })
+        .where(and(eq(calibrationsTable.eventId, eventId), inArray(calibrationsTable.criterionId, ids)));
     }
   });
   const [ev] = await db.select({ cycleId: eventsTable.cycleId, resultsConfirmed: eventsTable.resultsConfirmed, status: eventsTable.status })

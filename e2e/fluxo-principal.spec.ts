@@ -1,7 +1,7 @@
 // Fluxo principal da Maratona de Resultados, de ponta a ponta pelo navegador:
 //
 //   admin entra → abre o evento → avaliador entra e avalia os critérios em
-//   /evaluations → admin calibra em /calibrations → admin confirma os
+//   /evaluations → admin calibra e PUBLICA em /calibrations → admin confirma os
 //   resultados no detalhe do evento → Resultados mostra a colaboradora
 //   passando de inelegível (7 eventos) para elegível com bônus (8 eventos).
 //
@@ -10,8 +10,6 @@
 // (support/a11y.ts).
 //
 // Fora do escopo (e por quê):
-//  - "Publicar" notas (parcial/final) na Calibração: não é pré-requisito para
-//    confirmar resultados nem muda o bônus; só libera o feedback ao avaliador.
 //  - Áudio da avaliação: opcional e depende do Object Storage do Google.
 //  - Matriz de Conformidade: sem avaliador de conformidade designado no seed,
 //    a conformidade fica "pendente = SIM" (sem desconto), a regra oficial.
@@ -99,7 +97,7 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     }
   });
 
-  await test.step("admin calibra a nota do 2º critério (8 → 9) com justificativa", async () => {
+  await test.step("admin calibra a nota do 2º critério (8 → 9) com justificativa e publica", async () => {
     await page.goto(`/events/${TARGET_EVENT.id}`);
     await page.getByTestId("link-event-calibrations").click();
     await expect(page).toHaveURL(new RegExp(`/calibrations\\?eventId=${TARGET_EVENT.id}$`));
@@ -118,6 +116,15 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     await expect(page.getByText("Calibração salva").first()).toBeVisible();
     await expect(c2).toContainText("→ 9");
     await expect(page.getByTestId(`input-cal-score-${CRITERIA[1].id}`)).toHaveValue("9");
+
+    // Regra do dono (01/10/2026): salva ainda NÃO vale na nota — a tela avisa
+    // o que falta publicar; publicar é o que faz a calibração contar.
+    await expect(c2.getByTestId("badge-criterion-pending-publish")).toBeVisible();
+    await expect(page.getByTestId("text-pending-publish")).toHaveText(/1 falta publicar/i);
+    await page.getByTestId("button-publish-all").click();
+    await expect(page.getByText(/^Publicado/).first()).toBeVisible();
+    await expect(page.getByTestId("text-pending-publish")).toHaveCount(0);
+    await expect(c2.getByTestId("badge-criterion-pending-publish")).toHaveCount(0);
   });
 
   await test.step("antes da confirmação: Ana tem 7 eventos e está inelegível", async () => {
