@@ -115,7 +115,7 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     await page.getByTestId(`input-cal-reason-inline-${CRITERIA[1].id}`).fill("E2E: atraso justificado pelo cliente.");
     await page.getByTestId(`input-cal-score-${CRITERIA[1].id}`).fill("9");
     await page.getByTestId(`button-save-cal-${CRITERIA[1].id}`).click();
-    await expect(page.getByText("Calibração registrada").first()).toBeVisible();
+    await expect(page.getByText("Calibração salva").first()).toBeVisible();
     await expect(c2).toContainText("→ 9");
     await expect(page.getByTestId(`input-cal-score-${CRITERIA[1].id}`)).toHaveValue("9");
   });

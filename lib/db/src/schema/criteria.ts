@@ -55,6 +55,11 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   // Auditoria de publicação: quem publicou parcial/final
   partialPublishedByUserId: integer("partial_published_by_user_id").references(() => usersTable.id),
   finalPublishedByUserId: integer("final_published_by_user_id").references(() => usersTable.id),
+  // Retrato do que o COLABORADOR vê: nota calibrada e justificativa no momento
+  // da última publicação (parcial ou final). Calibrar de novo não muda o que
+  // ele vê até o calibrador publicar outra vez (regra do dono, 01/10/2026).
+  publishedScore: numeric("published_score", { precision: 5, scale: 2 }),
+  publishedReason: text("published_reason"),
 }, (t) => ({
   // Um vínculo por (evento, critério): corrida entre resync e seeding da
   // integração criava duas linhas e o critério contava duas vezes na nota.

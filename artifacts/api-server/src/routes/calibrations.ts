@@ -3,7 +3,6 @@ import { db, calibrationsTable, calibrationCommentsTable, criteriaTable, usersTa
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { recomputeCycleResults } from "./results.js";
 import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
@@ -123,11 +122,10 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
     afterSnap,
   );
 
-  let warnings: string[] = [];
-  if (event.resultsConfirmed || event.status === "closed") {
-    const recompute = await recomputeCycleResults(event.cycleId, req.user!.userId);
-    warnings = recompute.warnings;
-  }
+  // Salvar NÃO recalcula o ciclo: o colaborador só vê a mudança quando o
+  // calibrador PUBLICA (parcial ou final) — é a publicação que grava o retrato
+  // e recalcula (routes/feedback.ts). Regra do dono, 01/10/2026.
+  const warnings: string[] = [];
 
   res.status(201).json({
     ...calibration,

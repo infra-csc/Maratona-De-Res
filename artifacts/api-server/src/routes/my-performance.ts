@@ -158,6 +158,8 @@ router.get("/my-performance", async (req, res) => {
       defaultWeight: criteriaTable.defaultWeight,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+      publishedScore: eventCriteriaTable.publishedScore,
+      publishedReason: eventCriteriaTable.publishedReason,
       eventScoped: criteriaTable.eventScoped,
       sourceCriterionId: criteriaTable.sourceCriterionId,
     })
@@ -247,7 +249,11 @@ router.get("/my-performance", async (req, res) => {
         const weight = parseFloat(((r.weight ?? r.defaultWeight) ?? "1") as string);
         const calibration = allCalibrations.find(cal => cal.criterionId === r.criterionId);
         const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
-        const scoreUsed = calibratedScore;
+        // O colaborador vê a nota do critério só depois de PUBLICADA (parcial ou
+        // final, ou feedback do evento liberado), e vê o retrato da publicação:
+        // salvar uma calibração nova não muda nada aqui até publicar de novo.
+        const isPublished = !!(r.partialPublishedAt || r.finalPublishedAt || p.feedbackReleased);
+        const scoreUsed = isPublished && r.publishedScore != null ? pgNum(r.publishedScore) : null;
         // Critério respondido por várias áreas: as cópias da mesma origem contam
         // junto — basta uma área concluída (conta só quem avaliou).
         const members = [r, ...eventCriteriaRows.filter(x => x.eventScoped && x.active && x.sourceCriterionId === r.criterionId)];
@@ -261,10 +267,8 @@ router.get("/my-performance", async (req, res) => {
         const publicComments = allEvals
           .filter(e => e.criterionId === r.criterionId && e.commentVisibility === "public" && e.comments)
           .map(e => e.comments!);
-        // Comentário de calibração: exibido apenas quando a nota já foi publicada
-        // (parcial ou final) — antes da publicação o colaborador não deve ver.
-        const isPublished = !!(r.partialPublishedAt || r.finalPublishedAt);
-        const calibrationReason = isPublished ? (calibration?.calibrationReason ?? null) : null;
+        // Justificativa: a da última publicação (mesmo retrato da nota).
+        const calibrationReason = isPublished ? (r.publishedReason ?? null) : null;
         return {
           criterionId: r.criterionId!,
           criterionName: r.criterionName ?? "",

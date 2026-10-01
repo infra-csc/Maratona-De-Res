@@ -29,6 +29,13 @@
       "when": 1790602776368,
       "tag": "0003_criterion_evaluating_areas",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790885320429,
+      "tag": "0004_published_snapshot",
+      "breakpoints": true
     }
   ]
 }
