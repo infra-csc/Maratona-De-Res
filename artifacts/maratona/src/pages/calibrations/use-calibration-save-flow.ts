@@ -220,7 +220,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       if (warnings.length > 0) {
         toast({ title: "Calibração registrada", description: warnings.join(" "), variant: "destructive" });
       } else {
-        toast({ title: "Calibração registrada" });
+        toast({ title: "Calibração salva", description: "O colaborador só vê depois que você publicar (parcial ou final)." });
       }
     } catch (e) {
       if (isAuthError(e)) toast(SESSION_EXPIRED_TOAST);

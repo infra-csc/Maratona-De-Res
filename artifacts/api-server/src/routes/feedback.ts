@@ -196,9 +196,45 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
     feedbackReleasedAt: new Date(),
   }).where(eq(eventsTable.id, eventId)).returning();
   await audit(req.user!.userId, "release_feedback", "events", eventId);
-  await recomputeCycleResults(updated.cycleId, req.user!.userId);
+  // Retrato de todos os critérios + recálculo (antes só recalculava).
+  await publishSnapshot(eventId, "all", req.user!.userId);
+  void updated.cycleId;
   res.json({ ...feedback, feedbackReleased: updated.feedbackReleased, feedbackReleasedAt: updated.feedbackReleasedAt });
 });
+
+/**
+ * Publicar = o que o colaborador passa a ver: grava o retrato (nota calibrada e
+ * justificativa atuais) nos critérios publicados — e nas cópias por área deles —
+ * e recalcula o ciclo quando o evento já conta para a nota. Salvar a calibração
+ * não faz nada disso; só publicar.
+ */
+async function publishSnapshot(eventId: number, criterionIds: number[] | "all", userId: number): Promise<string[]> {
+  const links = await db.select({ id: eventCriteriaTable.id, criterionId: eventCriteriaTable.criterionId, sourceCriterionId: criteriaTable.sourceCriterionId })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(eventCriteriaTable.eventId, eventId));
+  const targets = criterionIds === "all"
+    ? links
+    : links.filter(l => criterionIds.includes(l.criterionId) || (l.sourceCriterionId != null && criterionIds.includes(l.sourceCriterionId)));
+  const cals = await db.select({ criterionId: calibrationsTable.criterionId, score: calibrationsTable.calibratedScore, reason: calibrationsTable.calibrationReason })
+    .from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
+  const calBy = new Map(cals.map(c => [c.criterionId, c]));
+  await db.transaction(async (tx) => {
+    for (const l of targets) {
+      const cal = calBy.get(l.criterionId);
+      await tx.update(eventCriteriaTable)
+        .set({ publishedScore: cal?.score ?? null, publishedReason: cal?.reason ?? null })
+        .where(eq(eventCriteriaTable.id, l.id));
+    }
+  });
+  const [ev] = await db.select({ cycleId: eventsTable.cycleId, resultsConfirmed: eventsTable.resultsConfirmed, status: eventsTable.status })
+    .from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (ev && (ev.resultsConfirmed || ev.status === "closed")) {
+    const { warnings } = await recomputeCycleResults(ev.cycleId, userId);
+    return warnings;
+  }
+  return [];
+}
 
 /**
  * POST /events/:id/criteria/:criterionId/publish-partial
@@ -230,6 +266,7 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
     finalPublishedByUserId: null,
   }).where(eq(eventCriteriaTable.id, link.id)).returning();
   await audit(req.user!.userId, "publish_partial_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
+  await publishSnapshot(eventId, [criterionId], req.user!.userId);
 
   const feedback = await buildEventFeedback(eventId);
   res.json({ ...feedback, criterionId, criterionPartialPublishedAt: updated.partialPublishedAt });
@@ -238,10 +275,10 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
 /**
  * POST /events/:id/criteria/:criterionId/publish-final
  * Publica a nota de UM critério como "FINAL" — o colaborador vê sem o aviso
- * de "projeção parcial". Não trava edição: se a calibração mudar depois, o
- * colaborador vê automaticamente o valor atualizado (o critério continua
- * marcado como Final). Pode ser chamado várias vezes (cada chamada atualiza
- * a data). Disponível mesmo se o evento não estiver fechado.
+ * de "projeção parcial". Não trava edição, mas o colaborador continua vendo o
+ * retrato desta publicação até o calibrador publicar de novo. Pode ser chamado
+ * várias vezes (cada chamada atualiza a data e o retrato). Disponível mesmo se
+ * o evento não estiver fechado.
  */
 router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
@@ -265,6 +302,7 @@ router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admi
     partialPublishedByUserId: link.partialPublishedByUserId ?? req.user!.userId,
   }).where(eq(eventCriteriaTable.id, link.id)).returning();
   await audit(req.user!.userId, "publish_final_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
+  await publishSnapshot(eventId, [criterionId], req.user!.userId);
 
   res.json({ criterionId, finalPublishedAt: updated.finalPublishedAt, partialPublishedAt: updated.partialPublishedAt });
 });
@@ -304,6 +342,7 @@ router.post("/events/:id/criteria/publish-partial-all", requireRole("admin", "rh
     return links;
   });
   await audit(req.user!.userId, "publish_partial_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
+  await publishSnapshot(eventId, "all", req.user!.userId);
 
   res.json({ published: criteriaLinks.length, partialPublishedAt: now });
 });
@@ -338,6 +377,7 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
     return links;
   });
   await audit(req.user!.userId, "publish_final_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
+  await publishSnapshot(eventId, "all", req.user!.userId);
 
   res.json({ published: criteriaLinks.length, finalPublishedAt: now });
 });
