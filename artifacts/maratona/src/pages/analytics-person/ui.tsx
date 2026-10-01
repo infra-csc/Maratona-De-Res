@@ -91,21 +91,27 @@ export function SearchPicker({ id, value, onChange, options, placeholder, emptyT
   const current = options.find(o => o.id === value);
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button id={id} type="button" role="combobox" aria-expanded={open} data-testid="picker-colaborador"
-          className="flex h-10 w-full items-center justify-between gap-2 rounded-md px-3 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={{ backgroundColor: "var(--card)", border: "1px solid var(--input)", color: current ? "var(--foreground)" : "var(--muted-foreground)", fontWeight: current ? 600 : 400 }}>
-          <span className="flex items-center gap-2 min-w-0">
-            {current?.color !== undefined && current && <span aria-hidden className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: current.color ?? "var(--muted-foreground)" }} />}
-            <span className="truncate">{current ? current.label : placeholder}</span>
-          </span>
-          {current ? (
-            <span role="button" tabIndex={0} aria-label="Limpar colaborador" onClick={e => { e.stopPropagation(); onChange(null); }}
-              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onChange(null); } }}
-              className="rounded p-0.5 hover:bg-[var(--secondary)]"><X size={14} aria-hidden /></span>
-          ) : <ChevronsUpDown size={14} aria-hidden style={{ color: "var(--muted-foreground)" }} />}
-        </button>
-      </PopoverTrigger>
+      {/* O botão de limpar é IRMÃO do combobox (posicionado por cima), não filho: botão dentro de botão é marcação inválida. */}
+      <div className="relative">
+        <PopoverTrigger asChild>
+          <button id={id} type="button" role="combobox" aria-expanded={open} data-testid="picker-colaborador"
+            className={`flex h-10 w-full items-center justify-between gap-2 rounded-md pl-3 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${current ? "pr-[68px]" : "pr-3"}`}
+            style={{ backgroundColor: "var(--card)", border: "1px solid var(--input)", color: current ? "var(--foreground)" : "var(--muted-foreground)", fontWeight: current ? 600 : 400 }}>
+            <span className="flex items-center gap-2 min-w-0">
+              {current?.color !== undefined && current && <span aria-hidden className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: current.color ?? "var(--muted-foreground)" }} />}
+              <span className="truncate">{current ? current.label : placeholder}</span>
+            </span>
+            <ChevronsUpDown size={14} aria-hidden className={current ? "absolute right-3 top-1/2 -translate-y-1/2" : ""} style={{ color: "var(--muted-foreground)" }} />
+          </button>
+        </PopoverTrigger>
+        {current && (
+          <button type="button" aria-label="Limpar colaborador" title="Limpar (toda a equipe)" onClick={() => onChange(null)} data-testid="picker-colaborador-clear"
+            className="absolute right-8 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ color: "var(--muted-foreground)" }}>
+            <X size={14} aria-hidden />
+          </button>
+        )}
+      </div>
       <PopoverContent align="start" className="p-0 w-[min(92vw,380px)]">
         <Command>
           <CommandInput placeholder="Buscar pelo nome…" />

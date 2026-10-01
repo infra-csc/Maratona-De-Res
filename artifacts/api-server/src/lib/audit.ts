@@ -32,6 +32,16 @@ export function currentLastAction(): AuditActorContext["lastAction"] | null {
   return actorContext.getStore()?.lastAction ?? null;
 }
 
+/**
+ * Define o "motivo" que o próximo recálculo grava na linha do tempo quando a
+ * requisição fez VÁRIAS ações (ex.: confirmar em lote) — sem isso, todo
+ * mundo herdava a última ação auditada (o último evento da lista).
+ */
+export function setRecomputeCause(cause: NonNullable<AuditActorContext["lastAction"]>): void {
+  const store = actorContext.getStore();
+  if (store) store.lastAction = cause;
+}
+
 export async function audit(
   userId: number | null,
   action: string,

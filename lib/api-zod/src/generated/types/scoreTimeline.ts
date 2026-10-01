@@ -9,6 +9,7 @@ import type { ScoreTimelineCycle } from './scoreTimelineCycle';
 import type { ScoreTimelineEntry } from './scoreTimelineEntry';
 import type { ScoreTimelinePerson } from './scoreTimelinePerson';
 import type { ScoreTimelinePlatoonsItem } from './scoreTimelinePlatoonsItem';
+import type { ScoreTimelineSubject } from './scoreTimelineSubject';
 
 export interface ScoreTimeline {
   cycle: ScoreTimelineCycle;
@@ -17,6 +18,11 @@ export interface ScoreTimeline {
      * @nullable
      */
   employeeId: number | null;
+  /**
+     * Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+     * @nullable
+     */
+  subject?: ScoreTimelineSubject;
   /** Situação atual de cada colaborador do ranking (nota, faixa, bônus) */
   people: ScoreTimelinePerson[];
   /** @nullable */

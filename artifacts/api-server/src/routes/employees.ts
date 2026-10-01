@@ -1,11 +1,12 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
+import { db, scoreChangesTable, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
 import { eq, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole, bumpTokenVersion } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
+import { PRESERVE_PAYMENT_STATUSES } from "../lib/cycle-compute.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 import { affectedRows } from "../lib/pg-num.js";
 
@@ -190,11 +191,26 @@ router.put("/employees/:id/cycle-exclusion", requireRole("admin"), async (req, r
   if (!Number.isInteger(employeeId) || employeeId <= 0) { res.status(400).json({ error: "Colaborador inválido" }); return; }
   const { excluded, reason } = req.body ?? {};
   if (typeof excluded !== "boolean") { res.status(400).json({ error: "Informe excluded (true ou false)" }); return; }
-  if (reason != null && typeof reason !== "string") { res.status(400).json({ error: "Motivo inválido" }); return; }
+  if (reason != null && (typeof reason !== "string" || reason.length > 300)) { res.status(400).json({ error: "Motivo inválido (até 300 caracteres)" }); return; }
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
   const [employee] = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
   if (!employee) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
+
+  // Pagamento já decidido (aprovado, agendado, pago, bloqueado) sairia do
+  // ciclo junto com a nota — sem aviso, o registro do pagamento se perdia.
+  if (excluded) {
+    const [q] = await db.select({ bonusStatus: quarterlyResultsTable.bonusStatus, paidAt: quarterlyResultsTable.paidAt })
+      .from(quarterlyResultsTable)
+      .where(and(eq(quarterlyResultsTable.employeeId, employeeId), eq(quarterlyResultsTable.cycleId, cycle.id))).limit(1);
+    if (q && (q.paidAt || PRESERVE_PAYMENT_STATUSES.includes(q.bonusStatus))) {
+      res.status(409).json({ error: `O bônus de ${employee.name} neste ciclo está com status "${q.bonusStatus}". Resolva o pagamento em Resultados antes de tirar do ciclo.` });
+      return;
+    }
+  }
+  const [previous] = await db.select({ excluded: employeeCycleEligibilityTable.excluded, reason: employeeCycleEligibilityTable.excludedReason })
+    .from(employeeCycleEligibilityTable)
+    .where(and(eq(employeeCycleEligibilityTable.employeeId, employeeId), eq(employeeCycleEligibilityTable.cycleId, cycle.id))).limit(1);
 
   const excludedReason = excluded ? (reason?.trim() || null) : null;
   const [record] = await db.insert(employeeCycleEligibilityTable).values({
@@ -203,7 +219,8 @@ router.put("/employees/:id/cycle-exclusion", requireRole("admin"), async (req, r
     target: [employeeCycleEligibilityTable.employeeId, employeeCycleEligibilityTable.cycleId],
     set: { excluded, excludedReason, updatedAt: new Date() },
   }).returning();
-  await audit(req.user!.userId, "set_cycle_exclusion", "employee_cycle_eligibility", record.id, null,
+  await audit(req.user!.userId, "set_cycle_exclusion", "employee_cycle_eligibility", record.id,
+    { employeeId, excluded: previous?.excluded ?? false, reason: previous?.reason ?? null },
     { employeeId, employeeName: employee.name, cycleId: cycle.id, excluded, reason: excludedReason });
   const { warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
   res.json({ employeeId, cycleId: cycle.id, excluded, excludedReason, warnings });
@@ -288,8 +305,10 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
         .where(eq(employeeCycleEligibilityTable.employeeId, dupId));
       for (const e of dupElig) {
         if (!canonicalCycleIds.has(e.cycleId)) {
+          // "Fora do ciclo" foi decisão sobre o cadastro DUPLICADO: não passa
+          // em silêncio para o canônico (que segue no ciclo até o admin decidir).
           await tx.update(employeeCycleEligibilityTable)
-            .set({ employeeId: canonicalId })
+            .set({ employeeId: canonicalId, excluded: false, excludedReason: null })
             .where(eq(employeeCycleEligibilityTable.id, e.id));
           canonicalCycleIds.add(e.cycleId);
         }
@@ -347,11 +366,19 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
         .where(eq(quarterlyResultsTable.employeeId, dupId));
     }
 
+    // Linha do tempo: o histórico do duplicado vai para o canônico (antes era
+    // apagado em cascata junto com o cadastro).
+    await tx.update(scoreChangesTable).set({ employeeId: canonicalId }).where(inArray(scoreChangesTable.employeeId, dupIds));
+
     // Delete duplicates
     await tx.delete(employeesTable).where(inArray(employeesTable.id, dupIds));
   });
 
   await audit(req.user!.userId, "merge", "employees", canonicalId, { duplicateIds: dupIds }, { movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals });
+  // Participações e lançamentos agora são do canônico: recalcula o ciclo
+  // atual para a nota dele já refletir (antes só no próximo recálculo).
+  const current = await getCurrentCycle();
+  if (current) await recomputeCycleResults(current.id, req.user!.userId);
   res.json({ canonicalId, merged: dupIds, movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals, removedUsers });
 });
 

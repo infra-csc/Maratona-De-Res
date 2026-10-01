@@ -1,5 +1,4 @@
 import type { EventsReport, PlatoonRule, QuarterlyResult, RankingDetail, RankingDetailEvent } from "@workspace/api-client-react";
-import { fmtNum } from "@/lib/utils";
 
 /**
  * Contas da análise por colaborador. Tudo aqui replica, no navegador, as
@@ -15,6 +14,10 @@ import { fmtNum } from "@/lib/utils";
  */
 
 // ── Formatação ────────────────────────────────────────────────────────────
+// Sem imports de "@/…": este arquivo também roda no `node --test` (derive.test.ts).
+/** Número no padrão brasileiro (vírgula decimal), casas fixas — igual a fmtNum de lib/utils. */
+export const fmtNum = (value: number, digits = 1) =>
+  value.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 export const n1 = (v: number | null | undefined) => (v == null ? "—" : fmtNum(v, 1));
 export const pts = (v: number) => fmtNum(v, Number.isInteger(v) ? 0 : 1);
 export const brl = (v: number | null | undefined) =>
@@ -52,11 +55,44 @@ export function faixaOf(score: number | null | undefined, faixas: Faixa[]): Faix
   return null;
 }
 
-/** Próxima faixa acima da nota (a de menor nota mínima maior que a nota). */
+/**
+ * Menor nota final (1 casa, como a nota é gravada) que entra na faixa: o próprio
+ * mínimo quando é inclusivo; quando é exclusivo ("acima de 70"), 70,1.
+ */
+export function entryScoreOf(f: Faixa): number {
+  const k = f.minInclusive ? Math.ceil(f.minScore * 10 - 1e-7) : Math.floor(f.minScore * 10 + 1e-7) + 1;
+  return k / 10;
+}
+
+/** Próxima faixa acima da nota (a de menor nota de entrada maior que a nota). */
 export function nextFaixaOf(score: number | null | undefined, faixas: Faixa[]): Faixa | null {
   if (score == null) return null;
   const cur = faixaOf(score, faixas);
-  return faixas.find(f => f.minScore > score && f.name !== cur?.name) ?? null;
+  return [...faixas]
+    .sort((a, b) => entryScoreOf(a) - entryScoreOf(b))
+    .find(f => entryScoreOf(f) > score + 1e-9 && f.name !== cur?.name) ?? null;
+}
+
+export interface NextStep {
+  faixa: Faixa;
+  /** Menor nota final que entra na faixa. */
+  entry: number;
+  /** Pontos que faltam na nota final (≥ 0, 1 casa). */
+  gap: number;
+  /** Elegível: bônus total que pagaria com a nota de entrada (mesmos extras). Senão: prêmio base da faixa. */
+  bonus: number;
+}
+
+/** O que falta para a próxima faixa e quanto ela pagaria, pela nota de ENTRADA (respeita limite exclusivo). */
+export function nextStepOf(score: number | null | undefined, faixas: Faixa[], eligible: boolean | null, extras: number): NextStep | null {
+  const faixa = nextFaixaOf(score, faixas);
+  if (score == null || !faixa) return null;
+  const entry = entryScoreOf(faixa);
+  return {
+    faixa, entry,
+    gap: Math.max(0, round1(entry - score)),
+    bonus: eligible ? bonusOf(entry, extras, faixas) : faixa.bonusValue,
+  };
 }
 
 // ── Nota e bônus ──────────────────────────────────────────────────────────
@@ -128,10 +164,10 @@ export function impactOf(input: {
 /**
  * Impacto a partir da linha do ranking (/results/quarterly, valores gravados no
  * último recálculo). Extras: deduzidos do valor extra gravado; se a faixa não
- * paga extra, eventos pontuados além do mínimo (a conta é conferida com o
- * bônus gravado antes de ser usada).
+ * paga extra, eventos COM NOTA além do mínimo (a conta é conferida com o
+ * bônus gravado antes de ser usada). minEvents null = mínimo desconhecido.
  */
-export function impactOfRow(q: QuarterlyResult, minEvents: number, faixas: Faixa[]): Impact {
+export function impactOfRow(q: QuarterlyResult, minEvents: number | null, faixas: Faixa[]): Impact {
   const n = q.eventsCount ?? 0;
   const eligible = q.eligible ?? null;
   const f = faixaOf(q.finalResult, faixas);
@@ -140,7 +176,7 @@ export function impactOfRow(q: QuarterlyResult, minEvents: number, faixas: Faixa
   else if (eligible) {
     extras = f && f.bonusValue > 0 && f.bonusPerExtraEvent > 0
       ? Math.round((q.extraBonusValue ?? 0) / f.bonusPerExtraEvent)
-      : Math.max(0, n - minEvents);
+      : minEvents != null ? Math.max(0, n - minEvents) : null;
   }
   return impactOf({
     scoreSum: q.scoreSum, n, penalty: q.absencePenalty ?? 0, merit: q.meritPoints ?? 0,
@@ -217,7 +253,9 @@ export function criteriaCompare(report: EventsReport | undefined, myEventIds: Se
   for (const ev of report.events) {
     if (!ev.resultsConfirmed || ev.finalScore == null) continue;
     for (const c of ev.criteria) {
-      if (!c.active || c.used == null) continue;
+      // O relatório só lista inativos já calibrados, e esses CONTAM na nota
+      // (computeEventTeamResultFromData): o filtro é ter nota usada, não `active`.
+      if (c.used == null) continue;
       const key = `${c.name}|${c.area ?? ""}`.toLowerCase();
       const v = c.used <= 10 ? c.used * 10 : c.used;
       const a = acc.get(key) ?? { name: c.name, area: c.area ?? null, mine: [], team: [] };

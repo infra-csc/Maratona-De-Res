@@ -127,9 +127,17 @@ export function TeamStrip({ people, faixas, highlightId, onPick, teamAvg }: {
   const ticks: number[] = [];
   for (let t = lo; t <= hi; t += 5) ticks.push(t);
   const hovered = placed.find(p => p.id === hover) ?? placed.find(p => p.id === highlightId) ?? null;
+  const highlighted = placed.find(p => p.id === highlightId) ?? null;
+  const HIT = 24; // alvo de toque mínimo (px), maior que o ponto
   return (
     <div ref={ref} className="relative min-w-0" style={{ paddingTop: 34 }}>
-      <div className="relative rounded-md" style={{ height: plotH }}>
+      {/* Descrição para leitor de tela; o gráfico é só para o mouse/toque (a lista ou o seletor dão acesso por teclado). */}
+      <p className="sr-only">
+        {`Distribuição das notas finais de ${people.length} colaboradores, de ${n1(Math.min(...people.map(p => p.final)))} a ${n1(Math.max(...people.map(p => p.final)))}`}
+        {teamAvg != null ? `; média da equipe ${n1(teamAvg)}` : ""}
+        {highlighted ? `; ${highlighted.name} com ${n1(highlighted.final)}` : ""}.
+      </p>
+      <div className="relative rounded-md" style={{ height: plotH }} aria-hidden>
         {/* Fundo: faixas */}
         {faixas.filter(f => f.maxScore >= lo && f.minScore <= hi).map(f => {
           const a = x(Math.max(lo, f.minScore)), b = x(Math.min(hi, f.maxScore + 0.01));
@@ -144,16 +152,24 @@ export function TeamStrip({ people, faixas, highlightId, onPick, teamAvg }: {
         )}
         {placed.map(p => {
           const isHi = p.id === highlightId;
+          const size = isHi ? D + 4 : D;
+          // Área de clique invisível de HIT px centrada no ponto; fora da ordem de Tab.
           return (
-            <button key={p.id} type="button" onClick={() => onPick(p.id)}
-              onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(p.id)} onBlur={() => setHover(null)}
-              aria-label={`${p.name}: nota final ${n1(p.final)}. Abrir análise.`}
-              className="absolute rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-transform hover:scale-125"
+            <button key={p.id} type="button" tabIndex={-1} onClick={() => onPick(p.id)}
+              onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)}
+              title={`${p.name} · ${n1(p.final)}`}
+              className="group absolute flex items-center justify-center rounded-full cursor-pointer"
               style={{
-                left: `${x(p.final)}%`, bottom: 6 + p.lvl * (D + 3), width: isHi ? D + 4 : D, height: isHi ? D + 4 : D,
-                transform: "translateX(-50%)", backgroundColor: isHi ? "var(--foreground)" : SERIES,
-                boxShadow: `0 0 0 2px var(--card)${isHi ? ", 0 0 0 4px var(--foreground)" : ""}`, zIndex: isHi ? 3 : 1,
-              }} />
+                left: `${x(p.final)}%`, bottom: 6 + p.lvl * (D + 3) + size / 2 - Math.max(HIT, size) / 2,
+                width: Math.max(HIT, size), height: Math.max(HIT, size),
+                transform: "translateX(-50%)", zIndex: isHi ? 3 : hover === p.id ? 2 : 1, background: "transparent",
+              }}>
+              <span className="block rounded-full transition-transform group-hover:scale-125"
+                style={{
+                  width: size, height: size, backgroundColor: isHi ? "var(--foreground)" : SERIES,
+                  boxShadow: `0 0 0 2px var(--card)${isHi ? ", 0 0 0 4px var(--foreground)" : ""}`,
+                }} />
+            </button>
           );
         })}
         {hovered && (
@@ -177,7 +193,8 @@ export function EventsChart({ events, teamAvg, faixas, name }: { events: PersonE
   const rows = events.map((e, i) => ({ ...e, i, label: dm(e.date) }));
   const domain = scoreDomain([...rows.map(r => r.score), teamAvg], 3);
   const wide = width === 0 || width >= 560;
-  const thresholds = wide ? faixas.filter(f => f.minScore > domain[0] && f.minScore < domain[1]) : [];
+  // Início de faixa colado na média do ciclo (< 1 ponto) sairia por cima da linha da média: some a linha E o rótulo.
+  const thresholds = wide ? faixas.filter(f => f.minScore > domain[0] && f.minScore < domain[1] && !(teamAvg != null && Math.abs(f.minScore - teamAvg) < 1)) : [];
   const showValues = rows.length <= (wide ? 16 : 7);
   return (
     <figure className="min-w-0">
@@ -189,7 +206,7 @@ export function EventsChart({ events, teamAvg, faixas, name }: { events: PersonE
             <XAxis dataKey="i" tickFormatter={(i: number) => rows[i]?.label ?? ""} axisLine={{ stroke: GRID }} tickLine={false} tick={AXIS_TICK} interval="preserveStartEnd" minTickGap={14} padding={{ left: 18, right: 18 }} />
             <YAxis domain={domain} ticks={Array.from({ length: Math.floor((domain[1] - domain[0]) / 5) + 1 }, (_, k) => domain[0] + k * 5)} allowDecimals={false} axisLine={false} tickLine={false} tick={AXIS_TICK} width={44} />
             {thresholds.map(f => (
-              <ReferenceLine key={f.name} y={f.minScore} stroke={f.color} strokeOpacity={teamAvg != null && Math.abs(f.minScore - teamAvg) < 1 ? 0 : 1} strokeDasharray="2 4" strokeWidth={1.5}
+              <ReferenceLine key={f.name} y={f.minScore} stroke={f.color} strokeDasharray="2 4" strokeWidth={1.5}
                 label={{ value: `${f.name} · ${n1(f.minScore)}`, position: "right", fontSize: 11, fill: "var(--muted-foreground)" }} />
             ))}
             {teamAvg != null && <ReferenceLine y={teamAvg} stroke="var(--muted-foreground)" strokeDasharray="6 4" strokeWidth={1.5} />}
@@ -264,7 +281,17 @@ export function EvolutionChart({ entries, currentFinal, faixas, name }: { entrie
     if (currentFinal != null) pts.push({ t: Date.now(), at: new Date().toISOString(), value: currentFinal, title: "Hoje", detail: null, before: null });
     return pts.sort((a, b) => a.t - b.t);
   }, [entries, currentFinal]);
-  if (rows.length < 2) return null;
+  if (rows.length < 2) {
+    // Um ponto só não forma linha: diz o que há em vez de deixar o cartão vazio.
+    const only = rows[0];
+    return (
+      <p className="rounded-lg px-3.5 py-3 text-[13px]" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
+        {only
+          ? <>Só uma mudança registrada até agora ({dmy(only.at)}): nota final <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(only.value)}</strong>. O gráfico aparece a partir da segunda.</>
+          : <>Ainda não há mudança suficiente para desenhar a evolução.</>}
+      </p>
+    );
+  }
   const domain = scoreDomain(rows.map(r => r.value), 2);
   const wide = width === 0 || width >= 560;
   const thresholds = faixas.filter(f => f.minScore > domain[0] && f.minScore < domain[1]);

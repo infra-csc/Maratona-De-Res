@@ -12,8 +12,18 @@ export interface ScoreTimelineEntry {
   /** Data-hora ISO */
   at: string;
   kind: ScoreTimelineEntryKind;
-  /** event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…) */
+  /** event_counted, penalty, merit, penalty_removed, merit_removed, cycle_excluded, cycle_included, recompute ou o código da ação (calibrate, publish_partial_feedback, confirm-results, confirm-results-bulk…) */
   type: string;
+  /**
+     * Mesma ação que causou a mudança — a tela agrupa só entradas com o mesmo causeId
+     * @nullable
+     */
+  causeId?: string | null;
+  /**
+     * Calibração salva pela regra "só vale publicada" (não muda a nota até publicar)
+     * @nullable
+     */
+  pendingPublish?: boolean | null;
   /** @nullable */
   employeeId?: number | null;
   /** @nullable */

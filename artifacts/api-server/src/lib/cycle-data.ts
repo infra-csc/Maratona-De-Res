@@ -74,6 +74,28 @@ export function heapOrder(table: AnyPgTable): SQL {
  * avaliações, calibrações, avaliadores designados, matriz de conformidade).
  * Todo id pedido aparece no Map (evento sem nada vira listas vazias).
  */
+/**
+ * Calibrações que VALEM na nota (fonte única: recálculo, lista de Eventos e
+ * Análises). Regra do dono, só daqui pra frente: calibração salva e NÃO
+ * publicada (pending_publish) não entra — vale a última versão publicada do
+ * critério (event_criteria.published_score) ou, se nunca publicou, nenhuma
+ * (fica a média dos avaliadores). Calibrações antigas (pending = false)
+ * continuam valendo pelo valor salvo. Sem isso, qualquer recálculo (uma falta
+ * de outra pessoa, uma confirmação) aplicava a calibração só salva.
+ */
+export async function effectiveCalibrations<T extends { eventId: number; criterionId: number; calibratedScore: string; calibrationReason?: string | null; pendingPublish: boolean }>(saved: T[]): Promise<T[]> {
+  const pendingEventIds = [...new Set(saved.filter(c => c.pendingPublish).map(c => c.eventId))];
+  if (pendingEventIds.length === 0) return saved;
+  const publishedRows = await db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, publishedScore: eventCriteriaTable.publishedScore, publishedReason: eventCriteriaTable.publishedReason })
+    .from(eventCriteriaTable).where(inArray(eventCriteriaTable.eventId, pendingEventIds));
+  const publishedBy = new Map(publishedRows.map(p => [`${p.eventId}:${p.criterionId}`, p]));
+  return saved.flatMap(c => {
+    if (!c.pendingPublish) return [c];
+    const p = publishedBy.get(`${c.eventId}:${c.criterionId}`);
+    return p?.publishedScore != null ? [{ ...c, calibratedScore: p.publishedScore, calibrationReason: p.publishedReason ?? null }] : [];
+  });
+}
+
 export async function loadEventTeamData(eventIds: number[]): Promise<Map<number, EventTeamData<EventConformity>>> {
   const ids = [...new Set(eventIds)];
   const out = new Map<number, EventTeamData<EventConformity>>();
@@ -102,22 +124,8 @@ export async function loadEventTeamData(eventIds: number[]): Promise<Map<number,
     .orderBy(eventCriteriaTable.eventId, eventCriteriaTable.criterionId);
   const evaluations = await db.select().from(evaluationsTable).where(inArray(evaluationsTable.eventId, ids))
     .orderBy(evaluationsTable.eventId, heapOrder(evaluationsTable));
-  const savedCalibrations = await db.select().from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids));
-  // Regra do dono (só daqui pra frente): calibração salva e NÃO publicada não
-  // entra na nota — vale a última versão publicada do critério ou, se nunca
-  // publicou, a média dos avaliadores. Sem isso, qualquer recálculo (uma falta
-  // de outra pessoa, uma confirmação) aplicava a calibração só salva.
-  const pendingEventIds = [...new Set(savedCalibrations.filter(c => c.pendingPublish).map(c => c.eventId))];
-  const publishedRows = pendingEventIds.length > 0
-    ? await db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, publishedScore: eventCriteriaTable.publishedScore, publishedReason: eventCriteriaTable.publishedReason })
-        .from(eventCriteriaTable).where(inArray(eventCriteriaTable.eventId, pendingEventIds))
-    : [];
-  const publishedBy = new Map(publishedRows.map(p => [`${p.eventId}:${p.criterionId}`, p]));
-  const calibrations = savedCalibrations.flatMap(c => {
-    if (!c.pendingPublish) return [c];
-    const p = publishedBy.get(`${c.eventId}:${c.criterionId}`);
-    return p?.publishedScore != null ? [{ ...c, calibratedScore: p.publishedScore, calibrationReason: p.publishedReason }] : [];
-  });
+  const calibrations = await effectiveCalibrations(
+    await db.select().from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids)));
   const assignments = await db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
     .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, ids));
   const conformities = await db.select().from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, ids));

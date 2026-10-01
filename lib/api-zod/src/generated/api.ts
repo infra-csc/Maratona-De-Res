@@ -4406,6 +4406,8 @@ export const GetCycleEligibilityResponseItem = zod.object({
   "cycleId": zod.int().optional(),
   "eligible": zod.boolean(),
   "reason": zod.string().nullish(),
+  "excluded": zod.boolean().optional().describe('O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus)'),
+  "excludedReason": zod.string().nullish(),
   "createdByUserId": zod.int().nullish(),
   "createdByName": zod.string().nullish(),
   "updatedAt": zod.string().optional()
@@ -4429,6 +4431,8 @@ export const SetCycleEligibilityResponse = zod.object({
   "cycleId": zod.int().optional(),
   "eligible": zod.boolean(),
   "reason": zod.string().nullish(),
+  "excluded": zod.boolean().optional().describe('O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus)'),
+  "excludedReason": zod.string().nullish(),
   "createdByUserId": zod.int().nullish(),
   "createdByName": zod.string().nullish(),
   "updatedAt": zod.string().optional()
@@ -4664,6 +4668,7 @@ export const GetRankingDetailResponse = zod.object({
   "eventsCount": zod.int(),
   "scoreSum": zod.number().nullish(),
   "confirmedEventCount": zod.int().optional(),
+  "participatedEventsCount": zod.int().nullish().describe('Eventos confirmados de que participou (base da elegibilidade); null = sem resultado gravado no ciclo'),
   "isQuarterClosed": zod.boolean(),
   "bonusBreakdown": zod.object({
   "minEvents": zod.int(),
@@ -4723,6 +4728,7 @@ export const GetRankingDetailResponse = zod.object({
   "total": zod.int(),
   "date": zod.string(),
   "reason": zod.string().nullish(),
+  "eventId": zod.int().nullish(),
   "eventName": zod.string().nullish()
 })),
   "merits": zod.array(zod.object({
@@ -4734,6 +4740,7 @@ export const GetRankingDetailResponse = zod.object({
   "total": zod.int(),
   "date": zod.string(),
   "reason": zod.string().nullish(),
+  "eventId": zod.int().nullish(),
   "eventName": zod.string().nullish()
 }))
 })
@@ -4758,6 +4765,14 @@ export const GetScoreTimelineResponse = zod.object({
   "endDate": zod.string().nullish()
 }),
   "employeeId": zod.int().nullable().describe('Filtro aplicado (null = todos)'),
+  "subject": zod.object({
+  "employeeId": zod.int(),
+  "name": zod.string(),
+  "functionName": zod.string().nullable(),
+  "inRanking": zod.boolean(),
+  "excluded": zod.boolean().describe('O admin tirou do ciclo'),
+  "excludedReason": zod.string().nullable()
+}).nullish().describe('Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)'),
   "people": zod.array(zod.object({
   "employeeId": zod.int(),
   "name": zod.string(),
@@ -4779,7 +4794,9 @@ export const GetScoreTimelineResponse = zod.object({
   "id": zod.string(),
   "at": zod.string().describe('Data-hora ISO'),
   "kind": zod.enum(['recorded', 'reconstructed', 'info']),
-  "type": zod.string().describe('event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…)'),
+  "type": zod.string().describe('event_counted, penalty, merit, penalty_removed, merit_removed, cycle_excluded, cycle_included, recompute ou o código da ação (calibrate, publish_partial_feedback, confirm-results, confirm-results-bulk…)'),
+  "causeId": zod.string().nullish().describe('Mesma ação que causou a mudança — a tela agrupa só entradas com o mesmo causeId'),
+  "pendingPublish": zod.boolean().nullish().describe('Calibração salva pela regra "só vale publicada" (não muda a nota até publicar)'),
   "employeeId": zod.int().nullish(),
   "employeeName": zod.string().nullish(),
   "eventId": zod.int().nullish(),

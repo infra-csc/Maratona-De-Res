@@ -41,9 +41,12 @@ export function EventsFilterBar({
   filterDateFrom, filterDateTo, setFilterDateFrom, setFilterDateTo, hasDateFilter,
 }: EventsFilterBarProps) {
   return (
-    <div className="px-6 py-3 flex items-center gap-2 shrink-0 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
+    // Uma linha só a partir do md: busca | chips de situação (rolam na
+    // horizontal, com setas, quando não cabem) | datas. Antes os chips
+    // quebravam linha e empurravam o "Filtrar datas" sozinho para baixo.
+    <div className="px-6 py-3 flex items-center gap-2 shrink-0 flex-wrap md:flex-nowrap" style={{ borderBottom: "1px solid var(--border)" }}>
       {/* Search */}
-      <div className="flex items-center gap-2 rounded-lg px-3 py-2 w-72 shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+      <div className="flex items-center gap-2 rounded-lg px-3 py-2 w-full md:w-60 xl:w-72 shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
         <Search size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
         <input
           data-testid="input-search-events"
@@ -58,6 +61,7 @@ export function EventsFilterBar({
       </div>
 
       {/* Status chip filters */}
+      <HScroller label="filtros de situação" className="flex-1 min-w-0">
       {chipFilters.map((f) => {
         const active = cardFilter === f.key;
         return (
@@ -79,12 +83,13 @@ export function EventsFilterBar({
           </button>
         );
       })}
+      </HScroller>
 
       {/* Date filter popover */}
       <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
         <PopoverTrigger asChild>
           <button
-            className="ml-auto h-8 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 transition-colors shrink-0"
+            className="h-8 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 whitespace-nowrap transition-colors shrink-0"
             style={{
               fontFamily: CONDENSED,
               backgroundColor: hasDateFilter ? "var(--primary)" : "transparent",

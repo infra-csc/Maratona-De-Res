@@ -7,7 +7,8 @@ import { score, sentenceOf, shortDate } from "./describe";
 const SERIES = "var(--viz-series-1)";
 const GRID = "var(--viz-grid)";
 
-interface Point { t: number; at: string; value: number; kind: "reconstructed" | "recorded" | "now"; label: string }
+/** value null = saiu do ciclo (sem nota): a linha quebra ali. */
+interface Point { t: number; at: string; value: number | null; kind: "reconstructed" | "recorded" | "now"; label: string }
 
 /**
  * Nota final ao longo do ciclo, em degraus (a nota só muda num instante).
@@ -21,28 +22,41 @@ export function TimelineChart({ entries, currentFinal, platoons, name, height }:
   const { rows, domain, thresholds, hasRecon, hasRecorded } = useMemo(() => {
     const pts: Point[] = [];
     for (const e of entries) {
-      if (e.kind === "info" || e.finalAfter == null) continue;
-      pts.push({ t: new Date(e.at).getTime(), at: e.at, value: e.finalAfter, kind: e.kind as Point["kind"], label: sentenceOf(e).title });
+      if (e.kind === "info") continue;
+      // Saiu do ciclo: ponto sem valor, para a linha parar ali (e não seguir reta).
+      if (e.finalAfter == null && e.finalBefore == null) continue;
+      pts.push({ t: new Date(e.at).getTime(), at: e.at, value: e.finalAfter ?? null, kind: e.kind as Point["kind"], label: sentenceOf(e).title });
     }
     if (currentFinal != null) pts.push({ t: Date.now(), at: new Date().toISOString(), value: currentFinal, kind: "now", label: "Hoje" });
     pts.sort((a, b) => a.t - b.t);
-    // Duas séries no mesmo eixo: a remontada termina onde o registro começa
-    // (o ponto de junção entra nas duas para a linha não quebrar).
+    // Saída do ciclo: o degrau precisa de um ponto final com a nota que valia
+    // até ali — sem ele, o último trecho antes da saída não era desenhado.
+    for (let i = pts.length - 1; i > 0; i--) {
+      const prev = pts[i - 1];
+      if (pts[i].value == null && prev.value != null && prev.t < pts[i].t) {
+        pts.splice(i, 0, { ...pts[i], t: pts[i].t - 1, value: prev.value, kind: pts[i].kind === "reconstructed" ? "reconstructed" : "recorded", label: prev.label });
+      }
+    }
+    // Duas séries no mesmo eixo. Em degrau (stepAfter), o trecho entre o último
+    // ponto remontado e o primeiro registrado ainda é o valor REMONTADO: ele
+    // fica na série tracejada (que vai até o primeiro registrado) e a série
+    // contínua só começa no primeiro registro — antes ela incluía o ponto
+    // anterior e desenhava esse trecho contínuo, contradizendo a legenda.
     const firstRecorded = pts.findIndex(p => p.kind !== "reconstructed");
     const rows = pts.map((p, i) => ({
       t: p.t, at: p.at, label: p.label, value: p.value,
       recon: p.kind === "reconstructed" || (firstRecorded > 0 && i === firstRecorded) ? p.value : null,
-      rec: p.kind !== "reconstructed" || (firstRecorded > 0 && i === firstRecorded - 1) ? p.value : null,
+      rec: p.kind !== "reconstructed" ? p.value : null,
     }));
-    const values = pts.map(p => p.value);
+    const values = pts.map(p => p.value).filter((v): v is number => v != null);
     // Eixo em múltiplos de 5, com folga, recortado em volta dos valores.
     const lo = values.length ? Math.max(0, Math.floor((Math.min(...values) - 2) / 5) * 5) : 0;
     const hi = values.length ? Math.min(100, Math.ceil((Math.max(...values) + 2) / 5) * 5) : 100;
     const thresholds = platoons.filter(f => f.minScore > lo && f.minScore < hi);
-    return { rows, domain: [lo, hi] as [number, number], thresholds, hasRecon: pts.some(p => p.kind === "reconstructed"), hasRecorded: pts.some(p => p.kind !== "reconstructed") };
+    return { rows, domain: [lo, hi] as [number, number], thresholds, hasRecon: pts.some(p => p.kind === "reconstructed"), hasRecorded: pts.some(p => p.kind === "recorded") };
   }, [entries, currentFinal, platoons]);
 
-  if (rows.length === 0) return null;
+  if (!rows.some(r => r.value != null)) return null;
   const legend = [
     hasRecon && { key: "recon", label: "Remontado (com as notas de hoje)", dash: true },
     hasRecorded && { key: "rec", label: "Registrado no recálculo", dash: false },
@@ -74,7 +88,7 @@ export function TimelineChart({ entries, currentFinal, platoons, name, height }:
                 return (
                   <div className="rounded-lg px-3 py-2 text-[12px] shadow-md" style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)" }}>
                     <div className="font-bold">{shortDate(r.at)} · {r.label}</div>
-                    <div className="mt-0.5 flex justify-between gap-6"><span style={{ color: "var(--muted-foreground)" }}>Nota final</span><strong className="tabular-nums">{score(r.value)}</strong></div>
+                    <div className="mt-0.5 flex justify-between gap-6"><span style={{ color: "var(--muted-foreground)" }}>Nota final</span><strong className="tabular-nums">{r.value == null ? "fora do ciclo" : score(r.value)}</strong></div>
                   </div>
                 );
               }}
@@ -84,7 +98,7 @@ export function TimelineChart({ entries, currentFinal, platoons, name, height }:
           </LineChart>
         </ResponsiveContainer>
       </div>
-      {legend.length > 1 && (
+      {hasRecon && (
         <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12px]" style={{ color: "var(--muted-foreground)" }}>
           {legend.map(l => (
             <span key={l.key} className="inline-flex items-center gap-2">

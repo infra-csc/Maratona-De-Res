@@ -92,11 +92,13 @@ export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, 
   );
 }
 
-/** Calibração salva e ainda não publicada: não vale na nota até publicar. */
-function PendingPublishBadge() {
+/** Calibração salva e ainda não publicada: não vale na nota até publicar.
+ *  `className`/`testId`: a coluna de status some no celular, então a linha do
+ *  critério repete o selo lá (com outro test id). */
+export function PendingPublishBadge({ className = "", testId = "badge-criterion-pending-publish" }: { className?: string; testId?: string }) {
   return (
-    <span data-testid="badge-criterion-pending-publish" title="Salva e ainda não publicada: o colaborador e a nota oficial só mudam depois de publicar"
-      className="inline-flex items-center text-[11px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap"
+    <span data-testid={testId} title="Salva e ainda não publicada: o colaborador e a nota oficial só mudam depois de publicar"
+      className={`inline-flex items-center text-[11px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap ${className}`}
       style={{ backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT, border: `1px solid ${AMBER}` }}>
       Falta publicar
     </span>

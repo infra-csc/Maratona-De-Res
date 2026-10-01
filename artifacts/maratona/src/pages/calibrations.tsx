@@ -309,7 +309,8 @@ export default function CalibrationsPage() {
           />
 
           {/* ── LEFT COLUMN: Calibrations table ── */}
-          <div className="flex-1 min-w-0 space-y-3 lg:order-1">
+          {/* w-full: na coluna (celular) com items-start, sem largura a coluna crescia até a largura da tabela e o "Publicar" saía da tela. */}
+          <div className="w-full flex-1 min-w-0 space-y-3 lg:order-1">
 
             {/* ── COMPACT ACTION BAR ── */}
           {displayActiveCriteria.length === 0 ? (

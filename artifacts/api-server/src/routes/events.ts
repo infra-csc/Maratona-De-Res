@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
-import { audit } from "../lib/audit.js";
+import { audit, setRecomputeCause } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria, calculateConformitySubtotal, calculateFinalEventScore } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { generateCriterionAssignments } from "./routing.js";
@@ -12,6 +12,7 @@ import { participantCountsForScore } from "../lib/participation.js";
 import { pgNum, affectedRows } from "../lib/pg-num.js";
 import { loadEventCriteria } from "../lib/event-console-data.js";
 import { applyAreaDefaults, setEventCriterionAreas, deleteEventCopyTx, AreaCopyError } from "../lib/area-copies.js";
+import { effectiveCalibrations } from "../lib/cycle-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -61,6 +62,16 @@ router.get("/events", async (req, res) => {
       .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), isNotNull(eventCriterionAssignmentsTable.assignedToId))),
   ]);
   const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
+  // Nota prévia: só a calibração que VALE (publicada ou antiga); a salva e não
+  // publicada fica de fora, como no cálculo oficial. Os contadores de
+  // calibração continuam usando a salva ("calibrado" = trabalho feito).
+  // "N a publicar" por CRITÉRIO (a cópia por área conta junto com o pai),
+  // igual à tela de Calibração.
+  const parentOf = new Map(eventCriteriaRows.map(c => [`${c.eventId}:${c.criterionId}`, (c.criterionSourceCriterionId ?? c.criterionId) as number]));
+  const pendingCountOf = (eventId: number) => new Set(calibrations
+    .filter(c => c.eventId === eventId && c.pendingPublish)
+    .map(c => parentOf.get(`${eventId}:${c.criterionId}`) ?? c.criterionId)).size;
+  const effectiveCalScore = new Map((await effectiveCalibrations(calibrations)).map(c => [`${c.eventId}:${c.criterionId}`, c.calibratedScore]));
 
   // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído,
   // e também um contador X/Y (itens respondidos / itens esperados) para exibir
@@ -168,7 +179,7 @@ router.get("/events", async (req, res) => {
         calibratedCriteriaCount,
         finalCalibratedCriteria,
         partialPublishedCount,
-        pendingPublishCount: calibrations.filter(c => c.eventId === ev.id && c.pendingPublish).length,
+        pendingPublishCount: pendingCountOf(ev.id),
         partialPublishedAt,
         criteriaConfirmed: true,
         unassignedAreaNames: [],
@@ -307,7 +318,11 @@ router.get("/events", async (req, res) => {
     const conformitySubtotal = confRow
       ? calculateConformitySubtotal([confRow.epi, confRow.estaiamentos, confRow.guardaEquipamentos, confRow.conduta])
       : 100;
-    const liveScore = criteriaWithProgress > 0 ? calculateFinalEventScore(calculateEventResult(criteriaForCalc), conformitySubtotal) : null;
+    const criteriaForScore = mergeEventScopedCriteria(criteriaRaw.map(c => {
+      const v = effectiveCalScore.get(`${ev.id}:${c.criterionId}`);
+      return { ...c, calibratedScore: v != null ? pgNum(v) : null };
+    }));
+    const liveScore = criteriaWithProgress > 0 ? calculateFinalEventScore(calculateEventResult(criteriaForScore), conformitySubtotal) : null;
     const officialScore = ev.resultsConfirmed ? officialScoreByEvent.get(ev.id) : undefined;
     const teamScore = officialScore ?? liveScore;
 
@@ -383,7 +398,7 @@ router.get("/events", async (req, res) => {
       ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
     return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount,
       // Calibrações salvas que ainda não foram publicadas (filtro "Falta publicar").
-      pendingPublishCount: calibrations.filter(c => c.eventId === ev.id && c.pendingPublish).length,
+      pendingPublishCount: pendingCountOf(ev.id),
       averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
@@ -1035,13 +1050,14 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
   if (hasRealData && force) {
     warnings.push(`Descartados dados do evento duplicado: ${evalCount.n} avaliação(ões), ${calibCount.n} calibração(ões), ${confCount.n} conformidade(s) e ${resultCount.n} resultado(s).`);
   }
+  // Audita ANTES de recalcular: o recálculo grava a ação como motivo na
+  // linha do tempo (antes ficava sem motivo).
+  const [after] = await db.select().from(eventsTable).where(eq(eventsTable.id, keepId)).limit(1);
+  await audit(req.user!.userId, "merge", "events", keepId, before, after);
   for (const cycleId of affectedCycles) {
     const result = await recomputeCycleResults(cycleId, req.user!.userId);
     warnings.push(...result.warnings);
   }
-
-  const [after] = await db.select().from(eventsTable).where(eq(eventsTable.id, keepId)).limit(1);
-  await audit(req.user!.userId, "merge", "events", keepId, before, after);
   res.json({ success: true, event: after, warnings });
 });
 
@@ -1080,13 +1096,26 @@ router.post("/events/:id/confirm-results", requireRole("admin", "rh"), async (re
   }).where(eq(eventsTable.id, id)).returning();
   await audit(req.user!.userId, "confirm-results", "events", id, before, ev);
   const { warnings } = await recomputeCycleResults(ev.cycleId, req.user!.userId);
-  res.json({ ...ev, warnings });
+  res.json({ ...ev, warnings: [...(await pendingPublishWarnings([id])), ...warnings] });
 });
 
 // Confirmação em lote (admin): mesma trava do endpoint individual, aplicada a
 // vários eventos numa transação. Só toca eventos ainda não confirmados e não
 // históricos; recalcula os resultados UMA vez por ciclo afetado (e não uma vez
 // por evento, que seria N recomputações do ciclo inteiro).
+/** Aviso ao confirmar: calibração salva e não publicada NÃO entra na nota. */
+async function pendingPublishWarnings(eventIds: number[]): Promise<string[]> {
+  if (eventIds.length === 0) return [];
+  const rows = await db.select({ eventId: calibrationsTable.eventId, name: eventsTable.name })
+    .from(calibrationsTable).innerJoin(eventsTable, eq(calibrationsTable.eventId, eventsTable.id))
+    .where(and(inArray(calibrationsTable.eventId, eventIds), eq(calibrationsTable.pendingPublish, true)));
+  if (rows.length === 0) return [];
+  const byEvent = new Map<string, number>();
+  for (const r of rows) byEvent.set(r.name, (byEvent.get(r.name) ?? 0) + 1);
+  return [...byEvent.entries()].map(([name, n]) =>
+    `${name}: ${n} ${n === 1 ? "calibração salva ainda não publicada não entrou" : "calibrações salvas ainda não publicadas não entraram"} na nota — publique na Calibração para valer.`);
+}
+
 router.post("/events/confirm-results-bulk", requireRole("admin"), async (req, res) => {
   const raw = req.body?.eventIds;
   if (!Array.isArray(raw) || raw.length === 0) {
@@ -1122,8 +1151,9 @@ router.post("/events/confirm-results-bulk", requireRole("admin"), async (req, re
   for (const ev of updated) {
     await audit(userId, "confirm-results", "events", ev.id, beforeById.get(ev.id), { ...ev, bulk: true });
   }
+  setRecomputeCause({ action: "confirm-results-bulk", entity: "events", entityId: null, detail: { eventIds: updated.map(e => e.id) } });
 
-  const warnings: string[] = [];
+  const warnings: string[] = await pendingPublishWarnings(updated.map(e => e.id));
   for (const cycleId of new Set(updated.map(e => e.cycleId))) {
     const r = await recomputeCycleResults(cycleId, userId);
     warnings.push(...r.warnings);

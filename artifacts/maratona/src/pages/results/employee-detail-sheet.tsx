@@ -2,7 +2,7 @@ import { useGetRankingDetail, getGetRankingDetailQueryKey } from "@workspace/api
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy, Award, AlertTriangle, MapPin, History } from "lucide-react";
 import { Link } from "wouter";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn, fmtDate, fmtNum } from "@/lib/utils";
 import { CONDENSED, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { contrastingTextColor, fmtBRL } from "./helpers";
@@ -18,7 +18,7 @@ export function EmployeeDetailSheet({
   const detailParams = { employeeId: employeeId ?? 0 };
   // Linha do tempo da nota: só admin e RH (a rota também barra).
   const { user } = useAuth();
-  const canSeeTimeline = user?.role === "admin" || user?.role === "rh";
+  const canSeeTimeline = hasRole(user, "admin") || hasRole(user, "rh");
   const { data: detail, isLoading: detailLoading } = useGetRankingDetail(detailParams, {
     query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: !!employeeId },
   });

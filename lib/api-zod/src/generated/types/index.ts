@@ -271,6 +271,7 @@ export * from './scoreTimelineEntry';
 export * from './scoreTimelineEntryKind';
 export * from './scoreTimelinePerson';
 export * from './scoreTimelinePlatoonsItem';
+export * from './scoreTimelineSubject';
 export * from './seedDefaultPenaltyTypes200';
 export * from './skippedPin';
 export * from './successResponse';

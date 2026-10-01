@@ -27,7 +27,8 @@ test("reconstructSteps: repassa eventos e ajustes em ordem, 1 casa", () => {
   const steps = reconstructSteps(
     [{ eventId: 1, name: "E1", at: "2026-07-01T10:00:00Z", score: 72 }, { eventId: 2, name: "E2", at: "2026-07-08T10:00:00Z", score: 67.85 }],
     [{ id: 1, at: "2026-07-05T10:00:00Z", kind: "penalty", label: "Falta", points: 5, quantity: 1, reason: null, eventName: null, by: "RH" }],
-    [{ name: "Sem", color: null, minScore: 0 }, { name: "70", color: null, minScore: 70 }],
+    [{ name: "Sem", color: null, minScore: 0, maxScore: 69.99, minInclusive: true, maxInclusive: true },
+     { name: "70", color: null, minScore: 70, maxScore: 100, minInclusive: true, maxInclusive: true }],
     null,
   );
   assert.deepEqual(steps.map(s => [s.type, s.finalBefore, s.finalAfter, s.platoonAfter]), [

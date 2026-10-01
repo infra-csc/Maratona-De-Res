@@ -9,7 +9,7 @@ import { EvaluatorScores } from "./evaluator-scores";
 import { CalibrationReasonEditor } from "./calibration-reason-editor";
 import { CalibrationAuditTrail } from "./calibration-audit-trail";
 import { CriterionComments } from "./criterion-comments";
-import { PublishStatusCell } from "./publish-status-cell";
+import { PendingPublishBadge, PublishStatusCell } from "./publish-status-cell";
 import { fmtNum } from "@/lib/utils";
 import type {
   AddCommentMutation,
@@ -119,6 +119,8 @@ export function CriterionRow({
                             <td className="px-3 py-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{c.criterionName}</span>
+                                {/* No celular a coluna de status some: o selo vem para cá. */}
+                                {cal?.pendingPublish && <PendingPublishBadge className="sm:hidden" testId="badge-criterion-pending-publish-mobile" />}
                                 {c.responsibleAreaName && (
                                   <span className="hidden lg:inline text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
                                 )}

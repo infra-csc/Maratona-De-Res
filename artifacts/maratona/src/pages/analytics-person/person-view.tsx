@@ -5,12 +5,13 @@ import {
   type EventsReport, type QuarterlyResult, type RankingDetail,
 } from "@workspace/api-client-react";
 import { ArrowRight, Award, AlertTriangle, CalendarClock, History, Info, ListChecks, Table2, TrendingUp, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, StatTile, StatusBadge } from "@/components/shared";
 import { CONDENSED, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
 import {
-  bonusOf, brl, criteriaCompare, impactOf, mean, n1, nextFaixaOf, personEvents, plural, pts, rankOf, signed,
-  type Faixa, type Impact, type PersonEvent,
+  brl, criteriaCompare, impactOf, mean, n1, nextStepOf, personEvents, plural, pts, rankOf, signed,
+  type CriterionCompare, type Faixa, type Impact, type PersonEvent,
 } from "./derive";
 import { CriteriaDumbbell, EventsChart, EvolutionChart, FaixaRuler, TeamStrip, entryTitle, type ScaleMarker } from "./charts";
 import { Card, FaixaChip, SmallLabel } from "./ui";
@@ -18,9 +19,12 @@ import { Card, FaixaChip, SmallLabel } from "./ui";
 const dmy = (iso: string | null | undefined) => (iso ? fmtDate(iso.slice(0, 10), { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
 /** Análise detalhada do ciclo de um colaborador. */
-export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, report, canTimeline, onPick }: {
-  detail: RankingDetail; rows: QuarterlyResult[]; faixas: Faixa[]; minEvents: number;
-  teamEventAvg: number | null; report: EventsReport | undefined; canTimeline: boolean; onPick: (id: number) => void;
+export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview, teamEventAvg, report, reportLoading, reportError, onRetryReport, canTimeline, onPick }: {
+  detail: RankingDetail; rows: QuarterlyResult[]; faixas: Faixa[];
+  /** Mínimo de eventos do bônus pela visão geral; null = não carregou. */
+  minEvents: number | null;
+  teamEventAvg: number | null; report: EventsReport | undefined; reportLoading: boolean; reportError: boolean; onRetryReport: () => void;
+  canTimeline: boolean; onPick: (id: number) => void;
 }) {
   const s = detail.summary;
   const bd = s.bonusBreakdown;
@@ -32,28 +36,37 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
   }), [s, n, bd, faixas]);
 
   const events = useMemo(() => personEvents(detail, report), [detail, report]);
-  const counted = events.filter(e => e.counts);
+  const counted = useMemo(() => events.filter(e => e.counts), [events]);
   const criteria = useMemo(() => criteriaCompare(report, new Set(counted.map(e => e.id))), [report, counted]);
   const rank = rankOf(rows, detail.employee.id);
+  const myRow = rows.find(r => r.employeeId === detail.employee.id) ?? null;
   const teamAvg = mean(rows.map(r => r.finalResult));
-  const final = s.finalResult ?? null;
+  // Sem evento com nota não há nota final (o servidor devolve a gravada, que é 0 ou antiga).
+  const final = n > 0 ? (s.finalResult ?? null) : null;
   const faixa = impact.faixa ?? faixas.find(f => f.name === s.platoon) ?? null;
-  const next = nextFaixaOf(final, faixas);
-  const gap = final != null && next ? Math.max(0, next.minScore - final) : null;
   const eligible = bd?.eligible ?? null;
+  const step = nextStepOf(final, faixas, eligible, bd?.extraEvents.length ?? 0);
+  // Elegibilidade ao bônus é por eventos PARTICIPADOS (com ou sem nota); o mínimo do detalhe vale mais que o da visão geral.
+  const minEvents = bd?.minEvents ?? minEventsOverview;
+  const participated = s.participatedEventsCount ?? myRow?.participatedEventsCount ?? null;
+  // Resultado gravado no ciclo × conta ao vivo do detalhe.
+  const storedFinal = myRow?.finalResult ?? null;
+  const pendingRecalc = s.isQuarterClosed && final != null && storedFinal != null && Math.abs(storedFinal - final) >= 0.05;
+  // Ligação lançamento → evento pelo NOME: /ranking-detail não devolve o eventId das penalidades/méritos.
   const launchesByEvent = useMemo(() => {
     const m = new Map<string, { pen: number; mer: number }>();
-    for (const p of detail.penalties) if (p.eventName) m.set(p.eventName, { ...(m.get(p.eventName) ?? { pen: 0, mer: 0 }), pen: (m.get(p.eventName)?.pen ?? 0) + p.total });
-    for (const p of detail.merits) if (p.eventName) m.set(p.eventName, { ...(m.get(p.eventName) ?? { pen: 0, mer: 0 }), mer: (m.get(p.eventName)?.mer ?? 0) + p.total });
+    // Pelo id do evento (dois eventos com o mesmo nome não se somam); o nome só
+    // como reserva para API antiga.
+    const key = (p: { eventId?: number | null; eventName?: string | null }) => (p.eventId != null ? `id:${p.eventId}` : p.eventName ? `nome:${p.eventName}` : null);
+    for (const p of detail.penalties) { const k = key(p); if (k) m.set(k, { ...(m.get(k) ?? { pen: 0, mer: 0 }), pen: (m.get(k)?.pen ?? 0) + p.total }); }
+    for (const p of detail.merits) { const k = key(p); if (k) m.set(k, { ...(m.get(k) ?? { pen: 0, mer: 0 }), mer: (m.get(k)?.mer ?? 0) + p.total }); }
     return m;
   }, [detail]);
 
   const markers: ScaleMarker[] = [];
   if (final != null) markers.push({ key: "final", value: final, label: "Nota final", kind: "main" });
-  if (impact.verified && impact.penalty > 0 && impact.finalNoPenalty != null) markers.push({ key: "nopen", value: impact.finalNoPenalty, label: "Sem as penalidades", kind: "ghost" });
+  if (final != null && impact.verified && impact.penalty > 0 && impact.finalNoPenalty != null) markers.push({ key: "nopen", value: impact.finalNoPenalty, label: "Sem as penalidades", kind: "ghost" });
   if (teamAvg != null && rows.length > 1) markers.push({ key: "team", value: teamAvg, label: "Média da equipe", kind: "team" });
-
-  const nextBonus = next ? (eligible ? bonusOf(next.minScore, bd?.extraEvents.length ?? 0, faixas) : next.bonusValue) : 0;
 
   return (
     <div className="space-y-5" data-testid="person-analysis">
@@ -70,8 +83,14 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
               {rank && <StatusBadge variant="neutral" icon={Trophy} label={`${rank.position}º de ${rank.total} no ranking`} />}
               {eligible === true && <StatusBadge variant="ok" label="Elegível ao bônus" />}
               {eligible === false && <StatusBadge variant="warn" label="Não elegível ao bônus" />}
-              {!s.isQuarterClosed && <StatusBadge variant="info" icon={Info} label="Valores parciais" srLabel="Ciclo ainda não recalculado para este colaborador: valores parciais" />}
+              {!s.isQuarterClosed && <StatusBadge variant="info" icon={Info} label="Sem resultado gravado" srLabel="Sem resultado gravado no ciclo para este colaborador: a nota é a conta de hoje; elegibilidade e bônus aparecem depois do recálculo" />}
+              {pendingRecalc && <StatusBadge variant="info" icon={Info} label="Recálculo pendente" srLabel={`Recálculo pendente: a nota de hoje (${n1(final)}) difere da gravada no último recálculo do ciclo (${n1(storedFinal)}), que é a usada no ranking e no bônus`} />}
             </div>
+            {pendingRecalc && (
+              <p className="mt-2 text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>
+                A nota de hoje ({n1(final)}) difere da gravada no último recálculo do ciclo ({n1(storedFinal)}); ranking e bônus usam a gravada até o ciclo ser recalculado em Resultados.
+              </p>
+            )}
             {eligible === false && bd?.eligibilityReason && (
               <p className="mt-2 text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>{bd.eligibilityReason}.</p>
             )}
@@ -82,21 +101,23 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
               <p className="text-[64px] sm:text-[76px] font-black leading-[0.85] tabular-nums" style={{ fontFamily: CONDENSED }} data-testid="person-final">{n1(final)}</p>
             </div>
             <p className="text-[13px] pb-1 md:pb-0" style={{ color: "var(--muted-foreground)" }}>
-              Média bruta <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(s.grossAverage)}</strong>
-              {teamAvg != null && final != null && <><br className="hidden md:block" /><span className="md:hidden"> · </span>equipe <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(teamAvg)}</strong> <span className="tabular-nums" style={{ color: final - teamAvg >= 0 ? GOOD_TEXT : DANGER_TEXT }}>({signed(final - teamAvg)})</span></>}
+              {final == null ? <>Sem evento com nota no ciclo</> : <>
+                Média bruta <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(s.grossAverage)}</strong>
+                {teamAvg != null && <><br className="hidden md:block" /><span className="md:hidden"> · </span>equipe <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(teamAvg)}</strong> <span className="tabular-nums" style={{ color: final - teamAvg >= 0 ? GOOD_TEXT : DANGER_TEXT }}>({signed(final - teamAvg)})</span></>}
+              </>}
             </p>
           </div>
         </div>
 
         {final != null && faixas.length > 0 && (
           <div className="rounded-lg p-3 sm:p-4" style={{ backgroundColor: "var(--secondary)" }}>
-            <FaixaRuler faixas={faixas} markers={markers} extraDomain={next ? [next.minScore] : []} />
+            <FaixaRuler faixas={faixas} markers={markers} extraDomain={step ? [step.entry] : []} />
             <p className="mt-3 text-[13px] leading-relaxed" data-testid="person-next-faixa">
-              {next && gap != null ? (
+              {step ? (
                 <>
-                  Faltam <strong className="tabular-nums">{n1(gap)}</strong> {gap === 1 ? "ponto" : "pontos"} para <strong>{next.name}</strong> ({n1(next.minScore)})
-                  {next.bonusValue > 0 && <>, que {eligible ? <>pagaria <strong>{brl(nextBonus)}</strong> de bônus</> : <>paga <strong>{brl(next.bonusValue)}</strong> de prêmio base</>}</>}.
-                  {n > 0 && <span style={{ color: "var(--muted-foreground)" }}> Com {plural(n, "evento", "eventos")} na nota, isso equivale a cerca de {fmtNum(gap * n, 1)} pontos a mais na soma das notas (ou de penalidade a menos).</span>}
+                  Faltam <strong className="tabular-nums">{n1(step.gap)}</strong> {step.gap === 1 ? "ponto" : "pontos"} para <strong>{step.faixa.name}</strong> (a partir de {n1(step.entry)})
+                  {step.faixa.bonusValue > 0 && <>, que {eligible ? <>pagaria <strong>{brl(step.bonus)}</strong> de bônus</> : <>paga <strong>{brl(step.faixa.bonusValue)}</strong> de prêmio base</>}</>}.
+                  <span style={{ color: "var(--muted-foreground)" }}> Com {plural(n, "evento", "eventos")} na nota, isso equivale a cerca de {fmtNum(step.gap * n, 1)} pontos a mais na soma das notas (ou de penalidade a menos).</span>
                 </>
               ) : <>Está na faixa mais alta.</>}
             </p>
@@ -107,8 +128,10 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
       {/* ── Indicadores ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatTile label="Média bruta" value={n1(s.grossAverage)} detail={s.scoreSum != null ? `Soma ${fmtNum(s.scoreSum, 2)} ÷ ${plural(n, "evento", "eventos")}` : "Sem evento na nota"} />
-        <StatTile label="Eventos na nota" value={<>{n}<span className="text-[16px] font-bold" style={{ color: "var(--muted-foreground)" }}> / {minEvents}</span></>}
-          detail={n >= minEvents ? "Atingiu o mínimo do bônus" : `Faltam ${minEvents - n} para o mínimo do bônus`} />
+        <StatTile label="Eventos participados" data-testid="person-participated"
+          value={<>{participated ?? "—"}<span className="text-[16px] font-bold" style={{ color: "var(--muted-foreground)" }}> / {minEvents ?? "—"}</span></>}
+          detail={`${plural(n, "evento", "eventos")} na nota · ${participated == null || minEvents == null ? "mínimo do bônus indisponível"
+            : participated >= minEvents ? "atingiu o mínimo do bônus" : `faltam ${minEvents - participated} para o mínimo do bônus`}`} />
         <StatTile label="Penalidades" value={<span style={{ color: s.penaltyPoints > 0 ? DANGER_TEXT : undefined }}>{s.penaltyPoints > 0 ? `−${pts(s.penaltyPoints)}` : "0"}</span>}
           detail={s.penaltyPoints > 0 ? (impact.verified ? `${signed(-impact.lostPoints)} na nota final` : plural(detail.penalties.length, "lançamento", "lançamentos")) : "Nenhuma no ciclo"} />
         <StatTile label="Méritos" value={<span style={{ color: s.meritPoints > 0 ? GOOD_TEXT : undefined }}>{s.meritPoints > 0 ? `+${pts(s.meritPoints)}` : "0"}</span>}
@@ -121,7 +144,7 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
       {/* ── Conta + custo das penalidades ── */}
       <div className="grid gap-5 lg:grid-cols-2 items-start">
         <CalcCard detail={detail} impact={impact} n={n} />
-        <PenaltyCostCard impact={impact} detail={detail} eligible={eligible} />
+        <PenaltyCostCard impact={impact} detail={detail} n={n} />
       </div>
 
       {/* ── Evento a evento ── */}
@@ -131,8 +154,13 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
       <div className="grid gap-5 lg:grid-cols-2 items-start">
         <LaunchesCard detail={detail} n={n} />
         <Card title="Critérios nos eventos dele" subtitle="Média de cada critério nos eventos confirmados de que participou, comparada com todos os eventos confirmados do ciclo. A nota do critério é do time do evento, não só dele.">
-          {criteria.length === 0 ? (
-            <EmptyState compact icon={ListChecks} title="Sem critérios avaliados" description={report ? "Nenhum evento dele com critérios avaliados e resultados confirmados." : "Não foi possível carregar o relatório por evento."} />
+          {reportLoading ? (
+            <LoadingState lines={4} label="Carregando os critérios" />
+          ) : reportError || !report ? (
+            <EmptyState compact icon={AlertTriangle} title="Não foi possível carregar os critérios" description="O relatório por evento não respondeu. Tente de novo em instantes."
+              action={<Button variant="outline" size="sm" onClick={onRetryReport}>Tentar de novo</Button>} />
+          ) : criteria.length === 0 ? (
+            <EmptyState compact icon={ListChecks} title="Sem critérios avaliados" description="Nenhum evento dele com critérios avaliados e resultados confirmados." />
           ) : (
             <>
               <CriteriaHighlights rows={criteria} />
@@ -144,7 +172,7 @@ export function PersonView({ detail, rows, faixas, minEvents, teamEventAvg, repo
 
       {/* ── Equipe + evolução ── */}
       <div className={`grid gap-5 items-start ${canTimeline ? "xl:grid-cols-2" : ""}`}>
-        <TeamCompareCard detail={detail} rows={rows} faixas={faixas} teamAvg={teamAvg} onPick={onPick} n={n} />
+        <TeamCompareCard detail={detail} rows={rows} faixas={faixas} teamAvg={teamAvg} onPick={onPick} n={n} final={final} participated={participated} />
         {canTimeline && <EvolutionCard employeeId={detail.employee.id} name={detail.employee.name} final={final} faixas={faixas} />}
       </div>
     </div>
@@ -165,20 +193,29 @@ function CalcCard({ detail, impact, n }: { detail: RankingDetail; impact: Impact
   const raw = net / n;
   return (
     <Card title="Como a nota foi calculada" subtitle="(Soma das notas dos eventos − penalidades + méritos) ÷ número de eventos, arredondada uma vez para 1 casa.">
-      <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-1.5" role="group" aria-label={`Conta: (${fmtNum(s.scoreSum, 2)} − ${pts(s.penaltyPoints)} + ${pts(s.meritPoints)}) ÷ ${n} = ${n1(s.finalResult)}`}>
-        <Term value={fmtNum(s.scoreSum, 2)} label={`Soma · ${plural(n, "evento", "eventos")}`} />
-        <Op>−</Op>
-        <Term value={pts(s.penaltyPoints)} label="Penalidades" color={s.penaltyPoints > 0 ? DANGER_TEXT : undefined} />
-        <Op>+</Op>
-        <Term value={pts(s.meritPoints)} label="Méritos" color={s.meritPoints > 0 ? GOOD_TEXT : undefined} />
-        <Op>÷</Op>
-        <Term value={String(n)} label="Eventos" />
-        <Op>=</Op>
-        <Term value={n1(s.finalResult)} label="Nota final" strong />
+      {/* Dois blocos que não quebram por dentro: "(soma − pen. + mér.)" e "÷ N = nota". Em tela estreita, o segundo desce inteiro. */}
+      <div className="flex flex-wrap xl:flex-nowrap items-stretch gap-x-1.5 gap-y-2" role="group" aria-label={`Conta: (${fmtNum(s.scoreSum, 2)} − ${pts(s.penaltyPoints)} + ${pts(s.meritPoints)}) ÷ ${n} = ${n1(s.finalResult)}`}>
+        <div className="flex flex-nowrap items-stretch gap-1 min-w-0 flex-[3_1_0%] basis-[300px]">
+          <Op paren>(</Op>
+          <Term value={fmtNum(s.scoreSum, 2)} label={`Soma · ${plural(n, "evento", "eventos")}`} grow />
+          <Op>−</Op>
+          <Term value={pts(s.penaltyPoints)} label="Penalidades" color={s.penaltyPoints > 0 ? DANGER_TEXT : undefined} />
+          <Op>+</Op>
+          <Term value={pts(s.meritPoints)} label="Méritos" color={s.meritPoints > 0 ? GOOD_TEXT : undefined} />
+          <Op paren>)</Op>
+        </div>
+        <div className="flex flex-nowrap items-stretch gap-1 min-w-0 flex-[2_1_0%] basis-[200px]">
+          <Op>÷</Op>
+          <Term value={String(n)} label="Eventos" />
+          <Op>=</Op>
+          <Term value={n1(s.finalResult)} label="Nota final" strong />
+        </div>
       </div>
       <div className="rounded-lg px-3.5 py-3 text-[13px] leading-relaxed" style={{ backgroundColor: "var(--secondary)" }}>
         <p>
-          {fmtNum(net, 2)} ÷ {n} = <strong className="tabular-nums">{fmtNum(raw, 2)}</strong>, arredondado para <strong className="tabular-nums">{n1(s.finalResult)}</strong>.
+          <span className="whitespace-nowrap">({fmtNum(s.scoreSum, 2)} − {pts(s.penaltyPoints)} + {pts(s.meritPoints)})</span>{" "}
+          <span className="whitespace-nowrap">÷ {n} = {fmtNum(net, 2)} ÷ {n}</span>{" "}
+          <span className="whitespace-nowrap">= <strong className="tabular-nums">{fmtNum(raw, 2)}</strong>,</span> arredondado para <strong className="tabular-nums">{n1(s.finalResult)}</strong>.
         </p>
         {impact.verified && (impact.penalty > 0 || impact.merit > 0) && (
           <p className="mt-1.5" style={{ color: "var(--muted-foreground)" }}>
@@ -196,21 +233,32 @@ function CalcCard({ detail, impact, n }: { detail: RankingDetail; impact: Impact
   );
 }
 
-function Term({ value, label, color, strong }: { value: string; label: string; color?: string; strong?: boolean }) {
+function Term({ value, label, color, strong, grow }: { value: string; label: string; color?: string; strong?: boolean; grow?: boolean }) {
   return (
-    <div className="rounded-lg px-2.5 py-2 min-w-[64px] flex-1 sm:min-w-0" style={{ backgroundColor: strong ? "var(--primary)" : "var(--card)", border: `1px solid ${strong ? "var(--primary)" : "var(--border)"}`, color: strong ? "var(--primary-foreground)" : undefined }}>
+    <div className={`rounded-lg px-2 py-2 min-w-0 ${grow ? "flex-[1.6_1_0%]" : "flex-1"}`} style={{ backgroundColor: strong ? "var(--primary)" : "var(--card)", border: `1px solid ${strong ? "var(--primary)" : "var(--border)"}`, color: strong ? "var(--primary-foreground)" : undefined }}>
       <p className="text-[22px] font-black leading-none tabular-nums whitespace-nowrap" style={{ fontFamily: CONDENSED, color: strong ? undefined : color }}>{value}</p>
       <p className="mt-1 text-[10.5px] font-bold uppercase leading-tight" style={{ fontFamily: CONDENSED, letterSpacing: "0.05em", color: strong ? undefined : "var(--muted-foreground)", opacity: strong ? 0.85 : 1 }}>{label}</p>
     </div>
   );
 }
-const Op = ({ children }: { children: string }) => (
-  <span aria-hidden className="self-center text-[22px] font-black px-0.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{children}</span>
+const Op = ({ children, paren }: { children: string; paren?: boolean }) => (
+  <span aria-hidden className={`self-center shrink-0 ${paren ? "text-[34px] font-light leading-none -mt-1" : "text-[20px] font-black px-0.5"}`} style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{children}</span>
 );
 
 // ── O que as penalidades custaram ─────────────────────────────────────────
-function PenaltyCostCard({ impact, detail, eligible }: { impact: Impact; detail: RankingDetail; eligible: boolean | null }) {
+function PenaltyCostCard({ impact, detail, n }: { impact: Impact; detail: RankingDetail; n: number }) {
   const bd = detail.summary.bonusBreakdown;
+  if (n === 0) {
+    // Sem evento com nota não há nota para comparar: nada de "com × sem" nem de "recalcule".
+    return (
+      <Card title="O que as penalidades custaram">
+        <EmptyState compact icon={CalendarClock} title="Sem nota para comparar"
+          description={impact.penalty > 0
+            ? `Há −${pts(impact.penalty)} pontos de penalidade lançados. O efeito na nota aparece quando um evento dele tiver os resultados confirmados.`
+            : "O efeito de penalidades e méritos aparece quando um evento dele tiver os resultados confirmados."} />
+      </Card>
+    );
+  }
   if (impact.penalty <= 0) {
     return (
       <Card title="O que as penalidades custaram">
@@ -295,7 +343,9 @@ function EventsCard({ events, counted, teamEventAvg, faixas, name, launchesByEve
   const [showTable, setShowTable] = useState(false);
   const outside = events.filter(e => !e.counts);
   const best = counted.length ? counted.reduce((m, e) => (e.score > m.score ? e : m)) : null;
-  const worst = counted.length > 1 ? counted.reduce((m, e) => (e.score < m.score ? e : m)) : null;
+  const lowest = counted.length > 1 ? counted.reduce((m, e) => (e.score < m.score ? e : m)) : null;
+  // Notas todas iguais: um destaque só (não o mesmo evento como "melhor" e "mais fraco").
+  const worst = best && lowest && lowest.score < best.score ? lowest : null;
   const aboveAvg = teamEventAvg != null ? counted.filter(e => e.score >= teamEventAvg).length : null;
   return (
     <Card
@@ -315,7 +365,11 @@ function EventsCard({ events, counted, teamEventAvg, faixas, name, launchesByEve
         <>
           {counted.length > 0 && (
             <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[13px]" aria-label="Destaques dos eventos">
-              {best && <Highlight label="Melhor evento" value={n1(best.score)} detail={`${best.name} · ${dmy(best.date)}`} color={GOOD_TEXT} />}
+              {best && (worst
+                ? <Highlight label="Melhor evento" value={n1(best.score)} detail={`${best.name} · ${dmy(best.date)}`} color={GOOD_TEXT} />
+                : counted.length === 1
+                  ? <Highlight label="Único evento na nota" value={n1(best.score)} detail={`${best.name} · ${dmy(best.date)}`} />
+                  : <Highlight label="Mesma nota em todos" value={n1(best.score)} detail={`Os ${counted.length} eventos na nota tiveram ${n1(best.score)}`} />)}
               {worst && <Highlight label="Evento mais fraco" value={n1(worst.score)} detail={`${worst.name} · ${dmy(worst.date)}`} color={DANGER_TEXT} />}
               {aboveAvg != null && teamEventAvg != null && <Highlight label="Acima da média do ciclo" value={`${aboveAvg} de ${counted.length}`} detail={`Média dos eventos do ciclo: ${n1(teamEventAvg)}`} />}
             </ul>
@@ -370,7 +424,7 @@ function EventsTable({ events, launchesByEvent }: { events: PersonEvent[]; launc
         </thead>
         <tbody>
           {events.map(e => {
-            const l = launchesByEvent.get(e.name);
+            const l = launchesByEvent.get(`id:${e.id}`) ?? launchesByEvent.get(`nome:${e.name}`);
             return (
               <tr key={e.id} style={{ opacity: e.counts ? 1 : 0.75 }}>
                 <td className="py-2 px-2 tabular-nums whitespace-nowrap" style={{ borderBottom: "1px solid var(--border)" }}>{dmy(e.date)}</td>
@@ -458,43 +512,52 @@ function LaunchesCard({ detail, n }: { detail: RankingDetail; n: number }) {
 }
 
 // ── Critérios: destaques ──────────────────────────────────────────────────
-function CriteriaHighlights({ rows }: { rows: ReturnType<typeof criteriaCompare> }) {
+/** Diferença que conta como "acima/abaixo do ciclo" (a mesma do ▲/▼ do gráfico; menos que isso aparece como ±0,0). */
+const DIFF_MIN = 0.05;
+
+function CriteriaHighlights({ rows }: { rows: CriterionCompare[] }) {
   const byDiff = [...rows].sort((a, b) => b.diff - a.diff);
-  const strong = byDiff[0];
-  const weak = byDiff.length > 1 ? byDiff[byDiff.length - 1] : null;
+  const byMine = [...rows].sort((a, b) => b.mine - a.mine);
+  // "Ponto mais forte" só se estiver ACIMA do ciclo; "a melhorar" só se ABAIXO. Senão, rótulo neutro pela média dele.
+  const top = byDiff[0]?.diff >= DIFF_MIN
+    ? { row: byDiff[0], label: "Ponto mais forte" }
+    : byMine[0] ? { row: byMine[0], label: "Critério com maior média" } : null;
+  const lastDiff = byDiff[byDiff.length - 1];
+  const bottomCandidate = lastDiff && lastDiff.diff <= -DIFF_MIN
+    ? { row: lastDiff, label: "Ponto a melhorar" }
+    : byMine.length > 1 ? { row: byMine[byMine.length - 1], label: "Critério com menor média" } : null;
+  const bottom = bottomCandidate && bottomCandidate.row.key !== top?.row.key ? bottomCandidate : null;
+  const items = [top, bottom].filter((x): x is { row: CriterionCompare; label: string } => x != null);
+  if (!items.length) return null;
   return (
-    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]">
-      {strong && (
-        <li className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)" }}>
-          <SmallLabel>Ponto mais forte</SmallLabel>
-          <p className="mt-1 font-semibold leading-snug">{strong.name}{strong.area ? <span style={{ color: "var(--muted-foreground)" }}> · {strong.area}</span> : null}</p>
-          <p className="text-[12px] mt-0.5 tabular-nums" style={{ color: "var(--muted-foreground)" }}>
-            {n1(strong.mine)} · <strong style={{ color: strong.diff >= 0 ? GOOD_TEXT : DANGER_TEXT }}>{strong.diff >= 0 ? "▲" : "▼"} {signed(strong.diff)}</strong> do ciclo
-          </p>
-        </li>
-      )}
-      {weak && (
-        <li className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)" }}>
-          <SmallLabel>Ponto a melhorar</SmallLabel>
-          <p className="mt-1 font-semibold leading-snug">{weak.name}{weak.area ? <span style={{ color: "var(--muted-foreground)" }}> · {weak.area}</span> : null}</p>
-          <p className="text-[12px] mt-0.5 tabular-nums" style={{ color: "var(--muted-foreground)" }}>
-            {n1(weak.mine)} · <strong style={{ color: weak.diff >= 0 ? GOOD_TEXT : DANGER_TEXT }}>{weak.diff >= 0 ? "▲" : "▼"} {signed(weak.diff)}</strong> do ciclo
-          </p>
-        </li>
-      )}
+    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]" aria-label="Destaques dos critérios">
+      {items.map(({ row: r, label }) => {
+        const up = r.diff >= DIFF_MIN, down = r.diff <= -DIFF_MIN;
+        return (
+          <li key={label} className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)" }}>
+            <SmallLabel>{label}</SmallLabel>
+            <p className="mt-1 font-semibold leading-snug">{r.name}{r.area ? <span style={{ color: "var(--muted-foreground)" }}> · {r.area}</span> : null}</p>
+            <p className="text-[12px] mt-0.5 tabular-nums" style={{ color: "var(--muted-foreground)" }}>
+              {n1(r.mine)} · <strong style={{ color: up ? GOOD_TEXT : down ? DANGER_TEXT : "var(--muted-foreground)" }}>{up ? "▲" : down ? "▼" : "="} {signed(r.diff)}</strong> do ciclo
+            </p>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
 // ── Na equipe ─────────────────────────────────────────────────────────────
-function TeamCompareCard({ detail, rows, faixas, teamAvg, onPick, n }: {
+function TeamCompareCard({ detail, rows, faixas, teamAvg, onPick, n, final, participated }: {
   detail: RankingDetail; rows: QuarterlyResult[]; faixas: Faixa[]; teamAvg: number | null; onPick: (id: number) => void; n: number;
+  final: number | null; participated: number | null;
 }) {
   const s = detail.summary;
   const avg = (f: (r: QuarterlyResult) => number) => mean(rows.map(f));
   const lines: { label: string; me: number | null; team: number | null; fmt: (v: number) => string; higherIsBetter: boolean }[] = [
-    { label: "Nota final", me: s.finalResult ?? null, team: teamAvg, fmt: n1, higherIsBetter: true },
-    { label: "Média bruta", me: s.grossAverage ?? null, team: avg(r => r.grossAverage ?? 0), fmt: n1, higherIsBetter: true },
+    { label: "Nota final", me: final, team: teamAvg, fmt: n1, higherIsBetter: true },
+    { label: "Média bruta", me: n > 0 ? (s.grossAverage ?? null) : null, team: avg(r => r.grossAverage ?? 0), fmt: n1, higherIsBetter: true },
+    { label: "Eventos participados", me: participated, team: avg(r => r.participatedEventsCount ?? 0), fmt: v => fmtNum(v, Number.isInteger(v) ? 0 : 1), higherIsBetter: true },
     { label: "Eventos na nota", me: n, team: avg(r => r.eventsCount ?? 0), fmt: v => fmtNum(v, Number.isInteger(v) ? 0 : 1), higherIsBetter: true },
     { label: "Pontos de penalidade", me: s.penaltyPoints, team: avg(r => r.absencePenalty ?? 0), fmt: v => fmtNum(v, Number.isInteger(v) ? 0 : 1), higherIsBetter: false },
     { label: "Pontos de mérito", me: s.meritPoints, team: avg(r => r.meritPoints ?? 0), fmt: v => fmtNum(v, Number.isInteger(v) ? 0 : 1), higherIsBetter: true },

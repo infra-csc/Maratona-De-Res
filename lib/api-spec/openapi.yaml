@@ -6337,6 +6337,11 @@ components:
           type: boolean
         reason:
           type: ["string", "null"]
+        excluded:
+          type: boolean
+          description: O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus)
+        excludedReason:
+          type: ["string", "null"]
         createdByUserId:
           type: ["integer", "null"]
         createdByName:
@@ -6636,6 +6641,8 @@ components:
           type: string
         reason:
           type: ["string", "null"]
+        eventId:
+          type: ["integer", "null"]
         eventName:
           type: ["string", "null"]
 
@@ -6687,6 +6694,9 @@ components:
               type: ["number", "null"]
             confirmedEventCount:
               type: integer
+            participatedEventsCount:
+              type: ["integer", "null"]
+              description: Eventos confirmados de que participou (base da elegibilidade); null = sem resultado gravado no ciclo
             isQuarterClosed:
               type: boolean
             bonusBreakdown:
@@ -6781,7 +6791,9 @@ components:
         id: { type: string }
         at: { type: string, description: Data-hora ISO }
         kind: { type: string, enum: [recorded, reconstructed, info] }
-        type: { type: string, description: "event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…)" }
+        type: { type: string, description: "event_counted, penalty, merit, penalty_removed, merit_removed, cycle_excluded, cycle_included, recompute ou o código da ação (calibrate, publish_partial_feedback, confirm-results, confirm-results-bulk…)" }
+        causeId: { type: ["string", "null"], description: "Mesma ação que causou a mudança — a tela agrupa só entradas com o mesmo causeId" }
+        pendingPublish: { type: ["boolean", "null"], description: "Calibração salva pela regra \"só vale publicada\" (não muda a nota até publicar)" }
         employeeId: { type: ["integer", "null"] }
         employeeName: { type: ["string", "null"] }
         eventId: { type: ["integer", "null"] }
@@ -6832,6 +6844,17 @@ components:
             startDate: { type: ["string", "null"] }
             endDate: { type: ["string", "null"] }
         employeeId: { type: ["integer", "null"], description: Filtro aplicado (null = todos) }
+        subject:
+          type: ["object", "null"]
+          description: Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+          required: [employeeId, name, functionName, inRanking, excluded, excludedReason]
+          properties:
+            employeeId: { type: integer }
+            name: { type: string }
+            functionName: { type: ["string", "null"] }
+            inRanking: { type: boolean }
+            excluded: { type: boolean, description: O admin tirou do ciclo }
+            excludedReason: { type: ["string", "null"] }
         people:
           type: array
           description: Situação atual de cada colaborador do ranking (nota, faixa, bônus)

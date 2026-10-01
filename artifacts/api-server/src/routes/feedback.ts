@@ -209,28 +209,40 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
  * não faz nada disso; só publicar.
  */
 async function publishSnapshot(eventId: number, criterionIds: number[] | "all", userId: number): Promise<string[]> {
-  const links = await db.select({ id: eventCriteriaTable.id, criterionId: eventCriteriaTable.criterionId, sourceCriterionId: criteriaTable.sourceCriterionId })
+  const links = await db.select({ id: eventCriteriaTable.id, criterionId: eventCriteriaTable.criterionId, sourceCriterionId: criteriaTable.sourceCriterionId, name: criteriaTable.name, eventScoped: criteriaTable.eventScoped })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
+  // Cópias por área: as ligadas pelo sourceCriterionId e as ÓRFÃS (sem
+  // sourceCriterionId) com o mesmo nome do critério — a tela de Calibração
+  // as funde pelo nome e salva junto; sem isto a órfã ficava "a publicar"
+  // para sempre e a calibração dela nunca valia.
+  const norm = (n: string | null) => (n ?? "").trim().toUpperCase();
+  const targetNames = criterionIds === "all" ? new Set<string>()
+    : new Set(links.filter(l => criterionIds.includes(l.criterionId) && !l.eventScoped).map(l => norm(l.name)));
   const targets = criterionIds === "all"
     ? links
-    : links.filter(l => criterionIds.includes(l.criterionId) || (l.sourceCriterionId != null && criterionIds.includes(l.sourceCriterionId)));
-  const cals = await db.select({ criterionId: calibrationsTable.criterionId, score: calibrationsTable.calibratedScore, reason: calibrationsTable.calibrationReason })
-    .from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
-  const calBy = new Map(cals.map(c => [c.criterionId, c]));
+    : links.filter(l => criterionIds.includes(l.criterionId)
+        || (l.sourceCriterionId != null && criterionIds.includes(l.sourceCriterionId))
+        || (l.eventScoped && l.sourceCriterionId == null && targetNames.has(norm(l.name))));
+  // Atômico: libera (pending_publish = false) e LÊ as calibrações no mesmo
+  // UPDATE … RETURNING, e grava o retrato com exatamente esses valores. Um
+  // "salvar" simultâneo espera a trava da linha e volta a ficar pendente —
+  // antes, a nota salva entre a leitura e o UPDATE virava oficial sem
+  // aparecer para o colaborador (achado na revisão de 01/10/2026).
+  const ids = targets.map(t => t.criterionId);
   await db.transaction(async (tx) => {
+    const cals = ids.length > 0
+      ? await tx.update(calibrationsTable).set({ pendingPublish: false })
+          .where(and(eq(calibrationsTable.eventId, eventId), inArray(calibrationsTable.criterionId, ids)))
+          .returning({ criterionId: calibrationsTable.criterionId, score: calibrationsTable.calibratedScore, reason: calibrationsTable.calibrationReason })
+      : [];
+    const calBy = new Map(cals.map(c => [c.criterionId, c]));
     for (const l of targets) {
       const cal = calBy.get(l.criterionId);
       await tx.update(eventCriteriaTable)
         .set({ publishedScore: cal?.score ?? null, publishedReason: cal?.reason ?? null })
         .where(eq(eventCriteriaTable.id, l.id));
-    }
-    // Publicada: a calibração salva passa a valer na nota oficial.
-    const ids = targets.map(t => t.criterionId);
-    if (ids.length > 0) {
-      await tx.update(calibrationsTable).set({ pendingPublish: false })
-        .where(and(eq(calibrationsTable.eventId, eventId), inArray(calibrationsTable.criterionId, ids)));
     }
   });
   const [ev] = await db.select({ cycleId: eventsTable.cycleId, resultsConfirmed: eventsTable.resultsConfirmed, status: eventsTable.status })

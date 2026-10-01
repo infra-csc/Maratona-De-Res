@@ -17,5 +17,7 @@ export interface RankingDetailRow {
   /** @nullable */
   reason?: string | null;
   /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
   eventName?: string | null;
 }

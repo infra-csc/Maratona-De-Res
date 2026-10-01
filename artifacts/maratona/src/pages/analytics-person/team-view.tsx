@@ -18,7 +18,10 @@ interface Row { q: QuarterlyResult; pos: number; impact: Impact; lostFaixa: bool
  * as penalidades e os méritos fizeram com cada nota. Clicar abre a análise.
  */
 export function TeamView({ rows, faixas, minEvents, onPick }: {
-  rows: QuarterlyResult[]; faixas: Faixa[]; minEvents: number; onPick: (id: number) => void;
+  rows: QuarterlyResult[]; faixas: Faixa[];
+  /** Mínimo de eventos PARTICIPADOS para o bônus; null = regras do ciclo não carregaram. */
+  minEvents: number | null;
+  onPick: (id: number) => void;
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
@@ -56,10 +59,10 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
         case "faixa": return r.q.platoonMinScore ?? r.q.finalResult;
         case "final": return r.q.finalResult;
         case "gross": return r.q.grossAverage ?? 0;
-        case "events": return r.q.eventsCount ?? 0;
+        case "events": return r.q.participatedEventsCount ?? 0;
         case "penalty": return r.q.absencePenalty ?? 0;
         case "merit": return r.q.meritPoints ?? 0;
-        case "lost": return r.impact.lostPoints;
+        case "lost": return r.impact.lostPoints; // não conferidos vão para o fim (abaixo)
         case "bonus": return r.q.bonusValue ?? 0;
       }
     };
@@ -71,11 +74,18 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
         : filter === "faixa" ? r.lostFaixa
         : !!r.q.eligible)
       .sort((a, b) => {
+        if (sort.key === "lost") {
+          // Só valores conferidos entram na ordem; com penalidade e sem conferência, sempre no fim.
+          const ua = unverified(a), ub = unverified(b);
+          if (ua !== ub) return ua ? 1 : -1;
+        }
         const x = val(a), y = val(b);
         const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "pt-BR");
         return c * sort.dir || a.pos - b.pos || a.q.employeeName.localeCompare(b.q.employeeName, "pt-BR");
       });
   }, [all, q, filter, sort]);
+
+  function unverified(r: Row) { return (r.q.absencePenalty ?? 0) > 0 && !r.impact.verified; }
 
   const toggle = (key: SortKey) => setSort(prev => prev.key === key
     ? { key, dir: prev.dir === 1 ? -1 : 1 }
@@ -92,7 +102,7 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
         <StatTile label="Com penalidade" value={withPenalty.length} detail={withPenalty.length ? `${pts(penaltyPts)} pontos lançados no total` : "Nenhuma penalidade no ciclo"} />
         <StatTile label="Faixa perdida por penalidade" value={lostFaixa.length} detail={lostFaixa.length ? "Sem as penalidades, estariam numa faixa acima" : "Ninguém mudou de faixa por penalidade"} />
         <StatTile label="Com mérito" value={counts.merito} detail="Ganharam pontos por mérito" />
-        <StatTile label="Elegíveis ao bônus" value={`${eligible.length}/${all.length}`} detail={`Mínimo de ${minEvents} eventos na nota`} />
+        <StatTile label="Elegíveis ao bônus" value={`${eligible.length}/${all.length}`} detail={minEvents != null ? `Mínimo de ${minEvents} eventos participados` : "Mínimo de eventos indisponível"} />
         <StatTile label="Bônus projetado" value={brl(bonusTotal)} detail={bonusLost > 0 ? `${brl(bonusLost)} a menos por penalidades` : "Nenhum real perdido por penalidades"} />
       </div>
 
@@ -133,7 +143,7 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
                   <tr>
                     {([
                       ["pos", "#", "left"], ["name", "Colaborador", "left"], ["faixa", "Faixa", "left"], ["final", "Nota final", "right"], ["gross", "Média bruta", "right"],
-                      ["events", "Eventos / mín.", "right"], ["penalty", "Penalidades", "right"], ["merit", "Méritos", "right"],
+                      ["events", "Participou / mín.", "right"], ["penalty", "Penalidades", "right"], ["merit", "Méritos", "right"],
                       ["lost", "Efeito das penalidades", "left"], ["bonus", "Bônus", "right"],
                     ] as [SortKey, string, "left" | "right"][]).map(([key, label, align]) => {
                       const active = sort.key === key;
@@ -163,7 +173,10 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
                       <Td right><span className="text-[16px] font-black tabular-nums" style={{ fontFamily: CONDENSED }}>{n1(r.q.finalResult)}</span></Td>
                       <Td right muted>{n1(r.q.grossAverage)}</Td>
                       <Td right>
-                        <span className="tabular-nums whitespace-nowrap"><strong>{r.q.eventsCount ?? 0}</strong><span style={{ color: "var(--muted-foreground)" }}> / {minEvents}</span></span>
+                        <span className="flex flex-col items-end tabular-nums whitespace-nowrap">
+                          <span><strong>{r.q.participatedEventsCount ?? "—"}</strong><span style={{ color: "var(--muted-foreground)" }}> / {minEvents ?? "—"}</span></span>
+                          <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{r.q.eventsCount ?? 0} na nota</span>
+                        </span>
                       </Td>
                       <Td right>{(r.q.absencePenalty ?? 0) > 0 ? <strong className="tabular-nums" style={{ color: DANGER_TEXT }}>−{pts(r.q.absencePenalty ?? 0)} pts</strong> : <Dash />}</Td>
                       <Td right>{(r.q.meritPoints ?? 0) > 0 ? <strong className="tabular-nums" style={{ color: GOOD_TEXT }}>+{pts(r.q.meritPoints ?? 0)} pts</strong> : <Dash />}</Td>
@@ -180,12 +193,18 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
             <ul className="lg:hidden grid gap-2.5" aria-label="Colaboradores">
               {visible.map(r => (
                 <li key={r.q.employeeId}>
-                  <button type="button" onClick={() => onPick(r.q.employeeId)} className="w-full text-left rounded-xl p-3.5 flex flex-col gap-2.5 transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{ border: "1px solid var(--border)" }} data-testid={`card-person-${r.q.employeeId}`}>
+                  <article className="relative rounded-xl p-3.5 flex flex-col gap-2.5 transition-colors hover:bg-[var(--secondary)] has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring"
+                    style={{ border: "1px solid var(--border)" }} data-testid={`card-person-${r.q.employeeId}`} aria-label={r.q.employeeName}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-bold tabular-nums" style={{ color: "var(--muted-foreground)" }}>{r.pos}º no ranking</p>
-                        <p className="font-bold leading-tight truncate">{r.q.employeeName}</p>
+                        <h3 className="font-bold leading-tight truncate">
+                          {/* O ::after estica a área de clique sobre o cartão inteiro; o resto do cartão é texto. */}
+                          <button type="button" onClick={() => onPick(r.q.employeeId)} aria-label={`Ver análise de ${r.q.employeeName}`}
+                            className="text-left font-bold focus-visible:outline-none after:absolute after:inset-0 after:rounded-xl after:content-['']">
+                            {r.q.employeeName}
+                          </button>
+                        </h3>
                         <div className="mt-1.5"><FaixaChip size="sm" name={r.q.platoon} color={r.q.platoonColor} muted /></div>
                       </div>
                       <div className="text-right shrink-0">
@@ -194,13 +213,13 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
                       </div>
                     </div>
                     <dl className="grid grid-cols-4 gap-2 text-[12px]">
-                      <MiniStat label="Eventos" value={`${r.q.eventsCount ?? 0}/${minEvents}`} />
+                      <MiniStat label="Particip." value={`${r.q.participatedEventsCount ?? "—"}/${minEvents ?? "—"}`} />
                       <MiniStat label="Penalid." value={(r.q.absencePenalty ?? 0) > 0 ? `−${pts(r.q.absencePenalty ?? 0)}` : "—"} color={(r.q.absencePenalty ?? 0) > 0 ? DANGER_TEXT : undefined} />
                       <MiniStat label="Méritos" value={(r.q.meritPoints ?? 0) > 0 ? `+${pts(r.q.meritPoints ?? 0)}` : "—"} color={(r.q.meritPoints ?? 0) > 0 ? GOOD_TEXT : undefined} />
                       <MiniStat label="Bônus" value={r.q.eligible ? brl(r.q.bonusValue) : "Não eleg."} />
                     </dl>
                     {((r.q.absencePenalty ?? 0) > 0) && <EffectCell r={r} />}
-                  </button>
+                  </article>
                 </li>
               ))}
             </ul>

@@ -35,4 +35,6 @@ export const scoreChangesTable = pgTable("score_changes", {
   eligibleAfter: boolean("eligible_after"),
 }, (t) => ({
   employeeCycleIdx: index("score_changes_employee_cycle_idx").on(t.employeeId, t.cycleId, t.changedAt),
+  // Linha do tempo do ciclo inteiro (sem filtro de colaborador).
+  cycleChangedIdx: index("score_changes_cycle_changed_idx").on(t.cycleId, t.changedAt),
 }));

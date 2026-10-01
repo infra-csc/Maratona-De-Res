@@ -3,7 +3,7 @@ import { isNotNull, eq, sql } from "drizzle-orm";
 import {
   db, usersTable, areasTable, employeesTable, criteriaTable, eventsTable,
   eventParticipantsTable, eventCriteriaTable, platoonRulesTable, rulesTable,
-  evaluationsTable, calibrationsTable, absencesTable, auditLogsTable,
+  evaluationsTable, calibrationsTable, absencesTable, auditLogsTable, scoreChangesTable,
   quarterlyResultsTable, employeeEventResultsTable, employeeCycleEligibilityTable,
   cyclesTable,
 } from "@workspace/db";
@@ -53,6 +53,8 @@ async function seed() {
 
   // Wipe in reverse-dependency order
   await db.delete(auditLogsTable);
+  // Linha do tempo: FK para cycles sem cascade — apagar antes dos ciclos.
+  await db.delete(scoreChangesTable);
   await db.delete(employeeCycleEligibilityTable);
   await db.delete(employeeEventResultsTable);
   await db.delete(quarterlyResultsTable);

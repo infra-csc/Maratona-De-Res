@@ -1567,6 +1567,10 @@ export interface QuarterEligibility {
   eligible: boolean;
   /** @nullable */
   reason?: string | null;
+  /** O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus) */
+  excluded?: boolean;
+  /** @nullable */
+  excludedReason?: string | null;
   /** @nullable */
   createdByUserId?: number | null;
   /** @nullable */
@@ -1742,6 +1746,8 @@ export interface RankingDetailRow {
   /** @nullable */
   reason?: string | null;
   /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
   eventName?: string | null;
 }
 
@@ -1828,6 +1834,11 @@ export type RankingDetailSummary = {
   /** @nullable */
   scoreSum?: number | null;
   confirmedEventCount?: number;
+  /**
+     * Eventos confirmados de que participou (base da elegibilidade); null = sem resultado gravado no ciclo
+     * @nullable
+     */
+  participatedEventsCount?: number | null;
   isQuarterClosed: boolean;
   bonusBreakdown?: RankingDetailBonusBreakdown;
 };
@@ -1855,8 +1866,18 @@ export interface ScoreTimelineEntry {
   /** Data-hora ISO */
   at: string;
   kind: ScoreTimelineEntryKind;
-  /** event_counted, penalty, merit, penalty_removed, merit_removed ou o código da ação (calibrate, publish_partial_feedback, confirm-results…) */
+  /** event_counted, penalty, merit, penalty_removed, merit_removed, cycle_excluded, cycle_included, recompute ou o código da ação (calibrate, publish_partial_feedback, confirm-results, confirm-results-bulk…) */
   type: string;
+  /**
+     * Mesma ação que causou a mudança — a tela agrupa só entradas com o mesmo causeId
+     * @nullable
+     */
+  causeId?: string | null;
+  /**
+     * Calibração salva pela regra "só vale publicada" (não muda a nota até publicar)
+     * @nullable
+     */
+  pendingPublish?: boolean | null;
   /** @nullable */
   employeeId?: number | null;
   /** @nullable */
@@ -1927,6 +1948,22 @@ export type ScoreTimelineCycle = {
   endDate?: string | null;
 };
 
+/**
+ * Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+ * @nullable
+ */
+export type ScoreTimelineSubject = {
+  employeeId: number;
+  name: string;
+  /** @nullable */
+  functionName: string | null;
+  inRanking: boolean;
+  /** O admin tirou do ciclo */
+  excluded: boolean;
+  /** @nullable */
+  excludedReason: string | null;
+} | null;
+
 export type ScoreTimelinePlatoonsItem = {
   name: string;
   /** @nullable */
@@ -1941,6 +1978,11 @@ export interface ScoreTimeline {
      * @nullable
      */
   employeeId: number | null;
+  /**
+     * Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+     * @nullable
+     */
+  subject?: ScoreTimelineSubject;
   /** Situação atual de cada colaborador do ranking (nota, faixa, bônus) */
   people: ScoreTimelinePerson[];
   /** @nullable */

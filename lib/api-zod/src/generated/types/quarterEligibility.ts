@@ -15,6 +15,10 @@ export interface QuarterEligibility {
   eligible: boolean;
   /** @nullable */
   reason?: string | null;
+  /** O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus) */
+  excluded?: boolean;
+  /** @nullable */
+  excludedReason?: string | null;
   /** @nullable */
   createdByUserId?: number | null;
   /** @nullable */

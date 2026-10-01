@@ -28,6 +28,8 @@ router.get("/cycle-eligibility", async (req, res) => {
     cycleId: employeeCycleEligibilityTable.cycleId,
     eligible: employeeCycleEligibilityTable.eligible,
     reason: employeeCycleEligibilityTable.reason,
+    excluded: employeeCycleEligibilityTable.excluded,
+    excludedReason: employeeCycleEligibilityTable.excludedReason,
     createdByUserId: employeeCycleEligibilityTable.createdByUserId,
     createdByName: usersTable.name,
     updatedAt: employeeCycleEligibilityTable.updatedAt,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, calibrationsTable, calibrationCommentsTable, criteriaTable, usersTable, areasTable, eventsTable, auditLogsTable, eventCriteriaTable } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { pgNum } from "../lib/pg-num.js";
@@ -13,7 +13,9 @@ router.use(requireAuth);
  * A nota calibrada substitui a nota original no cálculo do evento e é aplicada
  * a todos os participantes daquele evento.
  */
-router.get("/calibrations", async (req, res) => {
+// Calibração salva (ainda não publicada) é rascunho do calibrador: só quem
+// calibra lê. Antes, qualquer usuário logado (inclusive colaborador) lia.
+router.get("/calibrations", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { eventId } = req.query;
   let query = db.select({
     id: calibrationsTable.id,
@@ -87,6 +89,15 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
     : null;
 
   if (existing) {
+    // Calibração ANTIGA (de antes da regra "só vale publicada") que nunca foi
+    // publicada conta na nota oficial pelo valor salvo. Ao re-salvar, ela vira
+    // pendente — guarda antes o valor que estava valendo como retrato, senão
+    // a nota cairia para a média dos avaliadores (revisão de 01/10/2026).
+    if (!existing.pendingPublish) {
+      await db.update(eventCriteriaTable)
+        .set({ publishedScore: existing.calibratedScore, publishedReason: existing.calibrationReason })
+        .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), isNull(eventCriteriaTable.publishedScore)));
+    }
     [calibration] = await db.update(calibrationsTable).set({
       calibratedScore: String(numScore),
       calibrationReason: reason,
@@ -118,7 +129,9 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
     }).returning();
   }
 
-  const afterSnap = { score: numScore, reason, eventId, criterionId, by: user.name };
+  // pendingPublish: a linha do tempo mostra "só muda a nota quando publicar"
+  // só para calibrações salvas pela regra nova (as antigas valeram na hora).
+  const afterSnap = { score: numScore, reason, eventId, criterionId, by: user.name, pendingPublish: true };
   await audit(
     req.user!.userId,
     event.feedbackReleased ? "recalibrate_released" : "calibrate",
@@ -209,7 +222,7 @@ router.get("/calibrations/audit", requireRole("admin", "rh", "diretoria"), async
 
 // ── Comentários de calibração ─────────────────────────────────────────────────
 
-router.get("/calibrations/comments", async (req, res) => {
+router.get("/calibrations/comments", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { eventId } = req.query;
   if (!eventId) { res.status(400).json({ error: "eventId obrigatório" }); return; }
 

@@ -130,7 +130,7 @@ export function EmployeesFilters({
 }) {
   return (
     <section className="flex flex-col md:flex-row gap-3 items-center flex-wrap">
-      <div className="relative flex-1">
+      <div className="relative w-full md:flex-1">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
         <input
           data-testid="input-search-employees"

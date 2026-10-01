@@ -16,7 +16,7 @@ export type EmployeeWithCycle = Employee & {
   hasAccess: boolean;
 };
 
-/** Situação no ciclo atual: com nota, fora do ciclo (admin) ou sem nota (não aparece na tela). */
+/** Situação no ciclo atual: com nota, fora do ciclo (admin) ou sem nota (só aparece pela busca). */
 export type CycleStatus = "in" | "out" | "none";
 
 export type EligibilityStatus = "eligible" | "not_eligible" | "freela" | "pending";

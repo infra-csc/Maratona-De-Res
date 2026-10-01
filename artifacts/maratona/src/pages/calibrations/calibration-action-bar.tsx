@@ -70,8 +70,8 @@ export function CalibrationActionBar({
                   <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: "var(--muted-foreground)" }} title={`${finalPublishedCount} de ${scorableCount} critérios (peso > 0) publicados como Final`}>
                     <ShieldCheck size={11} style={{ color: GOOD_TEXT }} /> {finalPublishedCount}/{scorableCount} final
                   </span>
-                  <div className="flex items-center gap-1">
-                    <Filter size={11} className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
+                  <div role="group" aria-label="Filtrar critérios" className="flex flex-wrap items-center gap-1">
+                    <Filter size={11} aria-hidden className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
                     {([
                       { value: "all", label: "Todos" },
                       { value: "uncalibrated", label: "Pendentes" },
@@ -83,6 +83,7 @@ export function CalibrationActionBar({
                         <button
                           key={opt.value}
                           type="button"
+                          aria-pressed={active}
                           onClick={() => setCriterionFilter(opt.value)}
                           className="text-[11px] font-black uppercase px-2 py-1 rounded transition-colors"
                           style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
@@ -92,7 +93,7 @@ export function CalibrationActionBar({
                   </div>
 
                   {/* Grupo direito: log de publicação + Salvar + Publicar */}
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2 max-w-full">
                     {/* Log de publicação */}
                     {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
                       <span className="text-[11px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD_TEXT : AMBER_TEXT }}>

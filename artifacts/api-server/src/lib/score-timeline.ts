@@ -1,4 +1,4 @@
-import { roundFinalResult } from "./calculations.js";
+import { roundFinalResult, getPlatoonByScore, type PlatoonRuleData } from "./calculations.js";
 
 /**
  * Linha do tempo da nota de UM colaborador num ciclo (só gestão).
@@ -15,13 +15,18 @@ import { roundFinalResult } from "./calculations.js";
 
 export interface TimelineEventFact { eventId: number; name: string; at: string; score: number }
 export interface TimelineAdjustmentFact { id: number; at: string; kind: "penalty" | "merit"; label: string; points: number; quantity: number; reason: string | null; eventName: string | null; by: string | null }
-export interface PlatoonLike { name: string; color: string | null; minScore: number }
+/** Faixa com os limites completos (mesma regra de getPlatoonByScore). */
+export type PlatoonLike = Pick<PlatoonRuleData, "name" | "minScore" | "maxScore" | "minInclusive" | "maxInclusive"> & { color: string | null };
 
 export interface TimelineEntry {
   id: string;
   at: string;
   kind: "recorded" | "reconstructed" | "info";
   type: string;
+  /** Mesma ação que causou (agrupa na tela só o que tem a MESMA causa). */
+  causeId?: string | null;
+  /** Calibração salva pela regra "só vale publicada" (ainda não vale na nota). */
+  pendingPublish?: boolean | null;
   employeeId?: number | null;
   employeeName?: string | null;
   eventId?: number | null;
@@ -46,11 +51,10 @@ export interface TimelineEntry {
   eligibleAfter?: boolean | null;
 }
 
+/** Faixa da nota — mesma regra oficial (limites mín./máx. inclusivos ou não). */
 export function platoonFor(score: number | null, rules: PlatoonLike[]): string | null {
   if (score == null) return null;
-  let name: string | null = null;
-  for (const r of [...rules].sort((a, b) => a.minScore - b.minScore)) if (score >= r.minScore) name = r.name;
-  return name;
+  return getPlatoonByScore(score, rules.map(r => ({ ...r, color: r.color ?? "", bonusValue: 0 })))?.name ?? null;
 }
 
 /**
@@ -72,7 +76,9 @@ export function reconstructSteps(
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   let sum = 0, n = 0, net = 0;
-  const final = () => (n > 0 ? Math.min(100, Math.max(0, roundFinalResult((sum - net) / n))) : null);
+  // Sem evento com nota: o oficial grava 0 quando já há lançamento; antes de
+  // qualquer fato, ainda não há nota.
+  const final = () => (n > 0 ? Math.min(100, Math.max(0, roundFinalResult((sum - net) / n))) : net !== 0 ? 0 : null);
   const out: TimelineEntry[] = [];
   for (const f of facts) {
     const before = final();
@@ -81,9 +87,9 @@ export function reconstructSteps(
     if (until && f.at >= until) continue; // daqui em diante vale o registro exato
     const base = { at: f.at, kind: "reconstructed" as const, finalBefore: before, finalAfter: after, platoonBefore: platoonFor(before, rules), platoonAfter: platoonFor(after, rules), eventsBefore: n - (f.ev ? 1 : 0), eventsAfter: n };
     if (f.ev) {
-      out.push({ ...base, id: `ev-${f.ev.eventId}`, type: "event_counted", eventId: f.ev.eventId, eventName: f.ev.name, eventScore: f.ev.score });
+      out.push({ ...base, id: `ev-${f.ev.eventId}`, causeId: `ev-${f.ev.eventId}`, type: "event_counted", eventId: f.ev.eventId, eventName: f.ev.name, eventScore: f.ev.score });
     } else if (f.adj) {
-      out.push({ ...base, id: `adj-${f.adj.id}`, type: f.adj.kind, label: f.adj.label, points: f.adj.points * f.adj.quantity, reason: f.adj.reason, eventName: f.adj.eventName, by: f.adj.by });
+      out.push({ ...base, id: `adj-${f.adj.id}`, causeId: `adj-${f.adj.id}`, type: f.adj.kind, label: f.adj.label, points: f.adj.points * f.adj.quantity, reason: f.adj.reason, eventName: f.adj.eventName, by: f.adj.by });
     }
   }
   return out;

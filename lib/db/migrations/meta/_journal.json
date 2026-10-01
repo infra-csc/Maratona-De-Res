@@ -57,6 +57,13 @@
       "when": 1790889573833,
       "tag": "0007_calibration_pending_publish",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790891253963,
+      "tag": "0008_score_changes_cycle_index",
+      "breakpoints": true
     }
   ]
 }

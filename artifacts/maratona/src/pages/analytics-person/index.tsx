@@ -6,15 +6,16 @@ import {
   useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey,
   useGetAnalyticsEventsReport, getGetAnalyticsEventsReportQueryKey,
   useGetRankingDetail, getGetRankingDetailQueryKey,
+  ApiError,
 } from "@workspace/api-client-react";
-import { AlertTriangle, ChevronLeft, ChevronRight, History, UserX, Users } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, History, UserMinus, UserX, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, EmptyState, LoadingState } from "@/components/shared";
 import { BODY, CONDENSED } from "@/lib/premium-theme";
 import { fmtDate } from "@/lib/utils";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { AnalyticsTabs } from "../analytics-team/analytics-tabs";
-import { activeFaixas, n1 } from "./derive";
+import { activeFaixas, n1, rankOf } from "./derive";
 import { SearchPicker } from "./ui";
 import { TeamView } from "./team-view";
 import { PersonView } from "./person-view";
@@ -51,20 +52,31 @@ export default function AnalyticsPersonPage() {
   const ranking = useGetQuarterlyResults(undefined, { query: { queryKey: getGetQuarterlyResultsQueryKey(), staleTime: 60_000 } });
   const rules = useGetPlatoonRules({ query: { queryKey: getGetPlatoonRulesQueryKey(), staleTime: 5 * 60_000 } });
   const overview = useGetAnalyticsOverview({ query: { queryKey: getGetAnalyticsOverviewQueryKey(), staleTime: 60_000 } });
-  const report = useGetAnalyticsEventsReport(undefined, { query: { queryKey: getGetAnalyticsEventsReportQueryKey(), staleTime: 60_000, enabled: employeeId != null } });
+
+  // Só abre a análise de quem está no ranking do ciclo. Fora do ciclo, inativo
+  // ou sem nota: nada de detalhe, relatório ou linha do tempo (o /ranking-detail
+  // não filtra; a tela não depende do servidor recusar).
+  const inRanking = employeeId != null && ranking.isSuccess && (ranking.data ?? []).some(r => r.employeeId === employeeId);
+  const outOfRanking = employeeId != null && ranking.isSuccess && !inRanking;
+
+  const report = useGetAnalyticsEventsReport(undefined, { query: { queryKey: getGetAnalyticsEventsReportQueryKey(), staleTime: 60_000, enabled: inRanking } });
   const detailParams = { employeeId: employeeId ?? 0 };
-  const detail = useGetRankingDetail(detailParams, { query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: employeeId != null, retry: false } });
+  const detail = useGetRankingDetail(detailParams, { query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: inRanking, retry: false } });
+  const detailNotFound = detail.error instanceof ApiError && detail.error.status === 404;
 
   const faixas = useMemo(() => activeFaixas(rules.data), [rules.data]);
-  const rows = ranking.data ?? [];
+  const rows = useMemo(() => ranking.data ?? [], [ranking.data]);
   const ordered = useMemo(() => [...rows].sort((a, b) => b.finalResult - a.finalResult || a.employeeName.localeCompare(b.employeeName, "pt-BR")), [rows]);
-  const minEvents = overview.data?.ruleSet.minEvents ?? overview.data?.kpis.minEvents ?? 0;
+  // Mínimo de eventos do bônus: nunca 0 por falha — sem a visão geral, fica desconhecido (null).
+  const minEvents = overview.data ? (overview.data.ruleSet?.minEvents ?? overview.data.kpis?.minEvents ?? null) : null;
   const cycle = overview.data?.cycle;
   const period = cycle?.startDate && cycle?.endDate ? `${fmtDay(cycle.startDate)} a ${fmtDay(cycle.endDate)}` : null;
 
+  // Anterior/próximo seguem a ordem da lista; a POSIÇÃO exibida é a do ranking (empate divide).
   const idx = employeeId != null ? ordered.findIndex(r => r.employeeId === employeeId) : -1;
   const prev = idx > 0 ? ordered[idx - 1] : null;
   const next = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : null;
+  const rank = employeeId != null ? rankOf(rows, employeeId) : null;
 
   const loadingBase = ranking.isLoading || rules.isLoading || overview.isLoading;
   const baseError = ranking.isError || rules.isError;
@@ -85,10 +97,10 @@ export default function AnalyticsPersonPage() {
         <div className="w-full sm:w-[380px] min-w-0">
           <label htmlFor="ap-colaborador" className="block mb-1 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>Colaborador</label>
           <SearchPicker id="ap-colaborador" value={employeeId} onChange={pick}
-            placeholder={ranking.isLoading ? "Carregando…" : "Toda a equipe"} emptyText="Ninguém com esse nome." allLabel="Toda a equipe"
+            placeholder={ranking.isLoading ? "Carregando…" : outOfRanking ? "Escolha um colaborador do ranking" : "Toda a equipe"} emptyText="Ninguém com esse nome." allLabel="Toda a equipe"
             options={ordered.map(r => ({ id: r.employeeId, label: r.employeeName, hint: n1(r.finalResult), color: r.platoonColor ?? null }))} />
         </div>
-        {employeeId != null && (
+        {employeeId != null && !outOfRanking && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1" role="group" aria-label="Navegar pelo ranking">
               <Button variant="outline" size="icon" className="h-10 w-10" disabled={!prev} onClick={() => prev && pick(prev.employeeId)}
@@ -112,12 +124,20 @@ export default function AnalyticsPersonPage() {
             )}
           </div>
         )}
-        {idx >= 0 && (
-          <p className="text-[12px] tabular-nums sm:ml-auto self-center" style={{ color: "var(--muted-foreground)" }}>
-            {idx + 1}º de {ordered.length} no ranking
+        {rank && (
+          <p className="text-[12px] tabular-nums sm:ml-auto self-center" style={{ color: "var(--muted-foreground)" }} data-testid="text-person-rank">
+            {rank.position}º de {rank.total} no ranking
           </p>
         )}
       </section>
+
+      {overview.isError && !loadingBase && !baseError && (
+        <div role="alert" className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]" style={{ backgroundColor: "var(--status-warn-bg)", border: "1px solid var(--border)" }}>
+          <AlertTriangle size={16} aria-hidden className="shrink-0" style={{ color: "var(--status-warn-text)" }} />
+          <p className="flex-1 min-w-[220px]">Não foi possível carregar as regras do ciclo: o mínimo de eventos do bônus e as médias do ciclo ficam sem valor até carregar.</p>
+          <Button variant="outline" size="sm" onClick={() => void overview.refetch()}>Tentar de novo</Button>
+        </div>
+      )}
 
       {loadingBase ? (
         <LoadingState lines={8} withHeader label="Carregando a análise" />
@@ -126,14 +146,28 @@ export default function AnalyticsPersonPage() {
           action={<Button variant="outline" onClick={() => { void ranking.refetch(); void rules.refetch(); }}>Tentar de novo</Button>} />
       ) : employeeId == null ? (
         <TeamView rows={rows} faixas={faixas} minEvents={minEvents} onPick={pick} />
+      ) : outOfRanking ? (
+        <EmptyState icon={UserMinus} title="Fora do ranking deste ciclo" data-testid="person-out-of-ranking"
+          description="Este colaborador não tem análise no ciclo atual: ainda não tem nota no ciclo, foi retirado do ciclo pelo administrador ou está com o cadastro inativo. Escolha outra pessoa ou volte para a equipe."
+          action={<Button variant="outline" onClick={() => pick(null)}><Users size={15} className="mr-1.5" aria-hidden /> Ver toda a equipe</Button>} />
       ) : detail.isLoading ? (
         <LoadingState lines={10} withHeader label="Montando a análise do colaborador" />
-      ) : detail.isError || !detail.data ? (
-        <EmptyState icon={UserX} title="Colaborador não encontrado" description="Ele pode ter sido removido ou não fazer parte do ciclo atual. Escolha outra pessoa ou volte para a equipe."
+      ) : detailNotFound ? (
+        <EmptyState icon={UserX} title="Colaborador não encontrado" description="O cadastro dele não foi encontrado. Escolha outra pessoa ou volte para a equipe."
           action={<Button variant="outline" onClick={() => pick(null)}>Ver toda a equipe</Button>} />
+      ) : detail.isError || !detail.data ? (
+        <EmptyState icon={AlertTriangle} title="Não foi possível carregar a análise do colaborador" description="Houve uma falha ao buscar os dados dele. Tente de novo em instantes."
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onClick={() => void detail.refetch()}>Tentar de novo</Button>
+              <Button variant="ghost" onClick={() => pick(null)}>Ver toda a equipe</Button>
+            </div>
+          } />
       ) : (
         <PersonView detail={detail.data} rows={rows} faixas={faixas} minEvents={minEvents}
-          teamEventAvg={overview.data?.kpis.avgEventScore ?? null} report={report.data} canTimeline={canTimeline} onPick={pick} />
+          teamEventAvg={overview.data?.kpis.avgEventScore ?? null}
+          report={report.data} reportLoading={report.isLoading} reportError={report.isError} onRetryReport={() => void report.refetch()}
+          canTimeline={canTimeline} onPick={pick} />
       )}
     </div>
   );
