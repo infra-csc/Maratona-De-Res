@@ -8,6 +8,7 @@ import {
   getPlatoonByScore,
   selectExtraEventScores,
   calculateQuarterFinalResult,
+  roundFinalResult,
   calculateQuarterGrossAverage,
   mergeEventScopedCriteria,
   calculateEventResult,
@@ -126,4 +127,14 @@ test("getCriterionEvaluationStatus: exige TODOS os designados da área; área se
   assert.equal(getCriterionEvaluationStatus(1, [10, 10, 11], byArea).submittedEvaluators, 2);
   assert.equal(getCriterionEvaluationStatus(2, [99], byArea).isEvaluated, true);
   assert.equal(getCriterionEvaluationStatus(2, [], byArea).isEvaluated, false);
+});
+
+test("nota final: arredonda para 1 casa antes da faixa (69,95 → 70,0 entra em Branco Caminhada)", () => {
+  assert.equal(roundFinalResult(69.95), 70);
+  assert.equal(roundFinalResult(69.949), 69.9);
+  assert.equal(roundFinalResult(83.75), 83.8);
+  assert.equal(roundFinalResult(86.875), 86.9);
+  assert.equal(roundFinalResult(70.33), 70.3);
+  // (139,9) ÷ 2 = 69,95 → 70,0
+  assert.equal(calculateQuarterFinalResult(calculateQuarterGrossAverage([69.9, 70]), 0, 2), 70);
 });

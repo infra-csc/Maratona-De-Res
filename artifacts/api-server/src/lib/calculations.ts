@@ -239,10 +239,22 @@ export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence
  * @param netPenalty     penaltyPoints − meritPoints (pode ser negativo se méritos > penalidades)
  * @param eventCount     Número de eventos confirmados/pontuados (N); se 0 retorna 0.
  */
+/**
+ * Nota final do ciclo, ARREDONDADA PARA 1 CASA (meio para cima) — é ela que
+ * define a faixa e o bônus. Decisão do dono em 01/10/2026: 69,95 aparecia como
+ * "70,0" na tela e ficava sem bônus; agora vale 70,0 e entra na faixa de 70.
+ * Um arredondamento só (arredondar para 2 casas antes levaria 69,949 a 70,0);
+ * a folga de 1e-7 cobre o ruído do ponto flutuante (69,95 é guardado como
+ * 69,9499999…).
+ */
+export function roundFinalResult(value: number): number {
+  return Math.round(value * 10 + 1e-7) / 10;
+}
+
 export function calculateQuarterFinalResult(grossAverage: number, netPenalty: number, eventCount: number): number {
   if (eventCount <= 0) return 0;
   const adjusted = grossAverage - netPenalty / eventCount;
-  return Math.min(100, Math.max(0, Math.round(adjusted * 100) / 100));
+  return Math.min(100, Math.max(0, roundFinalResult(adjusted)));
 }
 
 export interface PlatoonRuleData {
