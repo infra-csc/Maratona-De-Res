@@ -463,6 +463,8 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
       partialPublishedByUserName: partialPublisherAlias.name,
       finalPublishedByUserName: finalPublisherAlias.name,
+      // Nota da última publicação (o que vale hoje para o colaborador).
+      publishedScore: eventCriteriaTable.publishedScore,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -475,7 +477,7 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
   const enrichedCriteria = criteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
+    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0, publishedScore: c.publishedScore != null ? parseFloat(c.publishedScore) : null };
   });
 
   const hasEvaluations = await eventHasEvaluations(id);

@@ -34,4 +34,9 @@ export interface EventCriterion {
   partialPublishedByUserName?: string | null;
   /** @nullable */
   finalPublishedByUserName?: string | null;
+  /**
+     * Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração
+     * @nullable
+     */
+  publishedScore?: number | null;
 }

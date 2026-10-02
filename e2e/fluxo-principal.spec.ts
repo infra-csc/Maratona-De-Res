@@ -120,11 +120,19 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     // Regra do dono (01/10/2026): salva ainda NÃO vale na nota — a tela avisa
     // o que falta publicar; publicar é o que faz a calibração contar.
     await expect(c2.getByTestId("badge-criterion-pending-publish")).toBeVisible();
+    await expect(c2.getByTestId(`status-published-${CRITERIA[1].id}`)).toContainText("Não publicado");
+    // Seletor "Publicar como" em Final: NÃO habilita o Salvar nem publica
+    // (regra do dono, 02/10/2026 — antes o Salvar publicava como Final).
+    await c2.getByRole("button", { name: "Final", exact: true }).click();
+    await expect(page.getByTestId("button-save-all-cal")).toBeDisabled();
+    await expect(c2.getByTestId(`status-published-${CRITERIA[1].id}`)).toContainText("Não publicado");
     await expect(page.getByTestId("text-pending-publish")).toHaveText(/1 falta publicar/i);
     await page.getByTestId("button-publish-all").click();
     await expect(page.getByText(/^Publicado/).first()).toBeVisible();
     await expect(page.getByTestId("text-pending-publish")).toHaveCount(0);
     await expect(c2.getByTestId("badge-criterion-pending-publish")).toHaveCount(0);
+    // Publicar respeita o seletor: saiu como Final.
+    await expect(c2.getByTestId(`status-published-${CRITERIA[1].id}`)).toContainText("Publicado final");
   });
 
   await test.step("antes da confirmação: Ana tem 7 eventos e está inelegível", async () => {

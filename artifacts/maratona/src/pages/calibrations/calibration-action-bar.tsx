@@ -109,11 +109,11 @@ export function CalibrationActionBar({
                       type="button"
                       disabled={savingAll || totalDirtyCount === 0}
                       onClick={handleSaveAll}
-                      title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
+                      title={totalDirtyCount === 0 ? "Nenhuma alteração para salvar" : `Salvar ${totalDirtyCount} alteração(ões) — salva a calibração, não publica`}
                       className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
                       style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >
-                      <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
+                      <Save size={13} /> {savingAll ? "Salvando..." : `Salvar calibração${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
                     </button>
                     {/* Aviso: calibração salva que ainda não vale na nota */}
                     {pendingPublishCount > 0 && (
@@ -129,7 +129,7 @@ export function CalibrationActionBar({
                         type="button"
                         disabled={publishingAll || savingAll}
                         onClick={handlePublishAll}
-                        title={unsavedEditsCount > 0 ? "Há notas não salvas — salve antes de publicar" : "Publicar os critérios calibrados conforme a intenção Parc./Final de cada um"}
+                        title={unsavedEditsCount > 0 ? "Há notas não salvas — salve antes de publicar" : "Publicar: a calibração salva passa a valer para o colaborador e na nota oficial (parcial ou final, conforme o seletor de cada critério)"}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                         style={pendingPublishCount > 0 ? { backgroundColor: "var(--status-warn)", color: "#191c1e" } : { border: "1px solid var(--border)" }}
                       >
@@ -137,6 +137,11 @@ export function CalibrationActionBar({
                       </button>
                     )}
                   </div>
+                  {/* Regra do dono (02/10/2026): salvar é calibrar; só publicar faz valer. */}
+                  <p data-testid="text-save-vs-publish" className="basis-full text-[11.5px] leading-snug pt-1.5 mt-0.5" style={{ color: "var(--muted-foreground)", borderTop: "1px solid var(--border)" }}>
+                    <strong style={{ color: "var(--foreground)" }}>Salvar calibração</strong> guarda a nota calibrada — o colaborador não vê e a nota oficial não muda.{" "}
+                    <strong style={{ color: "var(--foreground)" }}>Publicar</strong> faz valer, como parcial ou final conforme o seletor de cada critério.
+                  </p>
                 </div>
   );
 }

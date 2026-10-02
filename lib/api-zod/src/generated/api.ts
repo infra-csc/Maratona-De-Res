@@ -866,7 +866,8 @@ export const GetEventResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -1688,7 +1689,8 @@ export const SetConformityEvaluatorResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -1827,7 +1829,8 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -1966,7 +1969,8 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -2105,7 +2109,8 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -2275,7 +2280,8 @@ export const GetEventCriteriaResponseItem = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -2314,7 +2320,8 @@ export const UpdateEventCriteriaResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })),
   "warnings": zod.array(zod.string()).optional()
 })
@@ -2394,7 +2401,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -2533,7 +2541,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -2668,7 +2677,8 @@ export const ResyncEventCriteriaResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -2922,7 +2932,8 @@ export const DuplicateEventCriterionResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -3062,7 +3073,8 @@ export const SetEventCriterionAreasResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -3197,7 +3209,8 @@ export const ApplyEventCriteriaAreaDefaultsResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -3333,7 +3346,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -5635,7 +5649,8 @@ export const SwapEventCriterionSourceResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.int(),
@@ -5763,7 +5778,8 @@ export const GetEvaluationConsoleResponse = zod.object({
   "partialPublishedAt": zod.string().nullish(),
   "finalPublishedAt": zod.string().nullish(),
   "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish()
+  "finalPublishedByUserName": zod.string().nullish(),
+  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
 })),
   "assignments": zod.array(zod.object({
   "id": zod.int().nullable().describe('null nas linhas "virtuais" do avaliador principal (critério ainda sem atribuição gravada).'),
