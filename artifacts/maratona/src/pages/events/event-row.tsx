@@ -88,6 +88,18 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, onConf
         ) : (
           <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
         )}
+        {(ev.pendingPublishCount ?? 0) > 0 && (
+          // "N calibração(ões) a publicar" não cabe numa linha nesta coluna (quebrava
+          // a etiqueta em duas): o texto curto fica visível e o completo vai no
+          // título e para o leitor de tela.
+          <span data-testid={`badge-pending-publish-${ev.id}`}
+            title={`${ev.pendingPublishCount} ${ev.pendingPublishCount === 1 ? "calibração salva e ainda não publicada" : "calibrações salvas e ainda não publicadas"}: só vale na nota depois de publicar`}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase whitespace-nowrap"
+            style={{ fontFamily: CONDENSED, letterSpacing: "0.03em", backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT }}>
+            <span aria-hidden>{ev.pendingPublishCount} a publicar</span>
+            <span className="sr-only">{ev.pendingPublishCount} {ev.pendingPublishCount === 1 ? "calibração" : "calibrações"} a publicar</span>
+          </span>
+        )}
       </div>
 
       {/* Matriz de Conformidade mini bar */}

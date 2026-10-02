@@ -2,15 +2,16 @@ import { Router } from "express";
 import {
   db, eventsTable, employeeEventResultsTable, quarterlyResultsTable, employeesTable, platoonRulesTable,
   evaluationsTable, calibrationsTable, eventCriteriaTable, criteriaTable, areasTable, eventConformitiesTable,
-  absencesTable, usersTable,
+  absencesTable, usersTable, employeeCycleEligibilityTable,
 } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { computeAnalytics } from "../lib/analytics.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { rankingScope } from "../lib/ranking-scope.js";
 import { buildEventsReport } from "../lib/events-report.js";
+import { effectiveCalibrations } from "../lib/cycle-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -55,7 +56,7 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
     }).from(evaluationsTable)
       .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
       .where(inArray(evaluationsTable.eventId, ids))),
-    inCycle(db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
+    inCycle(db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore, pendingPublish: calibrationsTable.pendingPublish })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids))),
     inCycle(db.select({
       eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active,
@@ -74,7 +75,8 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       points: absencesTable.points, quantity: absencesTable.quantity,
     }).from(absencesTable)
       .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
-      .where(and(eq(absencesTable.cycleId, cycle.id))),
+      // Quem o admin tirou do ciclo não entra (nem nos rankings de penalidade/mérito).
+      .where(and(eq(absencesTable.cycleId, cycle.id), sql`NOT EXISTS (SELECT 1 FROM ${employeeCycleEligibilityTable} x WHERE x.employee_id = ${absencesTable.employeeId} AND x.cycle_id = ${absencesTable.cycleId} AND x.excluded)`)),
     loadPenaltyLabels(),
     // Catálogo inteiro (poucas dezenas de linhas): liga cópias por evento à origem.
     db.select({ id: criteriaTable.id, name: criteriaTable.name, eventScoped: criteriaTable.eventScoped, sourceCriterionId: criteriaTable.sourceCriterionId }).from(criteriaTable),
@@ -97,7 +99,8 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       eventId: e.eventId, criterionId: e.criterionId, evaluatorUserId: e.evaluatorUserId,
       evaluatorName: e.evaluatorName ?? `Usuário #${e.evaluatorUserId}`, score: num(e.score), status: e.status, submittedAt: e.submittedAt,
     })),
-    calibrations: cals.map(c => ({ eventId: c.eventId, criterionId: c.criterionId, calibratedScore: num(c.calibratedScore) })),
+    // Só a calibração que vale na nota (a salva e não publicada fica de fora).
+    calibrations: (await effectiveCalibrations(cals)).map(c => ({ eventId: c.eventId, criterionId: c.criterionId, calibratedScore: num(c.calibratedScore) })),
     eventCriteria: ecs.map(c => ({
       eventId: c.eventId, criterionId: c.criterionId, active: c.active,
       name: c.name ?? `Critério #${c.criterionId}`, area: c.areaLabel ?? c.areaName ?? null,

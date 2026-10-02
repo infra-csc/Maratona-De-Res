@@ -242,6 +242,40 @@ export interface Employee {
   eligibilityReason?: string | null;
   sourceType?: string;
   createdAt?: string;
+  /**
+     * Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEligible?: boolean | null;
+  /** @nullable */
+  participatedEventsCount?: number | null;
+  /**
+     * Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEventsCount?: number | null;
+  /** O admin tirou o colaborador do ciclo atual */
+  cycleExcluded?: boolean;
+  /** @nullable */
+  cycleExcludedReason?: string | null;
+  /** @nullable */
+  linkedUserId?: number | null;
+  hasAccess?: boolean;
+}
+
+export interface CycleExclusionInput {
+  excluded: boolean;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface CycleExclusionResult {
+  employeeId: number;
+  cycleId: number;
+  excluded: boolean;
+  /** @nullable */
+  excludedReason: string | null;
+  warnings: string[];
 }
 
 /**
@@ -333,6 +367,8 @@ export interface Event {
   finalCalibratedCriteria?: number;
   /** Nº de critérios ativos com pelo menos uma publicação parcial. */
   partialPublishedCount?: number;
+  /** Nº de calibrações salvas e ainda NÃO publicadas (não valem na nota até publicar). */
+  pendingPublishCount?: number;
   /** @nullable */
   averageScore?: number | null;
   /** @nullable */
@@ -933,6 +969,8 @@ export interface Calibration {
   /** @nullable */
   calibratedByName?: string | null;
   calibratedAt?: string;
+  /** Salva e ainda não publicada — não vale na nota até publicar. */
+  pendingPublish?: boolean;
   /** @nullable */
   warnings?: string[] | null;
 }
@@ -1529,6 +1567,10 @@ export interface QuarterEligibility {
   eligible: boolean;
   /** @nullable */
   reason?: string | null;
+  /** O admin tirou o colaborador deste ciclo (sem nota, ranking e bônus) */
+  excluded?: boolean;
+  /** @nullable */
+  excludedReason?: string | null;
   /** @nullable */
   createdByUserId?: number | null;
   /** @nullable */
@@ -1704,6 +1746,8 @@ export interface RankingDetailRow {
   /** @nullable */
   reason?: string | null;
   /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
   eventName?: string | null;
 }
 
@@ -1790,6 +1834,11 @@ export type RankingDetailSummary = {
   /** @nullable */
   scoreSum?: number | null;
   confirmedEventCount?: number;
+  /**
+     * Eventos confirmados de que participou (base da elegibilidade); null = sem resultado gravado no ciclo
+     * @nullable
+     */
+  participatedEventsCount?: number | null;
   isQuarterClosed: boolean;
   bonusBreakdown?: RankingDetailBonusBreakdown;
 };
@@ -1801,6 +1850,145 @@ export interface RankingDetail {
   events: RankingDetailEvent[];
   penalties: RankingDetailRow[];
   merits: RankingDetailRow[];
+}
+
+export type ScoreTimelineEntryKind = typeof ScoreTimelineEntryKind[keyof typeof ScoreTimelineEntryKind];
+
+
+export const ScoreTimelineEntryKind = {
+  recorded: 'recorded',
+  reconstructed: 'reconstructed',
+  info: 'info',
+} as const;
+
+export interface ScoreTimelineEntry {
+  id: string;
+  /** Data-hora ISO */
+  at: string;
+  kind: ScoreTimelineEntryKind;
+  /** event_counted, penalty, merit, penalty_removed, merit_removed, cycle_excluded, cycle_included, recompute ou o código da ação (calibrate, publish_partial_feedback, confirm-results, confirm-results-bulk…) */
+  type: string;
+  /**
+     * Mesma ação que causou a mudança — a tela agrupa só entradas com o mesmo causeId
+     * @nullable
+     */
+  causeId?: string | null;
+  /**
+     * Calibração salva pela regra "só vale publicada" (não muda a nota até publicar)
+     * @nullable
+     */
+  pendingPublish?: boolean | null;
+  /** @nullable */
+  employeeId?: number | null;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  eventName?: string | null;
+  /** @nullable */
+  criterionName?: string | null;
+  /** @nullable */
+  label?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  by?: string | null;
+  /** @nullable */
+  eventScore?: number | null;
+  /** @nullable */
+  points?: number | null;
+  /** @nullable */
+  scoreBefore?: number | null;
+  /** @nullable */
+  scoreAfter?: number | null;
+  /** @nullable */
+  finalBefore?: number | null;
+  /** @nullable */
+  finalAfter?: number | null;
+  /** @nullable */
+  platoonBefore?: string | null;
+  /** @nullable */
+  platoonAfter?: string | null;
+  /** @nullable */
+  bonusBefore?: number | null;
+  /** @nullable */
+  bonusAfter?: number | null;
+  /** @nullable */
+  eventsBefore?: number | null;
+  /** @nullable */
+  eventsAfter?: number | null;
+  /** @nullable */
+  eligibleBefore?: boolean | null;
+  /** @nullable */
+  eligibleAfter?: boolean | null;
+}
+
+export interface ScoreTimelinePerson {
+  employeeId: number;
+  name: string;
+  /** @nullable */
+  functionName?: string | null;
+  finalResult: number;
+  /** @nullable */
+  platoon: string | null;
+  /** @nullable */
+  platoonColor: string | null;
+  bonusValue: number;
+  eventsCount: number;
+  eligible: boolean;
+}
+
+export type ScoreTimelineCycle = {
+  id: number;
+  name: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+};
+
+/**
+ * Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+ * @nullable
+ */
+export type ScoreTimelineSubject = {
+  employeeId: number;
+  name: string;
+  /** @nullable */
+  functionName: string | null;
+  inRanking: boolean;
+  /** O admin tirou do ciclo */
+  excluded: boolean;
+  /** @nullable */
+  excludedReason: string | null;
+} | null;
+
+export type ScoreTimelinePlatoonsItem = {
+  name: string;
+  /** @nullable */
+  color: string | null;
+  minScore: number;
+};
+
+export interface ScoreTimeline {
+  cycle: ScoreTimelineCycle;
+  /**
+     * Filtro aplicado (null = todos)
+     * @nullable
+     */
+  employeeId: number | null;
+  /**
+     * Quem está filtrado — inclusive quem não está no ranking (sem nota ou fora do ciclo)
+     * @nullable
+     */
+  subject?: ScoreTimelineSubject;
+  /** Situação atual de cada colaborador do ranking (nota, faixa, bônus) */
+  people: ScoreTimelinePerson[];
+  /** @nullable */
+  recordedSince: string | null;
+  platoons: ScoreTimelinePlatoonsItem[];
+  entries: ScoreTimelineEntry[];
 }
 
 export interface AuditLog {
@@ -2966,6 +3154,14 @@ search?: string;
 
 export type GetRankingDetailParams = {
 employeeId: number;
+};
+
+export type GetScoreTimelineParams = {
+/**
+ * Sem informar = todos os colaboradores do ranking
+ */
+employeeId?: number;
+cycleId?: number;
 };
 
 export type GetAuditLogsParams = {

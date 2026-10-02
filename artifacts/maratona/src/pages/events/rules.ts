@@ -54,6 +54,7 @@ export function filterAndSortEvents(all: EventItem[], { search, filterDateFrom, 
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed && !ev.isHistorical)
       || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "pendingCal" && isPastOrClosed(ev, todayStr) && (ev.finalCalibratedCriteria ?? 0) === 0 && (ev.partialPublishedCount ?? 0) === 0)
+      || (cardFilter === "pendingPub" && (ev.pendingPublishCount ?? 0) > 0)
       || (cardFilter === "partialPub" && hasPartialPublication(ev))
       || (cardFilter === "fullyEval"  && isPubFinal(ev));
     return matchSearch && matchDate && matchCard;

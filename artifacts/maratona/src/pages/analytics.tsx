@@ -15,6 +15,7 @@ import { PageHeader, EmptyState, LoadingState, StatusBadge, StatTile } from "@/c
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
 import { AnalyticsTabs } from "./analytics-team/analytics-tabs";
+import { useAuth, hasRole } from "@/lib/auth-context";
 
 // Paleta dos gráficos validada (dataviz/validate_palette) contra as superfícies
 // do app: série 1 = lima da marca escurecido para barra/linha (#6f8300 claro,
@@ -209,6 +210,9 @@ export default function AnalyticsPage() {
 function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
   data: AnalyticsOverview; updatedAt: number; refreshing: boolean; onRefresh: () => void;
 }) {
+  const { user } = useAuth();
+  // Linha do tempo é só de admin e RH (diretoria vê Análises, mas não o histórico).
+  const canTimeline = hasRole(user, "admin") || hasRole(user, "rh");
   const k = data.kpis;
   const period = data.cycle.startDate && data.cycle.endDate
     ? `${fmtDate(data.cycle.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} a ${fmtDate(data.cycle.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}`
@@ -510,7 +514,12 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
                     head={["Colaborador", "Pontos", "Ocorr."]}
                     rows={col.people.map(p => [
                       <span className="flex flex-col">
-                        <span className="font-semibold">{p.name}</span>
+                        {canTimeline ? (
+                          <Link href={`/linha-do-tempo?colaborador=${p.employeeId}&tipo=lancamentos`} className="font-semibold hover:underline underline-offset-2"
+                            title={`Ver na linha do tempo as faltas e méritos de ${p.name}`} data-testid={`link-timeline-${col.key}-${p.employeeId}`}>
+                            {p.name}
+                          </Link>
+                        ) : <span className="font-semibold">{p.name}</span>}
                         <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{p.types.join(", ")}</span>
                       </span>,
                       <StatusBadge size="sm" variant={col.variant} label={`${col.sign}${fmtNum(p.points, Number.isInteger(p.points) ? 0 : 1)}`} />,
@@ -549,6 +558,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         <section className="rounded-xl p-5 flex flex-col gap-2 text-[13px]" style={{ backgroundColor: "var(--secondary)" }}>
           <h2 className="text-[15px] font-black uppercase" style={{ fontFamily: CONDENSED }}>Onde agir</h2>
           <p><Link href="/analytics/eventos" className="font-semibold underline underline-offset-2" data-testid="link-events-report">Resultado por evento</Link> <span style={{ color: "var(--muted-foreground)" }}>— nota final calibrada, critérios e equipe de cada evento confirmado.</span></p>
+          {canTimeline && <p><Link href="/linha-do-tempo" className="font-semibold underline underline-offset-2" data-testid="link-timeline">Linha do tempo</Link> <span style={{ color: "var(--muted-foreground)" }}>— o que mudou nas notas, dia a dia, e por quê.</span></p>}
           <p style={{ color: "var(--muted-foreground)" }}>Os números acima vêm das telas de trabalho:</p>
           <ul className="space-y-1.5">
             <li><Link href="/events?status=unconfirmed" className="font-semibold underline underline-offset-2">Eventos não confirmados</Link> <span style={{ color: "var(--muted-foreground)" }}>— não entram na nota.</span></li>

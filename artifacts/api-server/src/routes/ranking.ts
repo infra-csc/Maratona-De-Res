@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   db, quarterlyResultsTable, employeesTable, absencesTable, eventsTable,
-  eventParticipantsTable, platoonRulesTable,
+  eventParticipantsTable, platoonRulesTable, employeeCycleEligibilityTable,
 } from "@workspace/db";
 import { eq, and, sql, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -147,6 +147,10 @@ router.get("/ranking-detail", async (req, res) => {
   ]);
 
   if (!employee) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
+  // Fora do ciclo (o admin tirou): não tem análise neste ciclo.
+  const [cycleSituation] = await db.select({ excluded: employeeCycleEligibilityTable.excluded }).from(employeeCycleEligibilityTable)
+    .where(and(eq(employeeCycleEligibilityTable.employeeId, employeeId), eq(employeeCycleEligibilityTable.cycleId, cycle.id))).limit(1);
+  if (cycleSituation?.excluded) { res.status(404).json({ error: "Colaborador fora deste ciclo" }); return; }
 
   const platoonRulesMapped = platoonRules.map(r => ({
     name: r.name, color: r.color,
@@ -235,6 +239,7 @@ router.get("/ranking-detail", async (req, res) => {
       quantity: absencesTable.quantity,
       date: absencesTable.date,
       reason: absencesTable.reason,
+      eventId: absencesTable.eventId,
       eventName: eventsTable.name,
     })
     .from(absencesTable)
@@ -255,6 +260,7 @@ router.get("/ranking-detail", async (req, res) => {
     total: a.points * a.quantity,
     date: a.date,
     reason: a.reason ?? null,
+    eventId: a.eventId ?? null,
     eventName: a.eventName ?? null,
   });
 
@@ -365,6 +371,8 @@ router.get("/ranking-detail", async (req, res) => {
       eventsCount: events.length,
       scoreSum: grossAverage !== null ? scoreSum : null,
       confirmedEventCount: scored.length,
+      // Base da elegibilidade (eventos confirmados de que participou, com ou sem nota).
+      participatedEventsCount: quarterResult?.participatedEventsCount ?? null,
       isQuarterClosed: !!quarterResult,
       ...(bonusBreakdown ? { bonusBreakdown } : {}),
     },

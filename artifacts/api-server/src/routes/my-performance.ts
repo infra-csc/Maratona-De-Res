@@ -455,7 +455,9 @@ router.get("/my-performance", async (req, res) => {
     : null;
 
   const registrationEligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
-  const quarterEligible = !quarterElig || quarterElig.eligible;
+  // Fora do ciclo (o admin tirou): sem nota, faixa e bônus — nem projetados.
+  const excludedFromCycle = !!quarterElig?.excluded;
+  const quarterEligible = (!quarterElig || quarterElig.eligible) && !excludedFromCycle;
   // Regra: participação como "Sup Ceno *" em qualquer evento do ciclo
   // desqualifica do ranking/bônus — mesma regra do fechamento (results.ts).
   const hasSupCenoParticipation = participations.some(p => isInformationalFunction(p.functionName));
@@ -499,6 +501,8 @@ router.get("/my-performance", async (req, res) => {
     nextPlatoonMinScore = nextRule?.minScore ?? null;
     currentBonus = pgNum(quarterResult.bonusValue);
     bonusStatus = quarterResult.bonusStatus;
+  } else if (excludedFromCycle) {
+    bonusStatus = "not_eligible";
   } else if (grossAverage !== null) {
     // Espelha a regra de fechamento (results.ts): méritos somam, penalidades
     // subtraem, resultado travado entre 0 e 100 — projeção precisa refletir

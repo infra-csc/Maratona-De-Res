@@ -14,6 +14,7 @@ import {
   bulkGenerateCasaPins,
   generateEmployeePin,
   bulkEmploymentReset,
+  useSetEmployeeCycleExclusion,
 } from "@workspace/api-client-react";
 import type { EmployeeInput, BulkGenerateAccessResult, MergeEmployeeResult, BulkSetCpfResult, CasaPin, SkippedPin } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,8 +22,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { BODY } from "@/lib/premium-theme";
+import { ConfirmDialog } from "@/components/shared";
+import { Textarea } from "@/components/ui/textarea";
+import { invalidateCycleResults } from "@/lib/invalidate-results";
 import type { BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
-import { getEligibilityStatus, parseCpfRows, serverErrorMessage } from "./employees/utils";
+import { cycleStatus, getEligibilityStatus, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
 import { EmployeesFilters, EmployeesHeader, EmployeesKpis } from "./employees/employees-header";
 import { CreateEmployeeDialog, EditEmployeeDialog } from "./employees/employee-form-dialogs";
 import { EmployeesTable } from "./employees/employees-table";
@@ -59,8 +63,13 @@ export default function EmployeesPage() {
   }, [impersonate, toast]);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filterActive, setFilterActive] = useState<"true" | "false">("true");
-  const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
+  // Lista padrão: quem tem nota no ciclo atual ("No ciclo") e quem o admin
+  // tirou dele ("Fora do ciclo", para poder devolver). Quem ainda NÃO tem nota
+  // (freela, recém-criado) aparece só pela busca, numa seção à parte "Sem nota
+  // no ciclo" — assim ninguém fica inacessível (editar, PIN, mesclar).
+  const [filterCycle, setFilterCycle] = useState<"in" | "out">("in");
+  const [cycleTarget, setCycleTarget] = useState<EmployeeWithCycle | null>(null);
+  const [cycleReason, setCycleReason] = useState("");
   const [open, setOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -164,9 +173,9 @@ export default function EmployeesPage() {
   const [casaSelection, setCasaSelection] = useState<Set<number>>(new Set());
   const [resetTypeSearch, setResetTypeSearch] = useState("");
 
-  const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
+  const qKey = getGetEmployeesQueryKey();
   const { data: employeesRaw, isLoading } = useGetEmployees(
-    { active: filterActive === "true" },
+    undefined,
     { query: { queryKey: qKey } }
   );
   const employees = employeesRaw as EmployeeWithCycle[] | undefined;
@@ -193,9 +202,16 @@ export default function EmployeesPage() {
 
   const createMutation = useCreateEmployee({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Colaborador criado" });
+        // Recém-criado ainda não tem nota: preenche a busca com o nome para ele
+        // aparecer na hora (seção "Sem nota no ciclo").
+        const createdName = (variables.data.name ?? "").trim();
+        if (createdName) setSearch(createdName);
+        toast({
+          title: `${toTitleCase(createdName || "Colaborador")} criado`,
+          description: "Aparece pela busca, em \"Sem nota no ciclo\". Entra em \"No ciclo\" quando tiver nota em algum evento.",
+        });
         setCreateOpen(false);
         if (data.generatedAccess?.cpfLogin && data.generatedAccess?.password) {
           setNewAccess({ cpfLogin: data.generatedAccess.cpfLogin, password: data.generatedAccess.password });
@@ -217,8 +233,7 @@ export default function EmployeesPage() {
   const mergeMutation = useMergeEmployee({
     mutation: {
       onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: true }) });
-        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: false }) });
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
         setMergeResult(data);
         setMergeMode(false);
         setMergeConfirmOpen(false);
@@ -282,12 +297,16 @@ export default function EmployeesPage() {
   const isAdmin = hasRole(user, "admin");
   const canBulk = isAdmin || hasRole(user, "rh");
   const canEdit = canBulk || hasRole(user, "operador");
-  const filtered = (employees ?? []).filter(e =>
-    (filterType === "all" || (e.employmentType ?? "casa") === filterType) &&
-    (e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.department.toLowerCase().includes(search.toLowerCase()) ||
-      e.functionName.toLowerCase().includes(search.toLowerCase()))
-  );
+  const inCycle = (employees ?? []).filter(e => cycleStatus(e) === "in");
+  const outOfCycle = (employees ?? []).filter(e => cycleStatus(e) === "out");
+  const term = search.trim().toLowerCase();
+  const matches = (e: EmployeeWithCycle) => !term ||
+    e.name.toLowerCase().includes(term) ||
+    e.department.toLowerCase().includes(term) ||
+    e.functionName.toLowerCase().includes(term);
+  const filtered = (filterCycle === "in" ? inCycle : outOfCycle).filter(matches);
+  // Sem nota no ciclo: só com texto na busca (a lista padrão continua só com quem tem nota).
+  const noScoreMatches = term ? (employees ?? []).filter(e => cycleStatus(e) === "none" && matches(e)) : [];
 
   function toggleMergeSelection(id: number) {
     setSelectedIds(prev => {
@@ -314,10 +333,35 @@ export default function EmployeesPage() {
   }
 
   const stats = {
-    total: employees?.length ?? 0,
-    ativos: employees?.filter(e => e.active).length ?? 0,
-    elegiveis: employees?.filter(e => getEligibilityStatus(e) === "eligible").length ?? 0,
+    noCiclo: inCycle.length,
+    elegiveis: inCycle.filter(e => getEligibilityStatus(e) === "eligible").length,
+    foraDoCiclo: outOfCycle.length,
   };
+
+  const cycleMutation = useSetEmployeeCycleExclusion();
+  function confirmCycleToggle() {
+    if (!cycleTarget) return;
+    const excluded = cycleStatus(cycleTarget) !== "out";
+    const name = toTitleCase(cycleTarget.name);
+    cycleMutation.mutate({ id: cycleTarget.id, data: { excluded, reason: excluded ? cycleReason.trim() || null : null } }, {
+      onSuccess: (res) => {
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+        invalidateCycleResults(qc);
+        // Avisos do servidor (ex.: recálculo que não terminou) vão no próprio
+        // toast, em vermelho — como nas outras telas (só cabe um toast por vez).
+        const warnings = res?.warnings ?? [];
+        toast({
+          title: excluded ? `${name} saiu do ciclo` : `${name} voltou ao ciclo`,
+          description: warnings.length > 0 ? warnings.join(" ")
+            : excluded ? "Sem nota, ranking e bônus neste ciclo. Dá para devolver em \"Fora do ciclo\"." : "Entrou de novo no ranking, nas análises e no bônus. Ciclo recalculado.",
+          variant: warnings.length > 0 ? "destructive" : undefined,
+        });
+        setCycleTarget(null);
+        setCycleReason("");
+      },
+      onError: e => toast({ title: "Não foi possível alterar", description: serverErrorMessage(e, "Tente novamente."), variant: "destructive" }),
+    });
+  }
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
@@ -369,17 +413,17 @@ export default function EmployeesPage() {
         <EmployeesFilters
           search={search}
           onSearchChange={setSearch}
-          filterActive={filterActive}
-          onFilterActiveChange={setFilterActive}
-          filterType={filterType}
-          onFilterTypeChange={setFilterType}
+          filterCycle={filterCycle}
+          onFilterCycleChange={setFilterCycle}
+          counts={{ in: inCycle.length, out: outOfCycle.length }}
         />
 
         {/* Table */}
         <EmployeesTable
           isLoading={isLoading}
           filtered={filtered}
-          total={stats.total}
+          noScore={noScoreMatches}
+          total={filterCycle === "in" ? inCycle.length : outOfCycle.length}
           mergeMode={mergeMode}
           selectedIds={selectedIds}
           canonicalId={canonicalId}
@@ -392,7 +436,28 @@ export default function EmployeesPage() {
           onPreviewAs={handlePreviewAs}
           onGeneratePin={handleGeneratePin}
           onEdit={setEditingEmployee}
+          onToggleCycle={isAdmin ? emp => { setCycleTarget(emp); setCycleReason(""); } : undefined}
         />
+
+        <ConfirmDialog
+          open={!!cycleTarget}
+          onOpenChange={o => { if (!o && !cycleMutation.isPending) setCycleTarget(null); }}
+          title={cycleTarget && cycleStatus(cycleTarget) === "out" ? `Devolver ${toTitleCase(cycleTarget.name)} ao ciclo?` : `Tirar ${cycleTarget ? toTitleCase(cycleTarget.name) : ""} do ciclo?`}
+          description={cycleTarget && cycleStatus(cycleTarget) === "out"
+            ? "Volta a ter nota, entrar no ranking, nas análises e no bônus deste ciclo. O ciclo é recalculado na hora."
+            : "Fica sem nota, fora do ranking, das análises e do bônus deste ciclo. O histórico dos eventos continua guardado e dá para devolver depois em \"Fora do ciclo\". O ciclo é recalculado na hora."}
+          confirmLabel={cycleTarget && cycleStatus(cycleTarget) === "out" ? "Devolver ao ciclo" : "Tirar do ciclo"}
+          destructive={!!cycleTarget && cycleStatus(cycleTarget) !== "out"}
+          isPending={cycleMutation.isPending}
+          onConfirm={confirmCycleToggle}
+        >
+          {cycleTarget && cycleStatus(cycleTarget) !== "out" && (
+            <div className="space-y-1.5">
+              <label htmlFor="cycle-reason" className="text-sm font-semibold">Motivo <span className="font-normal" style={{ color: "var(--muted-foreground)" }}>(opcional)</span></label>
+              <Textarea id="cycle-reason" value={cycleReason} onChange={e => setCycleReason(e.target.value)} maxLength={300} rows={3} placeholder="Ex.: desligado em setembro, afastado…" />
+            </div>
+          )}
+        </ConfirmDialog>
 
         {/* Merge action bar */}
         {mergeMode && selectedIds.size >= 2 && (

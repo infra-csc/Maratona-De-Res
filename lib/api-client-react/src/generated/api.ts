@@ -72,6 +72,8 @@ import type {
   CsvExport,
   CsvImportInput,
   Cycle,
+  CycleExclusionInput,
+  CycleExclusionResult,
   CycleHistory,
   CycleSummary,
   DashboardSummary,
@@ -132,6 +134,7 @@ import type {
   GetQuarterlyResultsParams,
   GetRankingDetailParams,
   GetRankingParams,
+  GetScoreTimelineParams,
   HealthStatus,
   HistoricalImportInput,
   HistoricalImportResult,
@@ -185,6 +188,7 @@ import type {
   ResyncEventCriteria200,
   Rule,
   RuleUpdate,
+  ScoreTimeline,
   SeedDefaultPenaltyTypes200,
   SuccessResponse,
   SurveyImportInput,
@@ -2398,6 +2402,95 @@ export const useMergeEmployee = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getMergeEmployeeMutationOptions(options));
+    }
+
+export const getSetEmployeeCycleExclusionUrl = (id: number,) => {
+
+
+
+
+  return `/employees/${id}/cycle-exclusion`
+}
+
+/**
+ * @summary Tira o colaborador do ciclo atual (ou devolve). Só admin; recalcula o ciclo.
+ */
+export const setEmployeeCycleExclusion = async (id: number,
+    cycleExclusionInput: CycleExclusionInput, options?: Parameters<typeof customFetch>[1]): Promise<CycleExclusionResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CycleExclusionResult>(getSetEmployeeCycleExclusionUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cycleExclusionInput)
+  }
+);}
+
+
+
+
+
+export const getSetEmployeeCycleExclusionMutationKey = () => ['setEmployeeCycleExclusion'] as const;
+
+export const getSetEmployeeCycleExclusionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext> => {
+
+const mutationKey = getSetEmployeeCycleExclusionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, SetEmployeeCycleExclusionMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setEmployeeCycleExclusion(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetEmployeeCycleExclusionMutationResult = NonNullable<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>>
+    export type SetEmployeeCycleExclusionMutationBody = BodyType<CycleExclusionInput>
+    export type SetEmployeeCycleExclusionMutationError = ErrorType<unknown>
+    export type SetEmployeeCycleExclusionMutationVariables = {id: number;data: BodyType<CycleExclusionInput>}
+
+    /**
+ * @summary Tira o colaborador do ciclo atual (ou devolve). Só admin; recalcula o ciclo.
+ */
+export const useSetEmployeeCycleExclusion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setEmployeeCycleExclusion>>,
+        TError,
+        SetEmployeeCycleExclusionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetEmployeeCycleExclusionMutationOptions(options));
     }
 
 export const getGetEmployeeHistoryUrl = (id: number,) => {
@@ -9727,6 +9820,93 @@ export function useGetRankingDetail<TData = Awaited<ReturnType<typeof getRanking
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankingDetailQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetScoreTimelineUrl = (params?: GetScoreTimelineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/results/timeline?${stringifiedParams}` : `/results/timeline`
+}
+
+/**
+ * Passado remontado (eventos confirmados e penalidades/méritos em ordem),
+ * calibrações e publicações da auditoria e, a partir de quando passou a
+ * existir, o registro exato de cada recálculo (antes → depois e motivo).
+ * @summary Linha do tempo das notas do ciclo — todos ou um colaborador (admin/RH)
+ */
+export const getScoreTimeline = async (params?: GetScoreTimelineParams, options?: Parameters<typeof customFetch>[1]): Promise<ScoreTimeline> => {
+
+  return customFetch<ScoreTimeline>(getGetScoreTimelineUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoreTimelineQueryKey = (params?: GetScoreTimelineParams,) => {
+    return [
+    `/results/timeline`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetScoreTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getScoreTimeline>>, TError = ErrorType<ErrorEnvelope>>(params?: GetScoreTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoreTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoreTimelineQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoreTimeline>>> = ({ signal }) => getScoreTimeline(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoreTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoreTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getScoreTimeline>>>
+export type GetScoreTimelineQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Linha do tempo das notas do ciclo — todos ou um colaborador (admin/RH)
+ */
+
+export function useGetScoreTimeline<TData = Awaited<ReturnType<typeof getScoreTimeline>>, TError = ErrorType<ErrorEnvelope>>(
+ params?: GetScoreTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoreTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoreTimelineQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

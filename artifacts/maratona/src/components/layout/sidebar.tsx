@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Calendar, Users, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck, CalendarRange,
   Database, LogOut, Target, Menu, X, TrendingUp,
-  FolderLock, BookOpen, Settings2, Sun, Moon, BarChart3 } from "lucide-react";
+  FolderLock, BookOpen, Settings2, Sun, Moon, BarChart3, History } from "lucide-react";
 import { useState } from "react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ const navGroups: NavGroup[] = [
       { label: "Calibrações", path: "/calibrations", icon: Target, roles: ["admin", "rh", "diretoria"] },
       { label: "Resultados & Ranking", path: "/results", icon: Trophy, roles: ["admin", "rh", "diretoria"] },
       { label: "Análises", path: "/analytics", icon: BarChart3, roles: ["admin", "rh", "diretoria"] },
+      { label: "Linha do tempo", path: "/linha-do-tempo", icon: History, roles: ["admin", "rh"] },
     ]
   },
   {

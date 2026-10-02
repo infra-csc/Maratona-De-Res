@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventCriteriaTable, criteriaTable, eventAreaAssignmentsTable, cyclesTable } from "@workspace/db";
+import { db, eventsTable, evaluationsTable, absencesTable, employeeCycleEligibilityTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventCriteriaTable, criteriaTable, eventAreaAssignmentsTable, cyclesTable } from "@workspace/db";
 import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -49,7 +49,9 @@ router.get("/dashboard/summary", async (req, res) => {
   const pendingEvaluations = eventsWithDraft.size;
   const submittedEvaluations = eventsWithAnyEval.size - eventsWithDraft.size;
 
-  const absences = await db.select().from(absencesTable).where(eq(absencesTable.cycleId, cycle.id));
+  // Quem o admin tirou do ciclo não entra (mesmo recorte de Análises).
+  const absences = await db.select().from(absencesTable).where(and(eq(absencesTable.cycleId, cycle.id),
+    sql`NOT EXISTS (SELECT 1 FROM ${employeeCycleEligibilityTable} x WHERE x.employee_id = ${absencesTable.employeeId} AND x.cycle_id = ${absencesTable.cycleId} AND x.excluded)`));
   const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
 
   const quarterResults = await db.select().from(quarterlyResultsTable).where(eq(quarterlyResultsTable.cycleId, cycle.id));

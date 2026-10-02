@@ -22,6 +22,8 @@ export type CalibrationActionBarProps = {
   partialPublishedAtDate: Date | null;
   totalDirtyCount: number;
   unsavedEditsCount: number;
+  /** Critérios salvos e ainda não publicados (não valem na nota). */
+  pendingPublishCount: number;
   handleSaveAll: () => Promise<void>;
   handlePublishAll: () => Promise<void>;
 };
@@ -43,6 +45,7 @@ export function CalibrationActionBar({
   partialPublishedAtDate,
   totalDirtyCount,
   unsavedEditsCount,
+  pendingPublishCount,
   handleSaveAll,
   handlePublishAll,
 }: CalibrationActionBarProps) {
@@ -67,18 +70,20 @@ export function CalibrationActionBar({
                   <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: "var(--muted-foreground)" }} title={`${finalPublishedCount} de ${scorableCount} critérios (peso > 0) publicados como Final`}>
                     <ShieldCheck size={11} style={{ color: GOOD_TEXT }} /> {finalPublishedCount}/{scorableCount} final
                   </span>
-                  <div className="flex items-center gap-1">
-                    <Filter size={11} className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
+                  <div role="group" aria-label="Filtrar critérios" className="flex flex-wrap items-center gap-1">
+                    <Filter size={11} aria-hidden className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
                     {([
                       { value: "all", label: "Todos" },
                       { value: "uncalibrated", label: "Pendentes" },
                       { value: "calibrated", label: "Calibrados" },
+                      ...(pendingPublishCount > 0 || criterionFilter === "pendingPub" ? [{ value: "pendingPub" as const, label: `Falta publicar (${pendingPublishCount})` }] : []),
                     ] as const).map(opt => {
                       const active = criterionFilter === opt.value;
                       return (
                         <button
                           key={opt.value}
                           type="button"
+                          aria-pressed={active}
                           onClick={() => setCriterionFilter(opt.value)}
                           className="text-[11px] font-black uppercase px-2 py-1 rounded transition-colors"
                           style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
@@ -88,7 +93,7 @@ export function CalibrationActionBar({
                   </div>
 
                   {/* Grupo direito: log de publicação + Salvar + Publicar */}
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2 max-w-full">
                     {/* Log de publicação */}
                     {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
                       <span className="text-[11px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD_TEXT : AMBER_TEXT }}>
@@ -110,6 +115,13 @@ export function CalibrationActionBar({
                     >
                       <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
                     </button>
+                    {/* Aviso: calibração salva que ainda não vale na nota */}
+                    {pendingPublishCount > 0 && (
+                      <span data-testid="text-pending-publish" className="text-[11px] font-black uppercase rounded-full px-2 py-1" style={{ backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT }}
+                        title="Calibrações salvas que ainda não foram publicadas: o colaborador e a nota oficial só mudam depois de publicar">
+                        {pendingPublishCount} {pendingPublishCount === 1 ? "falta publicar" : "faltam publicar"}
+                      </span>
+                    )}
                     {/* Publicar */}
                     {canFinalize && (
                       <button
@@ -119,7 +131,7 @@ export function CalibrationActionBar({
                         onClick={handlePublishAll}
                         title={unsavedEditsCount > 0 ? "Há notas não salvas — salve antes de publicar" : "Publicar os critérios calibrados conforme a intenção Parc./Final de cada um"}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ border: "1px solid var(--border)" }}
+                        style={pendingPublishCount > 0 ? { backgroundColor: "var(--status-warn)", color: "#191c1e" } : { border: "1px solid var(--border)" }}
                       >
                         <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
                       </button>

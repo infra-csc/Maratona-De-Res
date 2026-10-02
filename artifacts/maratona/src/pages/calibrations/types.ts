@@ -18,7 +18,7 @@ import type { getCycleWeekends } from "@/lib/utils";
 export type { ApiEvent, EventCriterion, Evaluation, Calibration };
 
 export type EventStatusFilter = "all" | "pending" | "inProgress" | "done";
-export type CriterionFilter = "all" | "uncalibrated" | "calibrated";
+export type CriterionFilter = "all" | "uncalibrated" | "calibrated" | "pendingPub";
 export type PublishIntent = "partial" | "final";
 
 export type QueryClientLike = ReturnType<typeof useQueryClient>;

@@ -26,6 +26,7 @@ import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
 import publicEvalRouter from "./public-eval.js";
 import adminRouter from "./admin.js";
+import scoreTimelineRouter from "./score-timeline.js";
 
 const router: IRouter = Router();
 
@@ -53,6 +54,7 @@ router.use(criteriaRouter);
 router.use(evaluationsRouter);
 router.use(calibrationsRouter);
 router.use(absencesRouter);
+router.use(scoreTimelineRouter);
 router.use(penaltyTypesRouter);
 router.use(rulesRouter);
 router.use(dashboardRouter);

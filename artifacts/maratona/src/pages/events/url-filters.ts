@@ -1,7 +1,7 @@
 // ── Filtros na URL ──────────────────────────────────────────────────────────
 // Chip de status, busca, período e ordenação vivem em ?status=&q=&from=&to=&sort=
 // para que "voltar" do detalhe devolva a lista exatamente como estava.
-export const CARD_FILTER_KEYS = ["pendingRH", "unconfirmed", "inEval", "pendingCal", "partialPub", "fullyEval"] as const;
+export const CARD_FILTER_KEYS = ["pendingRH", "unconfirmed", "inEval", "pendingCal", "pendingPub", "partialPub", "fullyEval"] as const;
 export const SORT_KEYS = [
   "nameAsc", "nameDesc", "dateDesc", "dateAsc", "participantsDesc", "participantsAsc",
   "evaluatedDesc", "evaluatedAsc", "calibrDesc", "calibrAsc", "scoreDesc", "scoreAsc",

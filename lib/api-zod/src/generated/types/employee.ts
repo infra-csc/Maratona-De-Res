@@ -29,4 +29,23 @@ export interface Employee {
   eligibilityReason?: string | null;
   sourceType?: string;
   createdAt?: string;
+  /**
+     * Elegibilidade calculada no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEligible?: boolean | null;
+  /** @nullable */
+  participatedEventsCount?: number | null;
+  /**
+     * Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)
+     * @nullable
+     */
+  cycleEventsCount?: number | null;
+  /** O admin tirou o colaborador do ciclo atual */
+  cycleExcluded?: boolean;
+  /** @nullable */
+  cycleExcludedReason?: string | null;
+  /** @nullable */
+  linkedUserId?: number | null;
+  hasAccess?: boolean;
 }

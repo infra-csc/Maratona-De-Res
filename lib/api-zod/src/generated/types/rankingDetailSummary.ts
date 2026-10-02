@@ -24,6 +24,11 @@ export type RankingDetailSummary = {
   /** @nullable */
   scoreSum?: number | null;
   confirmedEventCount?: number;
+  /**
+     * Eventos confirmados de que participou (base da elegibilidade); null = sem resultado gravado no ciclo
+     * @nullable
+     */
+  participatedEventsCount?: number | null;
   isQuarterClosed: boolean;
   bonusBreakdown?: RankingDetailBonusBreakdown;
 };

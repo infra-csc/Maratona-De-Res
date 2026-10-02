@@ -12,6 +12,7 @@ import {
   getGetEventsQueryKey,
   getGetCalibrationsQueryKey,
 } from "@workspace/api-client-react";
+import { invalidateCycleResults } from "@/lib/invalidate-results";
 import { isAuthError, errorMessage, SESSION_EXPIRED_TOAST } from "./helpers";
 import type { DerivedCriteria } from "./derive";
 import type { deriveDirtyState } from "./derive";
@@ -167,9 +168,13 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       }
     }
     setPublishingAll(false);
+    // Publicar tira a marca "falta publicar" das calibrações.
+    qc.invalidateQueries({ queryKey: calQKey });
     qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
     qc.invalidateQueries({ queryKey: fbQKey });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    // Publicar recalcula a nota do ciclo: ranking, resultados, análises…
+    if (okFinal + okPartial > 0) invalidateCycleResults(qc);
     if (sessionExpired) {
       toast(SESSION_EXPIRED_TOAST);
       return;
@@ -397,6 +402,8 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
     qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
     qc.invalidateQueries({ queryKey: fbQKey });
+    // Publicar recalcula a nota do ciclo: ranking, resultados, análises…
+    if (okPublish > 0) invalidateCycleResults(qc);
 
     if (sessionExpired) {
       toast({ ...SESSION_EXPIRED_TOAST, description: `${SESSION_EXPIRED_TOAST.description}${totalOk > 0 ? ` ${totalOk} item(ns) já haviam sido salvos.` : ""}` });

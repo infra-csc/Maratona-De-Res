@@ -16,3 +16,4 @@ export * from "./audit-logs";
 export * from "./event-review-requests";
 export * from "./routing";
 export * from "./columns";
+export * from "./score-changes";

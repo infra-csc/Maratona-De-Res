@@ -70,6 +70,17 @@ export function EventHeader({ event, canManage, resultsConfirmBusy, resultsDialo
               Calibração
             </Link>
             {canManage && (
+              <Link
+                href={`/linha-do-tempo?evento=${event.id}`}
+                data-testid="link-event-timeline"
+                title="O que este evento mudou nas notas, dia a dia"
+                className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors hover:opacity-80"
+                style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
+              >
+                Linha do tempo
+              </Link>
+            )}
+            {canManage && (
               event.resultsConfirmed ? (
                 <button
                   data-testid="button-unconfirm-results"
