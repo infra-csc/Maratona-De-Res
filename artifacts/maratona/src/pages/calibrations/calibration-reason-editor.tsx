@@ -35,7 +35,7 @@ export function CalibrationReasonEditor({
   return (
                               <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[11px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)" }}>Calibração</span>
+                                  <span className="text-[11px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)" }} title={cal ? "Calibração salva: só vale para o colaborador depois de publicada" : undefined}>{cal ? "Calibração salva" : "Calibração"}</span>
                                   {cal?.calibratedByName && (
                                     <span className="text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
                                   )}

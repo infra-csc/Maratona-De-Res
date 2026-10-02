@@ -225,7 +225,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       if (warnings.length > 0) {
         toast({ title: "Calibração registrada", description: warnings.join(" "), variant: "destructive" });
       } else {
-        toast({ title: "Calibração salva", description: "O colaborador só vê depois que você publicar (parcial ou final)." });
+        toast({ title: "Calibração salva — ainda não publicada", description: "O colaborador e a nota oficial só mudam quando você clicar em Publicar." });
       }
     } catch (e) {
       if (isAuthError(e)) toast(SESSION_EXPIRED_TOAST);
@@ -358,34 +358,10 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       }
     }
 
-    // 4. Mudanças de status (Parc./Final). Recalculado AQUI, depois da etapa 1:
-    // um critério que acabou de receber a primeira nota ainda não tinha
-    // calibração no render anterior e ficaria fora de `pendingPublishCritIds`,
-    // deixando a intenção "Final" sem efeito. Considera publicável todo critério
-    // salvo agora OU já calibrado no servidor cuja intenção diverge do publicado.
-    const publishTargets = displayActiveCriteria.filter(c => {
-      const hasCalibration = savedScoreIds.has(c.criterionId) || !!getCalibration(c.criterionId);
-      if (!hasCalibration) return false;
-      const intent = publishIntents[c.criterionId];
-      if (intent === undefined) return false;
-      const baseline = c.finalPublishedAt ? "final" : "partial";
-      return intent !== baseline;
-    }).map(c => c.criterionId);
-    if (!sessionExpired) for (const critId of publishTargets) {
-      const intent = publishIntents[critId];
-      try {
-        if (intent === "final") {
-          await publishCriterionFinalMutation.mutateAsync({ id: eventId, criterionId: critId });
-        } else {
-          await publishCriterionPartialMutation.mutateAsync({ id: eventId, criterionId: critId });
-        }
-        okPublish++;
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failedPublish.push(critId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
+    // SALVAR NUNCA PUBLICA (regra do dono, 02/10/2026). Antes havia aqui um
+    // passo 4 que publicava (parcial ou FINAL) todo critério cujo seletor
+    // Parc./Final divergia do já publicado — trocar o seletor para "Final" e
+    // salvar publicava como Final. Publicar é só pelo botão "Publicar".
 
     setSavingAll(false);
     const totalOk = okCal + okWeight + okPublish;
@@ -416,7 +392,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       if (okCal > 0) parts.push(`${okCal} calibraç${okCal === 1 ? "ão" : "ões"}`);
       if (okWeight > 0) parts.push(`${okWeight} peso${okWeight === 1 ? "" : "s"}`);
       if (okPublish > 0) parts.push(`${okPublish} status`);
-      toast({ title: `Tudo salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined, variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
+      toast({ title: `Salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : (okCal > 0 ? "Ainda não publicado: o colaborador e a nota oficial só mudam quando você clicar em Publicar." : undefined), variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
     } else {
       const failedIds = Array.from(new Set([...failedCal, ...failedWeight, ...failedPublish]));
       toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: failedDescription(failedIds, firstError), variant: "destructive" });

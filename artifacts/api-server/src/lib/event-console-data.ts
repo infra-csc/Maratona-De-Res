@@ -30,6 +30,7 @@ export async function loadEventCriteria(eventIds: number[]) {
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
       partialPublishedByUserName: partialPubAlias.name,
       finalPublishedByUserName: finalPubAlias.name,
+      publishedScore: eventCriteriaTable.publishedScore,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -47,7 +48,7 @@ export async function loadEventCriteria(eventIds: number[]) {
   return criteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
     const totalWeight = totalByEvent.get(c.eventId) ?? 0;
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
+    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0, publishedScore: c.publishedScore != null ? parseFloat(c.publishedScore) : null };
   });
 }
 

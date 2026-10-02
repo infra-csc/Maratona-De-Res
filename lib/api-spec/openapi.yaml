@@ -5218,6 +5218,9 @@ components:
           type: ["string", "null"]
         finalPublishedByUserName:
           type: ["string", "null"]
+        publishedScore:
+          type: ["number", "null"]
+          description: Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração
 
     EventCriteriaUpdate:
       type: object

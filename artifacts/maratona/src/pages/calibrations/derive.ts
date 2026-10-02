@@ -123,22 +123,13 @@ export function deriveDirtyState(params: {
     return raw !== "" && !isNaN(Number(raw)) && Number(raw) >= 0;
   });
 
-  // Critérios cuja intenção de publicação (toggle Parc./Final) diverge do estado
-  // JÁ publicado no servidor — cada divergência é uma mudança de status pendente
-  // que o "Salvar" deve aplicar (publicar/rebaixar), não só as edições de nota.
-  // Só conta critérios calibrados (sem calibração não há o que publicar).
-  const pendingPublishCritIds = displayActiveCriteria.filter(c => {
-    if (!getCalibration(c.criterionId)) return false;
-    const intent = publishIntents[c.criterionId];
-    if (intent === undefined) return false;
-    const baseline = c.finalPublishedAt ? "final" : "partial";
-    return intent !== baseline;
-  }).map(c => c.criterionId);
-
-  // Edições de DADOS não salvas (nota, justificativa, peso). Não inclui a
-  // divergência de intenção Parc./Final — essa é justamente o que "Publicar" aplica.
+  // Edições de DADOS não salvas (nota, justificativa, peso). O seletor
+  // Parc./Final NÃO conta: ele só diz como o botão "Publicar" publica. Regra do
+  // dono (02/10/2026): SALVAR NUNCA PUBLICA — antes, trocar o seletor para
+  // "Final" e clicar em Salvar publicava o critério como Final.
+  void publishIntents;
   const unsavedEditsCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length;
-  const totalDirtyCount = unsavedEditsCount + pendingPublishCritIds.length;
+  const totalDirtyCount = unsavedEditsCount;
 
   return { pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount };
 }
