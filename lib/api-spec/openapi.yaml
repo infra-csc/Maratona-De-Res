@@ -5109,6 +5109,18 @@ components:
           description: |
             ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,
             ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
+        areaResponses:
+          type: ["object", "null"]
+          description: |
+            Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios
+            multiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.
+            null fora do ciclo por área. Só em GET /events.
+          required: [done, total]
+          properties:
+            done:
+              type: integer
+            total:
+              type: integer
         createdAt:
           type: string
 

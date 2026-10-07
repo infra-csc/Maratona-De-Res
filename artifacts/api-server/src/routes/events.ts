@@ -434,10 +434,27 @@ router.get("/events", async (req, res) => {
   // não precisa derivar. nextCycle = "fora do período" = do próximo ciclo
   // (não aceita avaliação até ser movido; conta em stats.eventsAfterEnd).
   const cycleById = new Map(scopeCycles.map(c => [c.id, c]));
+  // Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as
+  // cópias por área dos critérios multiárea incluídas; feito = avaliação
+  // enviada ou critério publicado) — a mesma conta da Central. Uma consulta
+  // agregada para a lista toda.
+  const areaModeIds = [...areaMode].filter(id => eventIds.includes(id));
+  const areaResponsesById = new Map<number, { done: number; total: number }>();
+  if (areaModeIds.length > 0) {
+    const rows = await db.execute<{ event_id: number; total: number; done: number }>(sql`
+      SELECT ec.event_id, count(*)::int AS total,
+             count(*) FILTER (WHERE ec.partial_published_at IS NOT NULL OR ec.final_published_at IS NOT NULL
+               OR EXISTS (SELECT 1 FROM evaluations v WHERE v.event_id = ec.event_id AND v.criterion_id = ec.criterion_id AND v.status = 'submitted'))::int AS done
+        FROM event_criteria ec
+       WHERE ec.active AND ec.event_id IN (${sql.join(areaModeIds.map(id => sql`${id}`), sql`, `)})
+       GROUP BY ec.event_id`);
+    for (const r of rows.rows) areaResponsesById.set(Number(r.event_id), { done: Number(r.done), total: Number(r.total) });
+  }
   const withPeriod = enriched.map(ev => {
     const c = cycleById.get(ev.cycleId);
     const periodPosition = eventPeriodPosition(ev, c);
-    return { ...ev, periodPosition, nextCycle: periodPosition === "after", openForEvaluation: isEventOpenForEvaluation(ev, c) };
+    return { ...ev, periodPosition, nextCycle: periodPosition === "after", openForEvaluation: isEventOpenForEvaluation(ev, c),
+      areaResponses: areaResponsesById.get(ev.id) ?? null };
   });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)

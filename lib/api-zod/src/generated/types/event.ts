@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventAreaResponses } from './eventAreaResponses';
 import type { EventPeriodPosition } from './eventPeriodPosition';
 
 export interface Event {
@@ -103,5 +104,12 @@ export interface Event {
      * ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
      */
   openForEvaluation?: boolean;
+  /**
+     * Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios
+     * multiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.
+     * null fora do ciclo por área. Só em GET /events.
+     * @nullable
+     */
+  areaResponses?: EventAreaResponses;
   createdAt?: string;
 }

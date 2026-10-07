@@ -210,3 +210,17 @@ test("Colaboradores no ciclo novo: GET /employees marca quem estava no ciclo ant
   assert.equal(list.find(e => e.id === outro)?.inPreviousCycle, false);
   void novo;
 });
+
+test("GET /events traz areaResponses no ciclo por área (critério ativo; feito = enviado ou publicado); fora dele, null", async () => {
+  const ev = await openEvent(areaCycle, [critA, critB], "Evento contagem R7", "2024-09-10");
+  await h.fx.evaluation({ eventId: ev, criterionId: critA, evaluatorUserId: ana, score: 8 });
+  await h.fx.evaluation({ eventId: ev, criterionId: critB, evaluatorUserId: beto, score: 7, status: "draft" });
+  const list = (await h.api("GET", `/events?cycleId=${areaCycle}`, { role: "admin", userId: adminU })).data as { id: number; areaResponses: { done: number; total: number } | null }[];
+  assert.deepEqual(list.find(e => e.id === ev)?.areaResponses, { done: 1, total: 2 });
+  await h.sql("update event_criteria set partial_published_at = now() where event_id = $1 and criterion_id = $2", [ev, critB]);
+  const again = (await h.api("GET", `/events?cycleId=${areaCycle}`, { role: "admin", userId: adminU })).data as { id: number; areaResponses: { done: number; total: number } | null }[];
+  assert.deepEqual(again.find(e => e.id === ev)?.areaResponses, { done: 2, total: 2 });
+  const old = await openEvent(atual, [critA], "Evento antigo contagem R7", "2030-02-02");
+  const oldList = (await h.api("GET", `/events?cycleId=${atual}`, { role: "admin", userId: adminU })).data as { id: number; areaResponses: unknown }[];
+  assert.equal(oldList.find(e => e.id === old)?.areaResponses, null);
+});

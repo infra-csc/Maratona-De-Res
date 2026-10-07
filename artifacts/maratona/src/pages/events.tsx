@@ -16,7 +16,7 @@ import { serverErrorMessage } from "./events/form-bits";
 import { EventsHeader } from "./events/events-header";
 import { EventsFilterBar, WeekendChipsRow } from "./events/events-filters";
 import { EventsTable, EventsLegend } from "./events/events-table";
-import { useAreaResponseCounts } from "./events/use-area-counts";
+import { areaCountsOf } from "./events/use-area-counts";
 import { CreateEventDialog, EditEventDialog } from "./events/event-form-dialogs";
 import { MergeEventDialog, DeleteEventDialog, BulkConfirmBanner, NormalizeDatesDialog } from "./events/event-action-dialogs";
 import type { EditingEvent, EventRef } from "./events/types";
@@ -67,7 +67,6 @@ export default function EventsPage() {
   const cycleNameById = new Map(scope.options.map(c => [c.id, c.name]));
   const cycleById = useMemo(() => new Map(scope.options.map(c => [c.id, c])), [scope.options]);
   // Ciclo por área: Avaliações conta respostas por área (a mesma conta da Central).
-  const areaCountsOf = useAreaResponseCounts(events, cycleById, user);
 
   // "Unificar Datas" em dois passos: prévia (dryRun) → diálogo com a lista →
   // aplicar só depois de digitar APLICAR (o servidor exige a mesma palavra).

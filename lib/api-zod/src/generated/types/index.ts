@@ -132,6 +132,7 @@ export * from './evaluationUpdate';
 export * from './event';
 export * from './eventActivityEntry';
 export * from './eventAreaAssignment';
+export * from './eventAreaResponses';
 export * from './eventAssignmentsUpdate';
 export * from './eventAssignmentsUpdateAssignmentsItem';
 export * from './eventBreakdown';
