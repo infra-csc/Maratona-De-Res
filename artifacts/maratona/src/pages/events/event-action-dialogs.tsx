@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { fmtDate, cn } from "@/lib/utils";
+import { fmtDate, cn, plural } from "@/lib/utils";
 import { CONDENSED, WARNING, AMBER, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { inputStyle, serverErrorMessage } from "./form-bits";
 import type { EventItem, EventRef, MergeConflict, BulkConfirmItem } from "./types";
@@ -129,7 +129,7 @@ export function MergeEventDialog({ event, events, onClose }: MergeEventDialogPro
           {conflict && (
             <div data-testid="alert-merge-conflict" className="rounded-lg p-3 text-sm space-y-1" style={{ backgroundColor: "rgba(232,162,61,0.12)", border: `1px solid ${AMBER}`, color: AMBER_TEXT }}>
               <p className="font-bold uppercase">O duplicado já tem dado gravado:</p>
-              <p>{conflict.evaluations} avaliação(ões), {conflict.calibrations} calibração(ões), {conflict.conformities} conformidade(s) e {conflict.results} resultado(s).</p>
+              <p>{plural(conflict.evaluations, "avaliação", "avaliações")}, {plural(conflict.calibrations, "calibração", "calibrações")}, {plural(conflict.conformities, "conformidade", "conformidades")} e {plural(conflict.results, "resultado", "resultados")}.</p>
               <p>Esses dados serão descartados. Confirma a mesclagem?</p>
             </div>
           )}
@@ -228,7 +228,7 @@ type BulkConfirmProps = {
   hasDateFilter: boolean;
 };
 
-/** Faixa "N evento(s) com resultados não confirmados" + diálogo de confirmação. */
+/** Faixa "N eventos com resultados não confirmados" + diálogo de confirmação. */
 export function BulkConfirmBanner({ events, hasDateFilter }: BulkConfirmProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -242,8 +242,8 @@ export function BulkConfirmBanner({ events, hasDateFilter }: BulkConfirmProps) {
       onSuccess: (d) => {
         qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
         setOpen(false);
-        const parts = [`${d.confirmed} evento(s) confirmado(s).`];
-        if (d.skipped > 0) parts.push(`${d.skipped} já estavam confirmados ou são históricos.`);
+        const parts = [`${plural(d.confirmed, "evento confirmado", "eventos confirmados")}.`];
+        if (d.skipped > 0) parts.push(d.skipped === 1 ? "1 já estava confirmado ou é histórico." : `${d.skipped} já estavam confirmados ou são históricos.`);
         if (d.warnings.length > 0) parts.push(d.warnings.join(" "));
         toast({ title: "Resultados confirmados", description: parts.join(" ") });
       },
@@ -258,7 +258,7 @@ export function BulkConfirmBanner({ events, hasDateFilter }: BulkConfirmProps) {
         style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid rgba(232,162,61,0.35)" }}
       >
         <p className="text-[12px] font-semibold" style={{ color: "var(--foreground)" }}>
-          <strong>{events.length}</strong> evento(s) com resultados não confirmados{hasDateFilter ? " no período selecionado" : ""}.
+          <strong>{events.length}</strong> {events.length === 1 ? "evento" : "eventos"} com resultados não confirmados{hasDateFilter ? " no período selecionado" : ""}.
           <span className="block text-[11px] font-normal" style={{ color: "var(--muted-foreground)" }}>
             Confirmar faz esses eventos passarem a contar na elegibilidade e na nota dos colaboradores.
           </span>
@@ -271,7 +271,7 @@ export function BulkConfirmBanner({ events, hasDateFilter }: BulkConfirmProps) {
           className="h-9 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wide inline-flex items-center gap-2 shrink-0 transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
         >
-          <Check size={14} /> Confirmar {events.length} evento(s)
+          <Check size={14} /> Confirmar {plural(events.length, "evento", "eventos")}
         </button>
       </div>
 
@@ -279,7 +279,7 @@ export function BulkConfirmBanner({ events, hasDateFilter }: BulkConfirmProps) {
         <DialogContent className="max-w-lg" style={dialogStyle}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-              Confirmar {items.length} evento(s)
+              Confirmar {plural(items.length, "evento", "eventos")}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -338,9 +338,9 @@ export function NormalizeDatesDialog({ preview, onClose, isPending, onApply }: N
     <ConfirmDialog
       open={!!preview}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Unificar datas de ${preview?.changes.length ?? 0} evento(s)`}
+      title={`Unificar datas de ${plural(preview?.changes.length ?? 0, "evento", "eventos")}`}
       description={preview
-        ? `${preview.fixedCount} correção(ões) pontual(is) e ${preview.normalizedCount} evento(s) multi-dia que passam a ter data única (início = fim). Isso grava direto nos eventos.`
+        ? `${plural(preview.fixedCount, "correção pontual", "correções pontuais")} e ${plural(preview.normalizedCount, "evento de vários dias", "eventos de vários dias")} que ${preview.normalizedCount === 1 ? "passa" : "passam"} a ter data única (início = fim). Isso grava direto nos eventos.`
         : undefined}
       confirmLabel="Aplicar"
       confirmText="APLICAR"

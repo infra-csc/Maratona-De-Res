@@ -11,4 +11,6 @@ import type { EventCriterionAssignment } from './eventCriterionAssignment';
 export interface EvaluationConsoleData {
   criteria: EventCriterion[];
   assignments: EventCriterionAssignment[];
+  /** Eventos de ciclo com avaliação por área — um critério conta "avaliado" com uma resposta enviada e qualquer avaliador da área responde (sem designação). */
+  areaModeEventIds?: number[];
 }

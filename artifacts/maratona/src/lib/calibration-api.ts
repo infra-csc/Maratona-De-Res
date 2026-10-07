@@ -38,10 +38,13 @@ export type CalibrationAuditEntry = GeneratedCalibrationAuditEntry;
 export class ApiRequestError extends Error {
   override readonly name = "ApiRequestError";
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** `code` do corpo de erro (ex.: EVENT_NEXT_CYCLE), quando o servidor manda. */
+  readonly code: string | null;
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -55,9 +58,9 @@ export async function withServerMessage<T>(request: Promise<T>): Promise<T> {
   } catch (e) {
     if (e instanceof ApiError) {
       if (e.status === 401) window.dispatchEvent(new CustomEvent("auth:unauthorized"));
-      const data = e.data as { error?: unknown } | null;
+      const data = e.data as { error?: unknown; code?: unknown } | null;
       const message = typeof data?.error === "string" && data.error.trim() ? data.error : `HTTP ${e.status}`;
-      throw new ApiRequestError(e.status, message);
+      throw new ApiRequestError(e.status, message, typeof data?.code === "string" ? data.code : null);
     }
     throw e;
   }

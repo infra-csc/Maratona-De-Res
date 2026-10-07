@@ -1,4 +1,5 @@
 import type { AnalyticsOverview } from "@workspace/api-client-react";
+import { funnelSteps } from "./bonus-funnel";
 
 /** Nome de arquivo seguro a partir do nome do ciclo ("Ciclo 2 · 2026" → "ciclo-2-2026"). */
 export function cycleSlug(name: string): string {
@@ -31,7 +32,9 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
     { Indicador: `Atingiram ${k.minEvents} eventos`, Valor: k.reachedMinEvents },
     { Indicador: "Elegíveis ao bônus", Valor: k.eligible },
     { Indicador: "Com bônus", Valor: k.withBonus },
-    { Indicador: "Bônus projetado (R$)", Valor: k.bonusTotal },
+    ...(k.bonusOfficial == null || k.bonusProjected == null ? [{ Indicador: "Bônus (R$)", Valor: k.bonusTotal }] : []),
+    ...(k.bonusOfficial != null ? [{ Indicador: "Bônus oficial — ciclos fechados (R$)", Valor: k.bonusOfficial }] : []),
+    ...(k.bonusProjected != null ? [{ Indicador: "Bônus projetado — ciclo aberto (R$)", Valor: k.bonusProjected }] : []),
     { Indicador: "Avaliações enviadas", Valor: k.evaluationsSubmitted },
     { Indicador: "Critérios calibrados", Valor: k.calibratedCriteria },
     { Indicador: "Ajuste médio da calibração (pts)", Valor: r1(k.avgCalibrationShift) },
@@ -48,7 +51,8 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
     Faixa: f.name, "Nota mínima": f.minScore, "Nota máxima": f.maxScore, "Bônus base (R$)": f.bonusValue,
     "Por evento extra (R$)": f.bonusPerExtraEvent, Pessoas: f.count, "Bônus projetado (R$)": f.bonusTotal,
   })));
-  add("Funil", data.funnel.map(f => ({ Etapa: f.label, Pessoas: f.count })));
+  const isAll = data.scope?.kind === "all";
+  add("Funil", funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents }).map(f => ({ Etapa: f.label, [isAll ? "Participações" : "Pessoas"]: f.count })));
   add("Perto da próxima faixa", data.nearNextFaixa.map(r => ({
     Colaborador: r.name, "Nota final": r.finalResult, "Faixa atual": r.currentFaixa ?? "", "Próxima faixa": r.nextFaixa,
     "Faltam (pts)": r.gap, "Bônus hoje (R$)": r.currentBonus, "Na próxima (R$)": r.potentialBonus,

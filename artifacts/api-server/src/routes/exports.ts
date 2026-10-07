@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable, eventParticipantsTable, employeeCycleEligibilityTable, type Cycle } from "@workspace/db";
+import { and, eq, exists, sql, type SQL } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { computeEventTeamResult, computeEventTeamResultsBatch } from "./results.js";
-import { getCurrentCycle } from "../lib/cycle.js";
+import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
+import { rankingScope } from "../lib/ranking-scope.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -19,9 +20,43 @@ function cycleSlug(name: string): string {
   return name.trim().replace(/\s+/g, "-");
 }
 
-router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json({ filename: `resultados.csv`, data: "" }); return; }
+/**
+ * Os CSVs saem com o MESMO recorte da tela de onde são baixados:
+ * ?cycleId= vazio = ciclo atual; id = aquele ciclo (anterior: só consulta).
+ */
+async function cycleFromQuery(req: import("express").Request, res: import("express").Response): Promise<{ cycle: Cycle; isCurrent: boolean } | null | "error"> {
+  const scoped = await resolveCycleScope(req.query.cycleId, { allowAll: false });
+  if (sendScopeError(res, scoped)) return "error";
+  return scoped.scope?.kind === "cycle" ? { cycle: scoped.scope.cycle, isCurrent: scoped.scope.isCurrent } : null;
+}
+
+/**
+ * Recorte da tela Resultados (GET /results/quarterly): colaborador da casa,
+ * com participação que conta no ciclo; no ciclo atual só ativos.
+ */
+function resultsScreenScope(cycle: Cycle, isCurrent: boolean): SQL {
+  return and(
+    eq(quarterlyResultsTable.cycleId, cycle.id),
+    eq(employeesTable.employmentType, "casa"),
+    isCurrent ? eq(employeesTable.active, true) : undefined,
+    exists(
+      db.select({ one: sql`1` })
+        .from(eventParticipantsTable)
+        .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
+        .where(and(
+          eq(eventParticipantsTable.employeeId, employeesTable.id),
+          eq(eventsTable.cycleId, cycle.id),
+          sql`(${eventParticipantsTable.functionName} IS NULL OR ${eventParticipantsTable.functionName} NOT ILIKE 'sup ceno%')`,
+        )),
+    ),
+  )!;
+}
+
+router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const r = await cycleFromQuery(req, res);
+  if (r === "error") return;
+  if (!r) { res.json({ filename: `resultados.csv`, data: "" }); return; }
+  const { cycle, isCurrent } = r;
 
   const results = await db
     .select({
@@ -31,13 +66,13 @@ router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria")
       "Total Faltas": quarterlyResultsTable.totalAbsences,
       "Penalidade Faltas": quarterlyResultsTable.absencePenalty,
       "Resultado Final": quarterlyResultsTable.finalResult,
-      "Pelotão": quarterlyResultsTable.platoon,
+      "Faixa": quarterlyResultsTable.platoon,
       "Bônus Caju (R$)": quarterlyResultsTable.bonusValue,
     })
     .from(quarterlyResultsTable)
-    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
-    .orderBy(quarterlyResultsTable.finalResult);
+    .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    .where(resultsScreenScope(cycle, isCurrent))
+    .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`, employeesTable.name);
 
   const rows = results.map(r => ({ "Ciclo": cycle.name, ...r }));
   res.json({ filename: `resultados-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
@@ -45,8 +80,10 @@ router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria")
 
 router.get("/exports/ranking", async (req, res) => {
   const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json({ filename: `ranking.csv`, data: "" }); return; }
+  const r = await cycleFromQuery(req, res);
+  if (r === "error") return;
+  if (!r) { res.json({ filename: `ranking.csv`, data: "" }); return; }
+  const { cycle, isCurrent } = r;
 
   const results = await db
     .select({
@@ -56,8 +93,9 @@ router.get("/exports/ranking", async (req, res) => {
       bonusValue: quarterlyResultsTable.bonusValue,
     })
     .from(quarterlyResultsTable)
-    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(eq(quarterlyResultsTable.cycleId, cycle.id));
+    .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    // Mesmo recorte do Ranking da tela (lib/ranking-scope.ts).
+    .where(and(eq(quarterlyResultsTable.cycleId, cycle.id), rankingScope({ activeOnlyInCycleId: isCurrent ? cycle.id : null })));
 
   const sorted = results.sort((a, b) => parseFloat(b.finalResult) - parseFloat(a.finalResult));
   const rows = sorted.map((r, i) => {
@@ -66,7 +104,7 @@ router.get("/exports/ranking", async (req, res) => {
       "Ciclo": cycle.name,
       "Nome": r.employeeName,
       "Resultado Final": r.finalResult,
-      "Pelotão": r.platoon ?? "",
+      "Faixa": r.platoon ?? "",
     };
     if (isManager) row["Bônus Caju (R$)"] = r.bonusValue;
     return row;
@@ -103,29 +141,34 @@ router.get("/exports/event-results", async (req, res) => {
   res.json({ filename: `evento-${ev.name}.csv`, data: toCsv(rows) });
 });
 
-router.get("/exports/caju-bonuses", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json({ filename: `bonus-caju.csv`, data: "" }); return; }
+router.get("/exports/caju-bonuses", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const r = await cycleFromQuery(req, res);
+  if (r === "error") return;
+  if (!r) { res.json({ filename: `bonus-caju.csv`, data: "" }); return; }
+  const { cycle, isCurrent } = r;
 
   const results = await db
     .select({
       "Nome": employeesTable.name,
-      "Pelotão": quarterlyResultsTable.platoon,
+      "Faixa": quarterlyResultsTable.platoon,
       "Resultado Final": quarterlyResultsTable.finalResult,
       "Bônus Caju (R$)": quarterlyResultsTable.bonusValue,
     })
     .from(quarterlyResultsTable)
-    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
-    .orderBy(quarterlyResultsTable.bonusValue);
+    .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    // Recorte da aba Pagamentos (o mesmo de Resultados), só quem é elegível.
+    .where(and(resultsScreenScope(cycle, isCurrent), eq(quarterlyResultsTable.eligible, true)))
+    .orderBy(sql`${quarterlyResultsTable.bonusValue} DESC`, employeesTable.name);
 
   const rows = results.map(r => ({ "Ciclo": cycle.name, ...r }));
   res.json({ filename: `bonus-caju-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
-router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json({ filename: `penalidades.csv`, data: "" }); return; }
+router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const r = await cycleFromQuery(req, res);
+  if (r === "error") return;
+  if (!r) { res.json({ filename: `penalidades.csv`, data: "" }); return; }
+  const { cycle } = r;
 
   const results = await db
     .select({
@@ -140,7 +183,9 @@ router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (
     .from(absencesTable)
     .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
     .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
-    .where(eq(absencesTable.cycleId, cycle.id))
+    // Quem o admin tirou do ciclo não entra (mesmo recorte de Análises/Dashboard).
+    .where(and(eq(absencesTable.cycleId, cycle.id),
+      sql`NOT EXISTS (SELECT 1 FROM ${employeeCycleEligibilityTable} x WHERE x.employee_id = ${absencesTable.employeeId} AND x.cycle_id = ${absencesTable.cycleId} AND x.excluded)`))
     .orderBy(absencesTable.date);
 
   const rows = results.map(r => ({ ...r, "Ciclo": cycle.name }));

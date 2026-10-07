@@ -33,6 +33,9 @@ export function CalibrationSidebar({
   eventComments,
 }: CalibrationSidebarProps) {
   const { conformity, canManageConformity } = conformityState;
+  // Nota final só existe depois de publicar (parcial ou final): antes disso o
+  // número do feedback é uma conta com o rascunho e não vale para ninguém.
+  const hasPublication = !!pickedEvent && (pickedEvent.isHistorical || (pickedEvent.finalCalibratedCriteria ?? 0) > 0 || (pickedEvent.partialPublishedCount ?? 0) > 0);
   return (
           <aside className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-16 self-start lg:order-2 rounded-xl max-h-[50vh] lg:max-h-[calc(100vh-90px)] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
 
@@ -43,11 +46,15 @@ export function CalibrationSidebar({
                   <h3 className="font-black uppercase tracking-tight text-sm truncate" style={{ fontFamily: CONDENSED }}>{pickedEvent.name}</h3>
                   <span className="text-[11px] font-bold uppercase truncate hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{pickedEvent.clientName}</span>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
                   {feedback && (
                     <span className="rounded-lg px-3 py-1.5 flex items-center gap-1.5" style={{ border: "1px solid var(--border)" }}>
                       <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
-                      <span className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(feedback.eventScore, 1)}<span className="text-xs" style={{ color: "var(--muted-foreground)" }}>/100</span></span>
+                      {hasPublication ? (
+                        <span className="text-lg font-black leading-none" data-testid="cal-final-score" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(feedback.eventScore, 1)}<span className="text-xs" style={{ color: "var(--muted-foreground)" }}>/100</span></span>
+                      ) : (
+                        <span className="text-[12px] font-bold leading-none" data-testid="cal-final-score-none" title="Nada publicado neste evento ainda: a nota final aparece depois de publicar" style={{ color: "var(--muted-foreground)" }}>— <span className="font-semibold">Sem nota publicada</span></span>
+                      )}
                     </span>
                   )}
                   <Link

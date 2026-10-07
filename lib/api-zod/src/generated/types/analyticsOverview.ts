@@ -17,10 +17,13 @@ import type { AnalyticsOverviewFunnelItem } from './analyticsOverviewFunnelItem'
 import type { AnalyticsOverviewKpis } from './analyticsOverviewKpis';
 import type { AnalyticsOverviewNearNextFaixaItem } from './analyticsOverviewNearNextFaixaItem';
 import type { AnalyticsOverviewRuleSet } from './analyticsOverviewRuleSet';
+import type { AnalyticsOverviewScope } from './analyticsOverviewScope';
 import type { AnalyticsOverviewScoreTrendItem } from './analyticsOverviewScoreTrendItem';
 
 export interface AnalyticsOverview {
+  /** Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo */
   cycle: AnalyticsOverviewCycle;
+  scope?: AnalyticsOverviewScope;
   kpis: AnalyticsOverviewKpis;
   /** Parâmetros das regras de negócio em vigor */
   ruleSet: AnalyticsOverviewRuleSet;

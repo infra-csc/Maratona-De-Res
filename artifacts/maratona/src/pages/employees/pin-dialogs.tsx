@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { CasaPin, SkippedPin } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
@@ -156,7 +157,7 @@ export function BulkPinDialog({
                 <button
                   onClick={async () => {
                     const lines = ["Nome | Senha", ...result.results.map(r => `${r.name} | ${r.pin}`)];
-                    if (await copyToClipboard(lines.join("\n"))) toast({ title: "Lista copiada!", description: `${result.results.length} colaboradores` });
+                    if (await copyToClipboard(lines.join("\n"))) toast({ title: "Lista copiada!", description: plural(result.results.length, "colaborador", "colaboradores") });
                     else toast(COPY_FAILED_TOAST);
                   }}
                   className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"

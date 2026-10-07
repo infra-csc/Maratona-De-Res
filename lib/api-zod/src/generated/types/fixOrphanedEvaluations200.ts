@@ -8,6 +8,8 @@
 import type { FixOrphanedEvaluations200CriteriaReactivatedItem } from './fixOrphanedEvaluations200CriteriaReactivatedItem';
 
 export type FixOrphanedEvaluations200 = {
+  /** Critérios de evento de ciclo FECHADO não reativados (só consulta) */
+  skippedClosedCycle?: number;
   fixed: number;
   eventsAffected: number;
   criteriaReactivated: FixOrphanedEvaluations200CriteriaReactivatedItem[];

@@ -15,5 +15,7 @@ export interface DedupeEvaluationsResult {
   groupsAffected: number;
   eventsAffected: number;
   duplicatesRemoved: number;
+  /** Duplicatas em evento de ciclo FECHADO deixadas como estão (só consulta) */
+  skippedClosedCycle?: number;
   warnings: string[];
 }

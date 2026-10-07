@@ -6,7 +6,7 @@ import { fieldStyle } from "./helpers";
 import type { CriteriaManagement } from "./use-criteria-management";
 
 /** Aba Critérios — tabela de critérios do evento (peso, avaliador principal/backup, ações). */
-export function CriteriaTable({ mgmt, isAdmin }: { mgmt: CriteriaManagement; isAdmin: boolean }) {
+export function CriteriaTable({ mgmt, isAdmin, areaMode = false }: { mgmt: CriteriaManagement; isAdmin: boolean; areaMode?: boolean }) {
   const {
     config, showInactiveCriteria, setShowInactiveCriteria, setPendingRemoval, setPendingDelete,
     editingName, setEditingName, assignments, primaryEvaluator, setPrimaryEvaluator,
@@ -114,6 +114,15 @@ export function CriteriaTable({ mgmt, isAdmin }: { mgmt: CriteriaManagement; isA
                         <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>—</span>
                       ) : areaEvaluators.length === 0 ? (
                         <p className="text-[11px] font-bold uppercase" style={{ color: DANGER_TEXT }}>Nenhum avaliador vinculado a esta área</p>
+                      ) : areaMode ? (
+                        // Ciclo por área: qualquer avaliador da área responde — sem
+                        // "Avaliador principal *" para escolher (nem o vermelho de falta).
+                        <div className="space-y-0.5" data-testid={`area-mode-evaluators-${item.criterionId}`}>
+                          <p className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Qualquer avaliador da área</p>
+                          <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }} title={areaEvaluators.map(u => u.name).join(", ")}>
+                            {areaEvaluators.length === 1 ? `${areaEvaluators[0].name} responde` : `${areaEvaluators.length} avaliadores podem responder`}
+                          </p>
+                        </div>
                       ) : !isFirstForArea ? (
                         (() => {
                           const primary = primaryEvaluator[areaId] ?? null;

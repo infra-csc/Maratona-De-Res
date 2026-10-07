@@ -7,8 +7,21 @@
  */
 
 export interface CycleStats {
+  /** Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo) */
   eventsTotal: number;
+  /** Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo) */
+  eventsAfterEnd?: number;
+  /**
+     * TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista
+     * (e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);
+     * "fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.
+     */
+  eventsStored?: number;
   eventsConfirmed: number;
+  /**
+     * Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,
+     * status "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.
+     */
   eventsOpen: number;
   /** @nullable */
   firstEventDate?: string | null;

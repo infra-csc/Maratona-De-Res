@@ -3,7 +3,7 @@ import {
   ComposedChart, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LabelList,
 } from "recharts";
 import type { ScoreTimelineEntry } from "@workspace/api-client-react";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, faixaEdge } from "@/lib/utils";
 import { DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { inkOn, n1, scoreDomain, signed, type CriterionCompare, type Faixa, type PersonEvent } from "./derive";
 import { AXIS_TICK, GRID, SERIES, SERIES_2, VizTooltipBox, useWidth } from "./ui";
@@ -58,7 +58,7 @@ export function FaixaRuler({ faixas, markers, extraDomain = [] }: { faixas: Faix
             const place = options.find(([, l]) => clear(l))?.[0];
             return (
               <div key={f.name} className="h-full flex items-center overflow-hidden" title={`${f.name}: ${n1(f.minScore)} a ${n1(f.maxScore)}`}
-                style={{ width: `${w}%`, backgroundColor: f.color, borderRight: "2px solid var(--card)", justifyContent: place ?? "center" }}>
+                style={{ width: `${w}%`, backgroundColor: f.color, borderRight: "2px solid var(--card)", justifyContent: place ?? "center", ...faixaEdge(f.color) }}>
                 {place && <span className="text-[11px] font-bold uppercase whitespace-nowrap px-1.5" style={{ color: inkOn(f.color), letterSpacing: "0.03em" }}>{f.name}</span>}
               </div>
             );
@@ -133,7 +133,7 @@ export function TeamStrip({ people, faixas, highlightId, onPick, teamAvg }: {
     <div ref={ref} className="relative min-w-0" style={{ paddingTop: 34 }}>
       {/* Descrição para leitor de tela; o gráfico é só para o mouse/toque (a lista ou o seletor dão acesso por teclado). */}
       <p className="sr-only">
-        {`Distribuição das notas finais de ${people.length} colaboradores, de ${n1(Math.min(...people.map(p => p.final)))} a ${n1(Math.max(...people.map(p => p.final)))}`}
+        {`Distribuição das notas finais de ${people.length === 1 ? "1 colaborador" : `${people.length} colaboradores`}, de ${n1(Math.min(...people.map(p => p.final)))} a ${n1(Math.max(...people.map(p => p.final)))}`}
         {teamAvg != null ? `; média da equipe ${n1(teamAvg)}` : ""}
         {highlighted ? `; ${highlighted.name} com ${n1(highlighted.final)}` : ""}.
       </p>

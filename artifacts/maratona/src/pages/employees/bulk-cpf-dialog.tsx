@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { BulkSetCpfResult } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, AlertTriangle, RefreshCw, CreditCard } from "lucide-react";
@@ -53,7 +54,7 @@ export function BulkCpfDialog({
               style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
             />
             <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {validCount} linha(s) válida(s) reconhecida(s).
+              {validCount === 1 ? "1 linha válida reconhecida." : `${validCount} linhas válidas reconhecidas.`}
             </p>
             <div className="flex justify-end gap-2 pt-1">
               <button
@@ -76,7 +77,7 @@ export function BulkCpfDialog({
         ) : (
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
-              <CheckCircle2 size={16} /> {result.updated.length} colaboradores atualizados
+              <CheckCircle2 size={16} /> {plural(result.updated.length, "colaborador atualizado", "colaboradores atualizados")}
             </div>
             {result.updated.length > 0 && (
               <div className="rounded-lg border text-xs max-h-36 overflow-y-auto divide-y">

@@ -8,14 +8,15 @@ import {
   getGetUsersQueryKey, getGetEventQueryKey, getGetEventResultQueryKey, getGetEventConformityQueryKey, getGetRankingQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ShieldAlert, AlertTriangle, UserCheck, Check, MessageSquare } from "lucide-react";
+import { ShieldAlert, AlertTriangle, UserCheck, Check, MessageSquare, Info } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, apiErrorMessage } from "@/lib/utils";
+import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import { CONDENSED, WARNING, GOOD, AMBER, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { CONFORMITY_ITEMS, fieldStyle } from "./helpers";
+import { conformityItemsFor, fieldStyle } from "./helpers";
 import type { ConformityForm, EventConformity, EventDetail, ImportedConformityRatio, SetState } from "./types";
 
 export type ConformitySectionProps = {
@@ -29,12 +30,25 @@ export type ConformitySectionProps = {
   importedConformityRatio: ImportedConformityRatio | null;
   importedConformityAllValue: boolean | null;
   conformityPenalty: number | undefined;
+  /**
+   * Evento de ciclo fechado (só consulta): o que ficou sem resposta é só
+   * "Não respondida", em tom neutro — não há mais nada a cobrar.
+   */
+  readOnly?: boolean;
+  /**
+   * Evento do PRÓXIMO ciclo: respostas da Matriz só quando o ciclo novo for
+   * criado (a API responde 409 EVENT_NEXT_CYCLE) — só leitura, com a frase
+   * única. O responsável continua podendo ser escolhido (preparação).
+   */
+  nextCycle?: boolean;
 };
 
 export function ConformitySection({
   id, event, canManage, canManageConformity, conformityData, conformityForm, setConformityForm,
-  importedConformityRatio, importedConformityAllValue, conformityPenalty,
+  importedConformityRatio, importedConformityAllValue, conformityPenalty, readOnly = false, nextCycle = false,
 }: ConformitySectionProps) {
+  // Sem cobrança (tom neutro) quando não há o que responder agora.
+  const neutral = readOnly || nextCycle;
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -50,7 +64,7 @@ export function ConformitySection({
         setConformityEvaluatorPickerOpen(false);
         toast({ title: "Avaliador de Cenografia atualizado" });
       },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Erro ao atribuir avaliador", description: apiErrorMessage(e, "Não foi possível salvar. Tente de novo."), variant: "destructive" }),
     },
   });
 
@@ -62,7 +76,7 @@ export function ConformitySection({
         setConformityEvaluatorFerramentasPickerOpen(false);
         toast({ title: "Avaliador de Ferramentas e Case atualizado" });
       },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Erro ao atribuir avaliador", description: apiErrorMessage(e, "Não foi possível salvar. Tente de novo."), variant: "destructive" }),
     },
   });
 
@@ -76,9 +90,24 @@ export function ConformitySection({
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         toast({ title: "Matriz de conformidade atualizada", variant: "default" });
       },
-      onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
+      // Qualquer erro: a marcação otimista é desfeita (save → revert) e a
+      // Matriz é relida do servidor; o toast traz a mensagem do servidor.
+      onError: (e: unknown) => {
+        qc.invalidateQueries({ queryKey: getGetEventConformityQueryKey(id) });
+        toast({ title: "Matriz não foi salva", description: apiErrorMessage(e, "Não foi possível salvar. Tente de novo."), variant: "destructive" });
+      },
     },
   });
+  type ConformityPatch = Parameters<typeof setConformity.mutate>[0]["data"];
+  /** Salva um pedaço da Matriz; em erro, `revert` desfaz o que a tela marcou antes da resposta. */
+  const save = (data: ConformityPatch, revert?: () => void) =>
+    setConformity.mutate({ id, data }, { onError: () => revert?.() });
+  /** Marca um item (Sim/Não/Pendente) na hora e desfaz se o servidor recusar. */
+  const markItem = (key: "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta" | "standoutResponse", value: boolean | null) => {
+    const prev = conformityForm[key];
+    setConformityForm(f => ({ ...f, [key]: value }));
+    save({ [key]: value } as ConformityPatch, () => setConformityForm(f => ({ ...f, [key]: prev })));
+  };
 
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
@@ -88,6 +117,12 @@ export function ConformitySection({
         <ShieldAlert size={16} style={{ color: "var(--accent-text)" }} />
         <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Matriz de Conformidade</span>
       </div>
+      {nextCycle && (
+        <p role="status" data-testid="conformity-next-cycle" className="mx-4 my-3 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
+          <Info size={13} aria-hidden className="mt-[2px] shrink-0" />
+          <span>{NEXT_CYCLE_NOTICE}</span>
+        </p>
+      )}
       {canManage ? (
         <div className="flex flex-col min-[480px]:flex-row" style={{ borderBottom: "1px solid var(--border)" }}>
           {[
@@ -145,7 +180,7 @@ export function ConformitySection({
       )}
 
       {(["cenografia", "ferramentas"] as const).map(group => {
-        const groupItems = CONFORMITY_ITEMS.filter(i => i.group === group);
+        const groupItems = conformityItemsFor(event).filter(i => i.group === group);
         if (groupItems.length === 0) return null;
         const groupLabel = group === "cenografia" ? "Cenografia" : "Ferramentas e Case";
         const evaluatorName = group === "cenografia" ? (event.conformityEvaluatorName ?? null) : (event.conformityEvaluatorFerramentasName ?? null);
@@ -153,7 +188,11 @@ export function ConformitySection({
           <div key={group}>
             <div className="flex items-center gap-2 px-5 py-2" style={{ backgroundColor: "var(--secondary)", borderTop: "1px solid var(--border)" }}>
               <span className="text-[11px] font-black uppercase">{groupLabel}</span>
-              {evaluatorName ? <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>— {evaluatorName}</span> : <span className="text-[11px]" style={{ color: DANGER_TEXT }}>— sem avaliador atribuído</span>}
+              {evaluatorName
+                ? <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>— {evaluatorName}</span>
+                : neutral
+                  ? <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>— {nextCycle ? "sem responsável ainda" : "sem avaliador"}</span>
+                  : <span className="text-[11px]" style={{ color: DANGER_TEXT }}>— sem avaliador atribuído</span>}
             </div>
             {groupItems.map(item => {
               const value = conformityForm[item.key];
@@ -163,7 +202,7 @@ export function ConformitySection({
               const needsComment = (isNonConforming || isPending) && !comment.trim();
               const isExpanded = expandedComments.has(item.key);
               return (
-                <div key={item.key} className="px-5" style={{ borderTop: "1px solid var(--border)", backgroundColor: isNonConforming ? "rgba(229,72,77,0.06)" : isPending ? "rgba(232,162,61,0.06)" : "transparent" }}>
+                <div key={item.key} className="px-5" style={{ borderTop: "1px solid var(--border)", backgroundColor: isNonConforming ? "rgba(229,72,77,0.06)" : isPending && !neutral ? "rgba(232,162,61,0.06)" : "transparent" }}>
                   <div className="grid items-center min-h-[52px]" style={{ gridTemplateColumns: "1fr auto auto" }}>
                     <div className="pr-4 py-3 leading-snug" style={{ maxWidth: 280 }}>
                       <span className="text-sm font-bold">{item.label}</span>
@@ -172,10 +211,14 @@ export function ConformitySection({
                       {isNonConforming && <span className="text-[11px] font-black uppercase whitespace-nowrap mr-1" style={{ color: DANGER_TEXT }}>-10 pts</span>}
                       {canManageConformity ? (
                         <div className="flex items-center rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-                          <button type="button" onClick={() => { setConformityForm({ ...conformityForm, [item.key]: true }); setConformity.mutate({ id, data: { [item.key]: true } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Sim</button>
-                          <button type="button" onClick={() => { setConformityForm({ ...conformityForm, [item.key]: false }); setConformity.mutate({ id, data: { [item.key]: false } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>Não</button>
-                          <button type="button" onClick={() => { setConformityForm({ ...conformityForm, [item.key]: null }); setConformity.mutate({ id, data: { [item.key]: null } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>Pendente</button>
+                          <button type="button" onClick={() => markItem(item.key, true)} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Sim</button>
+                          <button type="button" onClick={() => markItem(item.key, false)} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>Não</button>
+                          <button type="button" onClick={() => markItem(item.key, null)} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>Pendente</button>
                         </div>
+                      ) : neutral && value === null ? (
+                        <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                          {nextCycle ? "Ainda não abre" : "Não respondida"}
+                        </span>
                       ) : (
                         <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded" style={{ backgroundColor: value === true ? "var(--primary)" : value === false ? WARNING : "rgba(232,162,61,0.24)", color: value === true ? "var(--primary-foreground)" : value === false ? "#fff" : AMBER }}>
                           {value === true ? "Sim" : value === false ? "Não" : "Pendente"}
@@ -210,7 +253,7 @@ export function ConformitySection({
                       <button
                         type="button"
                         disabled={setConformity.isPending}
-                        onClick={() => setConformity.mutate({ id, data: { [item.commentKey]: comment || null } })}
+                        onClick={() => save({ [item.commentKey]: comment || null } as ConformityPatch)}
                         className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                         style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                       >
@@ -242,7 +285,7 @@ export function ConformitySection({
               <span className="text-sm font-bold">Faltou / Atrasou?</span>
               {conformityForm.absencesResponse !== null
                 ? <span className="text-[11px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>Respondido</span>
-                : <span className="text-[11px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}>Não respondido</span>}
+                : <span className="text-[11px] font-black uppercase rounded px-2 py-0.5" style={neutral ? { backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" } : { backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}>Não respondido</span>}
             </div>
             {canManageConformity ? (
               <div className="space-y-1.5">
@@ -256,7 +299,7 @@ export function ConformitySection({
                 <button
                   type="button"
                   disabled={setConformity.isPending}
-                  onClick={() => setConformity.mutate({ id, data: { absencesResponse: conformityForm.absencesReport.trim() ? true : null, absencesReport: conformityForm.absencesReport || null } })}
+                  onClick={() => save({ absencesResponse: conformityForm.absencesReport.trim() ? true : null, absencesReport: conformityForm.absencesReport || null })}
                   className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >
@@ -274,13 +317,17 @@ export function ConformitySection({
               <span className="text-sm font-bold">Desempenho Fora da Curva?</span>
               {canManageConformity ? (
                 <div className="flex items-center rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-                  <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformity.mutate({ id, data: { standoutResponse: false, standoutJustification: null } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
-                  <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformity.mutate({ id, data: { standoutResponse: true } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
+                  <button type="button" onClick={() => { const prev = { standoutResponse: conformityForm.standoutResponse, standoutJustification: conformityForm.standoutJustification }; setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); save({ standoutResponse: false, standoutJustification: null }, () => setConformityForm(f => ({ ...f, ...prev }))); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
+                  <button type="button" onClick={() => markItem("standoutResponse", true)} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
                 </div>
               ) : (
+                neutral && conformityForm.standoutResponse === null ? (
+                  <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded shrink-0" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{nextCycle ? "Ainda não abre" : "Não respondida"}</span>
+                ) : (
                 <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded shrink-0" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : conformityForm.standoutResponse === false ? "var(--primary)" : "rgba(232,162,61,0.24)", color: conformityForm.standoutResponse === true ? "#fff" : conformityForm.standoutResponse === false ? "var(--primary-foreground)" : AMBER }}>
                   {conformityForm.standoutResponse === true ? "Sim" : conformityForm.standoutResponse === false ? "Não" : "Pendente"}
                 </span>
+                )
               )}
             </div>
             {conformityForm.standoutResponse === true && (
@@ -296,7 +343,7 @@ export function ConformitySection({
                   <button
                     type="button"
                     disabled={setConformity.isPending}
-                    onClick={() => setConformity.mutate({ id, data: { standoutJustification: conformityForm.standoutJustification || null } })}
+                    onClick={() => save({ standoutJustification: conformityForm.standoutJustification || null })}
                     className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                     style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                   >

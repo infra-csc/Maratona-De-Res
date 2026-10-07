@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
+import { db, cyclesTable, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit, setRecomputeCause } from "../lib/audit.js";
@@ -8,21 +8,48 @@ import { recomputeCycleResults } from "./results.js";
 import { generateCriterionAssignments } from "./routing.js";
 import { freezeEventCriteriaWeights } from "./evaluations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
+import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
 import { participantCountsForScore } from "../lib/participation.js";
 import { pgNum, affectedRows } from "../lib/pg-num.js";
 import { loadEventCriteria } from "../lib/event-console-data.js";
 import { applyAreaDefaults, setEventCriterionAreas, deleteEventCopyTx, AreaCopyError } from "../lib/area-copies.js";
-import { effectiveCalibrations } from "../lib/cycle-data.js";
+import { effectiveCalibrations, eventsWithoutConduta } from "../lib/cycle-data.js";
+import { areaModeEventIds, requiredAssignmentsFor } from "../lib/area-mode.js";
+import { isAfterCycleEnd, eventPeriodPosition } from "../lib/cycle-rules.js";
+import { conformityProgress } from "../lib/conformity-status.js";
+import { isEventOpenForEvaluation } from "../lib/next-cycle.js";
+import { isOpenForEvaluation, opensLabel } from "../lib/evaluation-dates.js";
+import { eventsLockedByClosedCycle, dateChangesBlockedByClosedCycle } from "../lib/closed-cycle-guard.js";
+import { plural } from "../lib/plural.js";
+
+/**
+ * Tira das mudanças de data em massa as que mexeriam em evento de ciclo
+ * FECHADO (só consulta): evento dentro do período dele, ou data nova que o
+ * colocaria de volta nesse período. Devolve as aplicáveis e as recusadas.
+ */
+async function splitClosedCycleDateChanges<T extends { eventId: number; eventName: string; startDateAfter: string }>(changes: T[]) {
+  const blocked = await dateChangesBlockedByClosedCycle(changes.map(c => ({ eventId: c.eventId, newStartDate: c.startDateAfter })));
+  return {
+    allowed: changes.filter(c => !blocked.has(c.eventId)),
+    skippedClosedCycle: changes.filter(c => blocked.has(c.eventId)).map(c => ({ eventId: c.eventId, eventName: c.eventName, reason: "Ciclo fechado: só consulta — a data deste evento não muda." })),
+  };
+}
 
 const router = Router();
 router.use(requireAuth);
+// Ciclo fechado só consulta: escritas em evento/avaliação/calibração/falta de
+// ciclo fechado → 409 (ver lib/closed-cycle-guard.ts; o pagamento segue liberado).
 
 router.get("/events", async (req, res) => {
   const { status } = req.query;
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json([]); return; }
+  // ?cycleId= vazio = ciclo atual (como sempre); id = aquele ciclo; all = todos.
+  const scoped = await resolveCycleScope(req.query.cycleId);
+  if (sendScopeError(res, scoped)) return;
+  const scope = scoped.scope;
+  if (!scope) { res.json([]); return; }
+  const scopeCycles = scope.kind === "all" ? scope.cycles : [scope.cycle];
   let query = db.select().from(eventsTable).$dynamic();
-  const conditions = [eq(eventsTable.cycleId, cycle.id)];
+  const conditions = [scope.kind === "all" ? inArray(eventsTable.cycleId, scopeCycles.map(c => c.id)) : eq(eventsTable.cycleId, scope.cycle.id)];
   if (status) conditions.push(eq(eventsTable.status, status as string));
   query = query.where(and(...conditions));
   const events = await query.orderBy(eventsTable.startDate);
@@ -51,6 +78,7 @@ router.get("/events", async (req, res) => {
       conduta: eventConformitiesTable.conduta,
       standoutResponse: eventConformitiesTable.standoutResponse,
       absencesResponse: eventConformitiesTable.absencesResponse,
+      absencesReport: eventConformitiesTable.absencesReport,
     }).from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, eventIds)),
     // Catálogo global: fonte de verdade para o total de quesitos do ciclo.
     db.select({ id: criteriaTable.id, defaultWeight: criteriaTable.defaultWeight })
@@ -62,6 +90,10 @@ router.get("/events", async (req, res) => {
       .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), isNotNull(eventCriterionAssignmentsTable.assignedToId))),
   ]);
   const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
+  // Ciclo com "Conduta" fora da Matriz de Conformidade (ciclo novo).
+  const noConduta = await eventsWithoutConduta(eventIds);
+  // Avaliação por área (ciclo novo): 1 resposta enviada = critério avaliado.
+  const areaMode = await areaModeEventIds(eventIds);
   // Nota prévia: só a calibração que VALE (publicada ou antiga); a salva e não
   // publicada fica de fora, como no cálculo oficial. Os contadores de
   // calibração continuam usando a salva ("calibrado" = trabalho feito).
@@ -75,28 +107,18 @@ router.get("/events", async (req, res) => {
 
   // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído,
   // e também um contador X/Y (itens respondidos / itens esperados) para exibir
-  // na listagem de eventos igual às barras de Avaliações/Calibrações.
-  // Cenografia = 5 itens (epi, estaiamentos, conduta, standoutResponse, absencesResponse);
-  // Ferramentas = 1 item (guardaEquipamentos). Só conta os lados que têm avaliador atribuído.
+  // na listagem de eventos igual às barras de Avaliações/Calibrações. A conta
+  // é a MESMA da tela do avaliador (lib/conformity-status.ts, B3): só os lados
+  // com responsável, Conduta conforme o ciclo do evento.
   function getConformityStatus(ev: (typeof events)[0]) {
     const cenoAssigned = ev.conformityEvaluatorUserId != null;
     const ferrAssigned = ev.conformityEvaluatorFerramentasUserId != null;
     const conformityNeeded = cenoAssigned || ferrAssigned;
     if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false, conformityFilled: 0, conformityTotal: 0, conformityCenografiaDone: false, conformityFerramentasDone: false };
-    const conf = conformityRows.find(c => c.eventId === ev.id);
-    const cenoFields = [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse, conf?.absencesResponse];
-    const cenoFilled = cenoAssigned ? cenoFields.filter(v => v != null).length : 0;
-    const cenoTotal = cenoAssigned ? 5 : 0;
-    const ferrFilled = ferrAssigned && conf?.guardaEquipamentos != null ? 1 : 0;
-    const ferrTotal = ferrAssigned ? 1 : 0;
-    const conformityFilled = cenoFilled + ferrFilled;
-    const conformityTotal = cenoTotal + ferrTotal;
-    const conformityComplete = conformityFilled === conformityTotal;
+    const p = conformityProgress(conformityRows.find(c => c.eventId === ev.id), { cenografia: cenoAssigned, ferramentas: ferrAssigned, withoutConduta: noConduta.has(ev.id) });
     // Por lado: quem respondeu a matriz de Cenografia / Ferramentas (a Central de
     // Avaliações usa para não contar esses avaliadores como pendentes).
-    const conformityCenografiaDone = cenoAssigned && cenoFilled === cenoTotal;
-    const conformityFerramentasDone = ferrAssigned && ferrFilled === ferrTotal;
-    return { conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone };
+    return { conformityNeeded, conformityComplete: p.complete, conformityFilled: p.filled, conformityTotal: p.total, conformityCenografiaDone: p.cenoDone, conformityFerramentasDone: p.ferrDone };
   }
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
@@ -111,10 +133,11 @@ router.get("/events", async (req, res) => {
     : [];
   const conformityEvalNameById = new Map(conformityEvalUsers.map(u => [u.id, u.name]));
 
-  const { startDate: cycleStartDate, endDate: cycleEndDate } = cycle;
-  const cycleEvents = cycleStartDate && cycleEndDate
-    ? events.filter(ev => ev.endDate >= cycleStartDate && ev.endDate <= cycleEndDate)
-    : events;
+  // Recorte SÓ pelo ciclo (cycleId): todo evento guardado no ciclo aparece,
+  // inclusive os "fora do período" (data de início antes do início ou depois
+  // do fim do ciclo — critério único em eventPeriodPosition, lib/cycle-rules.ts).
+  // A tela marca esses com o selo "Fora do período"; antes eles sumiam da lista.
+  const cycleEvents = events;
 
   // Nota OFICIAL por evento (snapshot de employee_event_results, já com a
   // penalidade da Matriz): para evento confirmado, a lista mostra o mesmo
@@ -209,7 +232,12 @@ router.get("/events", async (req, res) => {
     );
     const activeCriteria = allEventCriteria.filter(c => !c.criterionEventScoped);
     const eventScopedCriteria = allEventCriteria.filter(c => c.criterionEventScoped);
-    const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
+    const evAssignments = areaAssignmentRows.filter(a => a.eventId === ev.id);
+    const assignedByArea = buildAssignedEvaluatorsByArea(requiredAssignmentsFor(evAssignments, areaMode.has(ev.id)));
+    // "Sem avaliador": no modo por área ninguém precisa ser designado
+    // (qualquer avaliador da área responde), então não há o alerta.
+    const designatedByArea = buildAssignedEvaluatorsByArea(evAssignments);
+    const needsDesignation = !areaMode.has(ev.id);
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
       ? scored.reduce((s, e) => s + pgNum(e.score), 0) / scored.length
@@ -316,7 +344,7 @@ router.get("/events", async (req, res) => {
     // tem linha oficial, ela prevalece.
     const confRow = conformityRows.find(c => c.eventId === ev.id);
     const conformitySubtotal = confRow
-      ? calculateConformitySubtotal([confRow.epi, confRow.estaiamentos, confRow.guardaEquipamentos, confRow.conduta])
+      ? calculateConformitySubtotal([confRow.epi, confRow.estaiamentos, confRow.guardaEquipamentos, noConduta.has(ev.id) ? null : confRow.conduta])
       : 100;
     const criteriaForScore = mergeEventScopedCriteria(criteriaRaw.map(c => {
       const v = effectiveCalScore.get(`${ev.id}:${c.criterionId}`);
@@ -377,8 +405,8 @@ router.get("/events", async (req, res) => {
         .map(c => c.responsibleAreaId as number)
     );
     const unassignedAreaNames = [...areaIdsWithActiveCriteria]
-      .filter(areaId =>
-        (!assignedByArea.has(areaId) || assignedByArea.get(areaId)!.size === 0) &&
+      .filter(areaId => needsDesignation &&
+        (!designatedByArea.has(areaId) || designatedByArea.get(areaId)!.size === 0) &&
         !areasCoveredByCritAssign.has(areaId)
       )
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
@@ -401,14 +429,24 @@ router.get("/events", async (req, res) => {
       pendingPublishCount: pendingCountOf(ev.id),
       averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
+  // Posição no período do ciclo (critério único, eventPeriodPosition) e
+  // "aberto para avaliação" (regra única, lib/next-cycle.ts) por evento: a tela
+  // não precisa derivar. nextCycle = "fora do período" = do próximo ciclo
+  // (não aceita avaliação até ser movido; conta em stats.eventsAfterEnd).
+  const cycleById = new Map(scopeCycles.map(c => [c.id, c]));
+  const withPeriod = enriched.map(ev => {
+    const c = cycleById.get(ev.cycleId);
+    const periodPosition = eventPeriodPosition(ev, c);
+    return { ...ev, periodPosition, nextCycle: periodPosition === "after", openForEvaluation: isEventOpenForEvaluation(ev, c) };
+  });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)
   // exibiria averageScore/teamScore como a coluna "Nota" senão.
   if (isRole(req.user?.role, "operador")) {
-    res.json(enriched.map(ev => ({ ...ev, averageScore: null, teamScore: null })));
+    res.json(withPeriod.map(ev => ({ ...ev, averageScore: null, teamScore: null })));
     return;
   }
-  res.json(enriched);
+  res.json(withPeriod);
 });
 
 // redactConformityContent: quando o solicitante é "operador", esconde o
@@ -502,7 +540,9 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
   // (falls back to "any submission" for areas without an assignment configured).
   const allEvals = await db.select({ criterionId: evaluationsTable.criterionId, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
   const submittedEvals = allEvals.filter(e => e.status === "submitted");
-  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments.map(a => ({ areaId: a.areaId, evaluatorUserId: a.evaluatorUserId })));
+  // Avaliação por área (ciclo novo): 1 resposta enviada basta.
+  const areaMode = (await areaModeEventIds([id])).has(id);
+  const assignedByArea = buildAssignedEvaluatorsByArea(requiredAssignmentsFor(areaAssignments.map(a => ({ areaId: a.areaId, evaluatorUserId: a.evaluatorUserId })), areaMode));
   const isDone = (c: (typeof activeCriteria)[number]) => {
     const submittedIds = submittedEvals.filter(e => e.criterionId === c.criterionId).map(e => e.evaluatorUserId as number);
     return getCriterionEvaluationStatus(c.responsibleAreaId, submittedIds, assignedByArea).isEvaluated;
@@ -547,7 +587,9 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
       }
     : conformity;
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: safeConformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName };
+  // Ciclo novo: "Conduta" fora da Matriz de Conformidade (as telas escondem a pergunta).
+  const conformityWithoutConduta = (await eventsWithoutConduta([ev.id])).has(ev.id);
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: safeConformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName, conformityWithoutConduta };
 }
 
 async function eventHasEvaluations(eventId: number) {
@@ -667,6 +709,12 @@ router.post("/events", requireRole("admin", "rh", "operador"), async (req, res) 
   }
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+  // Ciclo atual já FECHADO (aguardando o próximo ser criado): só entra evento
+  // de depois do fim dele — fica "fora do período" e vai para o ciclo novo.
+  if (cycle.status === "closed" && !isAfterCycleEnd({ startDate: String(startDate) }, cycle)) {
+    res.status(409).json({ error: `O ciclo "${cycle.name}" já foi fechado e esta data fica no período dele. Crie o próximo ciclo em Ciclos (ou use uma data depois do fim do ciclo).` });
+    return;
+  }
   // Evento e vínculo com o catálogo juntos: nunca fica um evento criado sem
   // critérios porque a segunda escrita falhou.
   const ev = await db.transaction(async (tx) => {
@@ -696,6 +744,15 @@ router.patch("/events/:id", requireRole("admin", "rh", "operador"), async (req, 
   const { name, clientName, location, city, state, startDate, endDate } = req.body;
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  // Evento "fora do período" de um ciclo fechado não pode voltar para dentro
+  // do período dele (mudaria o resultado oficial do ciclo fechado).
+  if (startDate !== undefined) {
+    const [c] = await db.select().from(cyclesTable).where(eq(cyclesTable.id, before.cycleId)).limit(1);
+    if (c?.status === "closed" && !isAfterCycleEnd({ startDate: String(startDate) }, c)) {
+      res.status(409).json({ error: `O ciclo "${c.name}" está fechado: a data do evento não pode cair no período dele.` });
+      return;
+    }
+  }
   const [ev] = await db.update(eventsTable).set({
     ...(name !== undefined && { name }),
     ...(clientName !== undefined && { clientName }),
@@ -887,7 +944,7 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
   }
 
   // 1) Planeja: o que muda em cada evento localizado (nada é gravado aqui).
-  const changes: EventDateChange[] = [];
+  const planned: EventDateChange[] = [];
   const notFound: string[] = [];
   let unchanged = 0;
   for (const { externalId, name, date } of updates) {
@@ -903,7 +960,7 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
       unchanged++;
       continue;
     }
-    changes.push({
+    planned.push({
       eventId: ev.id,
       eventName: ev.name,
       newName: nameChanges ? newName : null,
@@ -915,8 +972,13 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
     });
   }
 
+  // Ciclo fechado só consulta: evento dele nunca muda de data (nem volta
+  // para dentro do período fechado). Ficam de fora, listados à parte.
+  const { allowed, skippedClosedCycle } = await splitClosedCycleDateChanges(planned);
+  const changes = allowed;
+
   if (mode.dryRun) {
-    res.json({ dryRun: true, updated: 0, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes });
+    res.json({ dryRun: true, updated: 0, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes, skippedClosedCycle });
     return;
   }
 
@@ -931,7 +993,7 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
   await audit(req.user!.userId, "bulk_date_sync", "events", undefined,
     changes.map(c => ({ eventId: c.eventId, name: c.eventName, startDate: c.startDateBefore, endDate: c.endDateBefore })),
     { rows: updates.length, updated: changes.length, unchanged, notFound, changes: changes.map(c => ({ eventId: c.eventId, date: c.startDateAfter, name: c.newName })) });
-  res.json({ dryRun: false, updated: changes.length, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes });
+  res.json({ dryRun: false, updated: changes.length, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes, skippedClosedCycle });
 });
 
 router.delete("/events/:id", requireRole("admin", "operador"), async (req, res) => {
@@ -1050,7 +1112,7 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
   const affectedCycles = Array.from(new Set([keep.cycleId, merge.cycleId]));
   const warnings: string[] = [];
   if (hasRealData && force) {
-    warnings.push(`Descartados dados do evento duplicado: ${evalCount.n} avaliação(ões), ${calibCount.n} calibração(ões), ${confCount.n} conformidade(s) e ${resultCount.n} resultado(s).`);
+    warnings.push(`Descartados dados do evento duplicado: ${plural(Number(evalCount.n), "avaliação", "avaliações")}, ${plural(Number(calibCount.n), "calibração", "calibrações")}, ${plural(Number(confCount.n), "conformidade")} e ${plural(Number(resultCount.n), "resultado")}.`);
   }
   // Audita ANTES de recalcular: o recálculo grava a ação como motivo na
   // linha do tempo (antes ficava sem motivo).
@@ -1338,7 +1400,11 @@ router.patch("/events/:id/conformity-evaluator", async (req, res) => {
   }
   await db.update(eventsTable).set({ conformityEvaluatorUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator", "events", id, { from: ev.conformityEvaluatorUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
+  // A1: quem não é admin/RH (o avaliador que repassa a matriz) recebe só a
+  // confirmação — nunca o detalhe do evento (participantes, comentários de
+  // RH, critérios e respostas de outras áreas).
+  if (!isAdminRh) { res.json({ ok: true, conformityEvaluatorUserId: newUserId }); return; }
+  res.json({ ok: true, ...(await loadEventDetail(id)) });
 });
 
 // Redirect: Grupo 1 (Ferramentas e Case) evaluator can delegate to another user in area 16
@@ -1358,11 +1424,27 @@ router.patch("/events/:id/conformity-evaluator-ferramentas", async (req, res) =>
   }
   await db.update(eventsTable).set({ conformityEvaluatorFerramentasUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator_ferramentas", "events", id, { from: ev.conformityEvaluatorFerramentasUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
+  // A1: só a confirmação para quem não é admin/RH.
+  if (!isAdminRh) { res.json({ ok: true, conformityEvaluatorFerramentasUserId: newUserId }); return; }
+  res.json({ ok: true, ...(await loadEventDetail(id)) });
 });
 
 router.get("/events/:id/conformity", async (req, res) => {
   const id = parseInt(req.params.id as string);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "Evento inválido" }); return; }
+  // Avaliador só lê a matriz do evento em que ELE responde Cenografia ou
+  // Ferramentas (a tela de avaliação dele); o resto é 403.
+  let evaluatorSides: { ceno: boolean; ferr: boolean } | null = null;
+  if (isRole(req.user?.role, "avaliador")) {
+    const [ev] = await db.select({ ceno: eventsTable.conformityEvaluatorUserId, ferr: eventsTable.conformityEvaluatorFerramentasUserId })
+      .from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+    if (!ev) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+    if (ev.ceno !== req.user!.userId && ev.ferr !== req.user!.userId) {
+      res.status(403).json({ error: "Acesso negado: você não responde a matriz deste evento." });
+      return;
+    }
+    evaluatorSides = { ceno: ev.ceno === req.user!.userId, ferr: ev.ferr === req.user!.userId };
+  }
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
   if (!conformity) { res.json(null); return; }
   let createdByUserName: string | null = null;
@@ -1370,6 +1452,9 @@ router.get("/events/:id/conformity", async (req, res) => {
     const [u] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, conformity.createdByUserId)).limit(1);
     createdByUserName = u?.name ?? null;
   }
+  // A1: o avaliador vê só a parte da matriz que ELE responde (Ferramentas não
+  // lê o relato de faltas da Cenografia, e vice-versa).
+  if (evaluatorSides) { res.json({ ...conformityForEvaluator(conformity, evaluatorSides), createdByUserName }); return; }
   // Mesma redação do GET /events/:id: operador e visualizador só sabem se foi
   // respondido, sem Sim/Não nem texto livre sobre pessoas.
   if (isRole(req.user?.role, "operador") || isRole(req.user?.role, "visualizador")) {
@@ -1400,11 +1485,22 @@ router.post("/events/:id/conformity", async (req, res) => {
   const [evRow] = await db.select({
     cycleId: eventsTable.cycleId,
     status: eventsTable.status,
+    startDate: eventsTable.startDate,
+    endDate: eventsTable.endDate,
     resultsConfirmed: eventsTable.resultsConfirmed,
     conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
     conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
   }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!evRow) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  // Avaliador responde a matriz só a partir do DIA SEGUINTE ao evento (mesma
+  // liberação da avaliação dos critérios, lib/evaluation-dates.ts).
+  if (isRole(role, "avaliador") && !isOpenForEvaluation(evRow)) {
+    res.status(409).json({ error: `A matriz deste evento abre para resposta ${opensLabel(evRow)}.` });
+    return;
+  }
+  // Ciclo com a Conduta fora da matriz: a resposta é ignorada (nada é gravado
+  // e não conta na nota; vale como "sim").
+  const dropConduta = (await eventsWithoutConduta([eventId])).has(eventId);
 
   const isAdminRh = ["admin", "rh"].includes(role);
   const isCenografiaEval = evRow.conformityEvaluatorUserId === userId;
@@ -1415,78 +1511,135 @@ router.post("/events/:id/conformity", async (req, res) => {
   }
 
   const {
-    epi, estaiamentos, guardaEquipamentos, conduta,
-    epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment,
+    epi, estaiamentos, guardaEquipamentos,
+    epiComment, estaiamentosComment, guardaEquipamentosComment,
     absencesResponse, absencesReport, standoutResponse, standoutJustification,
   } = req.body;
+  const conduta = dropConduta ? undefined : req.body?.conduta;
+  const condutaComment = dropConduta ? undefined : req.body?.condutaComment;
 
   // Campos permitidos por grupo
   const canCenografia = isAdminRh || isCenografiaEval;
   const canFerramentas = isAdminRh || isFerramentasEval;
 
-  // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
-  // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
-  const existing = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
   // Lookup do nome do usuário logado para registrar quem preencheu cada seção.
   const [userRow] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   const userName = userRow?.name ?? null;
 
-  if (existing.length > 0) {
-    const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (canCenografia) {
-      if (epi !== undefined) patch.epi = epi;
-      if (estaiamentos !== undefined) patch.estaiamentos = estaiamentos;
-      if (conduta !== undefined) patch.conduta = conduta;
-      if (epiComment !== undefined) patch.epiComment = epiComment || null;
-      if (estaiamentosComment !== undefined) patch.estaiamentosComment = estaiamentosComment || null;
-      if (condutaComment !== undefined) patch.condutaComment = condutaComment || null;
-      if (absencesResponse !== undefined) patch.absencesResponse = absencesResponse;
-      if (absencesReport !== undefined) patch.absencesReport = absencesReport || null;
-      if (standoutResponse !== undefined) patch.standoutResponse = standoutResponse;
-      if (standoutJustification !== undefined) patch.standoutJustification = standoutJustification || null;
-      if (userName) patch.cenografiaSubmittedByName = userName;
+  // B6: trava a linha do evento (SELECT … FOR UPDATE, a mesma trava do link
+  // público) antes de ler e gravar a matriz — a tela e o link combinado ao
+  // mesmo tempo ficam em fila, sem um apagar o outro.
+  const outcome = await db.transaction(async (tx) => {
+    await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, eventId)).for("update");
+    // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
+    // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
+    const existing = await tx.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
+
+    if (existing.length > 0) {
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (canCenografia) {
+        if (epi !== undefined) patch.epi = epi;
+        if (estaiamentos !== undefined) patch.estaiamentos = estaiamentos;
+        if (conduta !== undefined) patch.conduta = conduta;
+        if (epiComment !== undefined) patch.epiComment = epiComment || null;
+        if (estaiamentosComment !== undefined) patch.estaiamentosComment = estaiamentosComment || null;
+        if (condutaComment !== undefined) patch.condutaComment = condutaComment || null;
+        if (absencesResponse !== undefined) patch.absencesResponse = absencesResponse;
+        if (absencesReport !== undefined) patch.absencesReport = absencesReport || null;
+        if (standoutResponse !== undefined) patch.standoutResponse = standoutResponse;
+        if (standoutJustification !== undefined) patch.standoutJustification = standoutJustification || null;
+        if (userName) patch.cenografiaSubmittedByName = userName;
+      }
+      if (canFerramentas) {
+        if (guardaEquipamentos !== undefined) patch.guardaEquipamentos = guardaEquipamentos;
+        if (guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = guardaEquipamentosComment || null;
+        if (userName) patch.ferramentasSubmittedByName = userName;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [updated] = await tx.update(eventConformitiesTable)
+        .set(patch as any)
+        .where(eq(eventConformitiesTable.eventId, eventId))
+        .returning();
+      return { kind: "updated" as const, before: existing[0], row: updated };
+    } else {
+      const [created] = await tx.insert(eventConformitiesTable)
+        .values({
+          eventId,
+          epi: canCenografia && epi !== undefined ? epi : null,
+          estaiamentos: canCenografia && estaiamentos !== undefined ? estaiamentos : null,
+          guardaEquipamentos: canFerramentas && guardaEquipamentos !== undefined ? guardaEquipamentos : null,
+          conduta: canCenografia && conduta !== undefined ? conduta : null,
+          epiComment: canCenografia ? (epiComment || null) : null,
+          estaiamentosComment: canCenografia ? (estaiamentosComment || null) : null,
+          guardaEquipamentosComment: canFerramentas ? (guardaEquipamentosComment || null) : null,
+          condutaComment: canCenografia ? (condutaComment || null) : null,
+          absencesResponse: canCenografia && absencesResponse !== undefined ? absencesResponse : null,
+          absencesReport: canCenografia ? (absencesReport || null) : null,
+          standoutResponse: canCenografia && standoutResponse !== undefined ? standoutResponse : null,
+          standoutJustification: canCenografia ? (standoutJustification || null) : null,
+          createdByUserId: userId,
+        })
+        .returning();
+      return { kind: "created" as const, before: null, row: created };
     }
-    if (canFerramentas) {
-      if (guardaEquipamentos !== undefined) patch.guardaEquipamentos = guardaEquipamentos;
-      if (guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = guardaEquipamentosComment || null;
-      if (userName) patch.ferramentasSubmittedByName = userName;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [updated] = await db.update(eventConformitiesTable)
-      .set(patch as any)
-      .where(eq(eventConformitiesTable.eventId, eventId))
-      .returning();
-    await audit(userId, "update_conformity", "events", eventId, existing[0], updated);
-    if (evRow.resultsConfirmed || evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
-    res.json(updated);
-  } else {
-    const [created] = await db.insert(eventConformitiesTable)
-      .values({
-        eventId,
-        epi: canCenografia && epi !== undefined ? epi : null,
-        estaiamentos: canCenografia && estaiamentos !== undefined ? estaiamentos : null,
-        guardaEquipamentos: canFerramentas && guardaEquipamentos !== undefined ? guardaEquipamentos : null,
-        conduta: canCenografia && conduta !== undefined ? conduta : null,
-        epiComment: canCenografia ? (epiComment || null) : null,
-        estaiamentosComment: canCenografia ? (estaiamentosComment || null) : null,
-        guardaEquipamentosComment: canFerramentas ? (guardaEquipamentosComment || null) : null,
-        condutaComment: canCenografia ? (condutaComment || null) : null,
-        absencesResponse: canCenografia && absencesResponse !== undefined ? absencesResponse : null,
-        absencesReport: canCenografia ? (absencesReport || null) : null,
-        standoutResponse: canCenografia && standoutResponse !== undefined ? standoutResponse : null,
-        standoutJustification: canCenografia ? (standoutJustification || null) : null,
-        createdByUserId: userId,
-      })
-      .returning();
-    await audit(userId, "create_conformity", "events", eventId, null, created);
-    if (evRow.resultsConfirmed || evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
-    res.status(201).json(created);
-  }
+  });
+
+  // Auditoria e recálculo DEPOIS do commit (lib/db-tx.ts).
+  await audit(userId, outcome.kind === "updated" ? "update_conformity" : "create_conformity", "events", eventId, outcome.before, outcome.row);
+  if (evRow.resultsConfirmed || evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
+  // A1: quem não é admin/RH recebe só a parte da matriz que responde.
+  res.status(outcome.kind === "updated" ? 200 : 201).json(isAdminRh ? outcome.row : conformityForEvaluator(outcome.row, { ceno: isCenografiaEval, ferr: isFerramentasEval }));
 });
+
+/**
+ * Matriz de Conformidade para o AVALIADOR: só a parte que ele responde. O
+ * lado que não é dele volta vazio (null), como "não respondido".
+ */
+function conformityForEvaluator<T extends typeof eventConformitiesTable.$inferSelect>(c: T, sides: { ceno: boolean; ferr: boolean }): T {
+  const out = { ...c };
+  if (!sides.ceno) {
+    Object.assign(out, {
+      epi: null, estaiamentos: null, conduta: null, epiComment: null, estaiamentosComment: null, condutaComment: null,
+      absencesResponse: null, absencesReport: null, standoutResponse: null, standoutJustification: null, cenografiaSubmittedByName: null,
+    });
+  }
+  if (!sides.ferr) Object.assign(out, { guardaEquipamentos: null, guardaEquipamentosComment: null, ferramentasSubmittedByName: null });
+  return out;
+}
 
 router.get("/events/:id/criteria", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  res.json(await loadEventCriteria([id]));
+  const rows = await loadEventCriteria([id]);
+  // Avaliador só vê o que foi avaliado: nada da nota calibrada/publicada.
+  // E só os critérios da ÁREA dele (cadastro) ou designados a ele neste
+  // evento (mesma regra de isAssignedForCriterion: designação por critério
+  // manda; sem ela, vale a designação evento→área).
+  if (isRole(req.user!.role, "avaliador")) {
+    const userId = req.user!.userId;
+    const [me] = await db.select({ areaId: usersTable.areaId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const [critAssign, areaAssign] = await Promise.all([
+      db.select({ criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
+        .from(eventCriterionAssignmentsTable)
+        .where(and(eq(eventCriterionAssignmentsTable.eventId, id), isNotNull(eventCriterionAssignmentsTable.assignedToId))),
+      db.select({ areaId: eventAreaAssignmentsTable.areaId }).from(eventAreaAssignmentsTable)
+        .where(and(eq(eventAreaAssignmentsTable.eventId, id), eq(eventAreaAssignmentsTable.evaluatorUserId, userId))),
+    ]);
+    const assignedTo = new Map(critAssign.map(a => [a.criterionId, a.assignedToId]));
+    const myAreas = new Set(areaAssign.map(a => a.areaId));
+    // D2: no modo por área só a área do cadastro dá acesso (designação ou
+    // redirecionamento para outra área não).
+    const areaMode = (await areaModeEventIds([id])).has(id);
+    const visible = rows.filter(r => {
+      if (me?.areaId != null && r.responsibleAreaId === me.areaId) return true;
+      if (areaMode) return false;
+      const who = assignedTo.get(r.criterionId);
+      if (who != null) return who === userId;
+      return r.responsibleAreaId != null && myAreas.has(r.responsibleAreaId);
+    });
+    res.json(visible.map(r => ({ ...r, publishedScore: null, partialPublishedByUserName: null, finalPublishedByUserName: null })));
+    return;
+  }
+  res.json(rows);
 });
 
 
@@ -1869,11 +2022,22 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
     const evaluatorUsers = await db.select().from(usersTable).where(inArray(usersTable.id, allUserIds));
     const invalid = allUserIds.filter(id => {
       const u = evaluatorUsers.find(u => u.id === id);
-      return !u || u.role !== "avaliador";
+      return !u || !isRole(u.role, "avaliador");
     });
     if (invalid.length > 0) {
       res.status(400).json({ error: "O avaliador atribuído deve ser um usuário com papel de avaliador" });
       return;
+    }
+    // A1 (4ª revisão): no ciclo por área só quem é da área do critério
+    // responde — designar alguém para OUTRA área não lhe daria acesso (nem
+    // visibilidade). Mesmo código do repasse de critério (routing.ts).
+    if ((await areaModeEventIds([eventId])).has(eventId)) {
+      const areaOf = new Map(evaluatorUsers.map(u => [u.id, u.areaId]));
+      const otherArea = parsedItems.some(i => i.evaluatorUserIds.some(uid => areaOf.get(uid) !== i.areaId));
+      if (otherArea) {
+        res.status(409).json({ error: "Neste ciclo a avaliação é por área: só dá para designar avaliadores da própria área. Quem é de outra área não consegue responder.", code: "AREA_MODE_OTHER_AREA" });
+        return;
+      }
     }
   }
 
@@ -1949,8 +2113,12 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
   let processed = 0, skipped = 0, failed = 0, totalAdded = 0, totalDeactivated = 0, totalActivated = 0;
   const details: { id: number; name: string; added: number; deactivated: number; activated: number }[] = [];
   const failures: { id: number; name: string; error: string }[] = [];
+  // Ciclo fechado só consulta: evento dele (dentro do período) não é tocado.
+  const locked = await eventsLockedByClosedCycle(events.map(e => e.id));
+  let skippedClosedCycle = 0;
 
   for (const ev of events) {
+    if (locked.has(ev.id)) { skipped += 1; skippedClosedCycle += 1; continue; }
     try {
       const { added, deactivated, activated: activatedRaw } = await resyncEventCriteriaOnce(ev.id, { force });
       const activated = activatedRaw ?? 0;
@@ -1971,7 +2139,7 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
     }
   }
 
-  res.json({ processed, skipped, failed, totalAdded, totalDeactivated, totalActivated, events: details, failures });
+  res.json({ processed, skipped, skippedClosedCycle, failed, totalAdded, totalDeactivated, totalActivated, events: details, failures });
 });
 
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {
@@ -1980,8 +2148,11 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
 
-  if (!confirmed && await eventHasEvaluations(id)) {
-    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem ser reabertos para edição." });
+  // Regra do dono (05–06/10/2026): não existe mais "reabrir critérios". O
+  // evento abre para avaliação sozinho no dia seguinte (evaluation-release);
+  // "Confirmar critérios" só antecipa a confirmação (pesos e designações).
+  if (!confirmed) {
+    res.status(409).json({ error: "Não é mais possível reabrir os critérios: o evento abre para avaliação sozinho no dia seguinte." });
     return;
   }
 
@@ -2032,7 +2203,7 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
 // ── Log completo de atividades do evento ─────────────────────────────────────
 router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid event id" }); return; }
+  if (isNaN(id)) { res.status(400).json({ error: "Evento inválido." }); return; }
 
   // Map criterion names for this event
   const criteriaRows = await db
@@ -2289,7 +2460,8 @@ router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, r
       reason: "fix",
     });
   }
-  const fixedCount = changes.length;
+  const blockedFix = await dateChangesBlockedByClosedCycle(changes.map(c => ({ eventId: c.eventId, newStartDate: c.startDateAfter })));
+  const fixedCount = changes.filter(c => !blockedFix.has(c.eventId)).length;
 
   // 2. Para todos os demais eventos multi-dia: startDate = endDate (data única)
   const multiDay = await db.select({ id: eventsTable.id, name: eventsTable.name, startDate: eventsTable.startDate, endDate: eventsTable.endDate })
@@ -2304,10 +2476,13 @@ router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, r
       reason: "normalize",
     });
   }
-  const normalizedCount = multiDay.length;
+  // Ciclo fechado só consulta: evento dele não muda de data.
+  const { allowed: allowedChanges, skippedClosedCycle } = await splitClosedCycleDateChanges(changes);
+  changes.splice(0, changes.length, ...allowedChanges);
+  const normalizedCount = changes.filter(c => c.reason === "normalize").length;
 
   if (mode.dryRun) {
-    res.json({ dryRun: true, ok: true, fixedCount, normalizedCount, changes });
+    res.json({ dryRun: true, ok: true, fixedCount, normalizedCount, changes, skippedClosedCycle });
     return;
   }
 
@@ -2322,9 +2497,9 @@ router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, r
 
   await audit(req.user!.userId, "normalize_event_dates", "events", undefined,
     changes.map(c => ({ eventId: c.eventId, startDate: c.startDateBefore, endDate: c.endDateBefore })),
-    { fixedCount, normalizedCount, fixedIds: changes.filter(c => c.reason === "fix").map(c => c.eventId), normalizedIds: multiDay.map(e => e.id) });
+    { fixedCount, normalizedCount, fixedIds: changes.filter(c => c.reason === "fix").map(c => c.eventId), normalizedIds: changes.filter(c => c.reason === "normalize").map(c => c.eventId) });
 
-  res.json({ dryRun: false, ok: true, fixedCount, normalizedCount, changes });
+  res.json({ dryRun: false, ok: true, fixedCount, normalizedCount, changes, skippedClosedCycle });
 });
 
 router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), async (req, res) => {
@@ -2337,22 +2512,34 @@ router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), asyn
 
   const results: { from: string; to: string; fromId: number; toId: number; updated: number }[] = [];
   let totalUpdated = 0;
+  // M4 (4ª revisão): ciclo fechado só consulta — as calibrações de evento de
+  // ciclo fechado (dentro do período) não são remapeadas; vêm em skippedClosedCycle.
+  const skipped = new Map<number, string>();
 
   for (const [fromName, toName] of Object.entries(nameMap)) {
     const [fromCrit] = await db.select({ id: criteriaTable.id }).from(criteriaTable).where(eq(criteriaTable.name, fromName)).limit(1);
     const [toCrit] = await db.select({ id: criteriaTable.id }).from(criteriaTable).where(eq(criteriaTable.name, toName)).limit(1);
     if (!fromCrit || !toCrit) continue;
 
+    const touched = await db.selectDistinct({ eventId: calibrationsTable.eventId, eventName: eventsTable.name })
+      .from(calibrationsTable).innerJoin(eventsTable, eq(calibrationsTable.eventId, eventsTable.id))
+      .where(eq(calibrationsTable.criterionId, fromCrit.id));
+    const locked = await eventsLockedByClosedCycle(touched.map(t => t.eventId));
+    for (const t of touched) if (locked.has(t.eventId)) skipped.set(t.eventId, t.eventName);
+    const lockedIds = [...locked];
+
     const updated = await db.execute(
-      sql`UPDATE calibrations SET criterion_id = ${toCrit.id} WHERE criterion_id = ${fromCrit.id}`
+      sql`UPDATE calibrations SET criterion_id = ${toCrit.id} WHERE criterion_id = ${fromCrit.id}
+          ${lockedIds.length > 0 ? sql`AND event_id NOT IN (${sql.join(lockedIds.map(id => sql`${id}`), sql`, `)})` : sql``}`
     );
     const count = affectedRows(updated);
     totalUpdated += count;
     results.push({ from: fromName, to: toName, fromId: fromCrit.id, toId: toCrit.id, updated: count });
   }
 
-  await audit(req.user!.userId, "fix_calibration_criteria", "calibrations", undefined, { results, totalUpdated }, undefined);
-  res.json({ totalUpdated, results });
+  const skippedClosedCycle = [...skipped].map(([eventId, eventName]) => ({ eventId, eventName, reason: "Ciclo fechado: só consulta — as calibrações deste evento não foram alteradas." }));
+  await audit(req.user!.userId, "fix_calibration_criteria", "calibrations", undefined, { results, totalUpdated, skippedClosedCycle }, undefined);
+  res.json({ totalUpdated, results, skippedClosedCycle });
 });
 
 export default router;

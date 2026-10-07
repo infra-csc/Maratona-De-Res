@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { KeyRound, GitMerge, X, RefreshCw, Hash, CreditCard, Search } from "lucide-react";
+import { KeyRound, GitMerge, X, RefreshCw, Hash, CreditCard, Search, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CONDENSED, WARNING, GOOD, GOOD_TEXT } from "@/lib/premium-theme";
 import { fieldStyle } from "./utils";
 
@@ -26,15 +27,45 @@ export function EmployeesHeader({
   createDialog: ReactNode;
 }) {
   return (
-    <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+    <section className="flex flex-col xl:flex-row xl:items-end justify-between gap-5">
       <div>
         <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>Colaboradores</h1>
         <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>Gestão do time e elegibilidade da Maratona</p>
       </div>
       {canEdit && (
-        <div className="flex flex-col sm:flex-row gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Telas menores que xl (tablet, notebook com menu aberto): as ações em
+              massa vão para "Mais ações" — antes os seis botões numa linha faziam a
+              página rolar de lado a 768. */}
           {canBulk && (
-            <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="button-employees-more-actions"
+                  className="xl:hidden h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                  style={mergeMode ? { backgroundColor: WARNING, color: "#fff" } : { border: "1px solid var(--border)" }}
+                >
+                  <MoreHorizontal size={16} aria-hidden /> Mais ações
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="p-1.5 min-w-[230px] rounded-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                {[
+                  { label: mergeMode ? "Cancelar mesclagem" : "Mesclar duplicatas", Icon: mergeMode ? X : GitMerge, on: onToggleMergeMode },
+                  { label: "Gerar acessos em massa", Icon: KeyRound, on: onOpenBulkAccess },
+                  { label: "Gerar senhas (casa)", Icon: Hash, on: onOpenBulkPin },
+                  { label: "Redefinir tipos", Icon: RefreshCw, on: onOpenResetTypes },
+                  { label: "Importar CPFs", Icon: CreditCard, on: onOpenBulkCpf },
+                ].map(a => (
+                  <DropdownMenuItem key={a.label} onClick={a.on} className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2.5 hover:bg-[var(--secondary)]">
+                    <a.Icon size={14} aria-hidden /> {a.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canBulk && (
+            <div className="hidden xl:flex flex-wrap gap-2.5">
               <button
                 type="button"
                 onClick={onToggleMergeMode}
@@ -79,7 +110,7 @@ export function EmployeesHeader({
               >
                 <CreditCard size={15} /> Importar CPFs
               </button>
-            </>
+            </div>
           )}
           {createDialog}
         </div>

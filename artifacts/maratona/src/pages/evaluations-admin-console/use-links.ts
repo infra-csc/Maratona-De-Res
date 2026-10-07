@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useState } from "react";
 import type { EventDetail } from "@workspace/api-client-react";
 import {
@@ -6,6 +7,7 @@ import {
   type AdminPublicToken,
 } from "@/lib/routing-api";
 import { CENOGRAFIA_AREA_ID, sameIdSet } from "./helpers";
+import { cenografiaItemsLabel } from "../evaluations/constants";
 import type { ToastFn } from "./use-event-mutations";
 import type { BatchLink, ConformityLinkDialogState, CritRow, EnrichedEvent, LinkDialogState } from "./types";
 
@@ -159,7 +161,7 @@ export function useLinkActions({ linkState, selected, selectedEventId, selectedD
     const hadCenoGroup = [...groups.values()].some(rows => rows[0].areaId === CENOGRAFIA_AREA_ID);
     if (!hadCenoGroup) {
       const cenoEvaluatorName = selectedDetail?.conformityEvaluatorName ?? "Sem avaliador";
-      const cenoBase: Omit<BatchLink, "url" | "error" | "reused"> = { key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true };
+      const cenoBase: Omit<BatchLink, "url" | "error" | "reused"> = { key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: [cenografiaItemsLabel(selectedDetail?.conformityWithoutConduta)], includeConformity: true };
       const existingCeno = pendingTokens.find(t => t.tokenType === "conformity_cenografia");
       if (existingCeno) {
         results.push({ ...cenoBase, url: evalUrl(existingCeno.id), error: null, reused: true });
@@ -195,7 +197,7 @@ export function useLinkActions({ linkState, selected, selectedEventId, selectedD
     const reused = results.filter(r => r.reused).length;
     const created = ok - reused;
     toast({
-      title: `${created} link(s) gerado(s)${reused > 0 ? ` · ${reused} reaproveitado(s)` : ""}${ok < results.length ? ` · ${results.length - ok} com erro` : ""}`,
+      title: `${plural(created, "link gerado", "links gerados")}${reused > 0 ? ` · ${plural(reused, "reaproveitado", "reaproveitados")}` : ""}${ok < results.length ? ` · ${results.length - ok} com erro` : ""}`,
     });
   }
 

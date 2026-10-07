@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { CONDENSED } from "@/lib/premium-theme";
 import { inkOn } from "./derive";
+import { faixaEdge } from "@/lib/utils";
 
 export const SERIES = "var(--viz-series-1)";
 export const SERIES_2 = "var(--viz-series-2)";
@@ -98,7 +99,7 @@ export function SearchPicker({ id, value, onChange, options, placeholder, emptyT
             className={`flex h-10 w-full items-center justify-between gap-2 rounded-md pl-3 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${current ? "pr-[68px]" : "pr-3"}`}
             style={{ backgroundColor: "var(--card)", border: "1px solid var(--input)", color: current ? "var(--foreground)" : "var(--muted-foreground)", fontWeight: current ? 600 : 400 }}>
             <span className="flex items-center gap-2 min-w-0">
-              {current?.color !== undefined && current && <span aria-hidden className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: current.color ?? "var(--muted-foreground)" }} />}
+              {current?.color !== undefined && current && <span aria-hidden className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: current.color ?? "var(--muted-foreground)", ...faixaEdge(current.color) }} />}
               <span className="truncate">{current ? current.label : placeholder}</span>
             </span>
             <ChevronsUpDown size={14} aria-hidden className={current ? "absolute right-3 top-1/2 -translate-y-1/2" : ""} style={{ color: "var(--muted-foreground)" }} />
@@ -123,7 +124,7 @@ export function SearchPicker({ id, value, onChange, options, placeholder, emptyT
               </CommandItem>
               {options.map(o => (
                 <CommandItem key={o.id} value={`${o.label} ${o.id}`} onSelect={() => { onChange(o.id); setOpen(false); }}>
-                  {o.color !== undefined && <span aria-hidden className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: o.color ?? "var(--muted-foreground)" }} />}
+                  {o.color !== undefined && <span aria-hidden className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: o.color ?? "var(--muted-foreground)", ...faixaEdge(o.color) }} />}
                   <span className="flex-1 truncate">{o.label}</span>
                   {o.hint && <span className="ml-2 text-[12px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>{o.hint}</span>}
                   {o.id === value && <Check size={14} className="ml-2" aria-hidden />}

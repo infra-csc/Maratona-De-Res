@@ -122,3 +122,14 @@ export function filterCalibratableEvents(
     return matchStatus && matchDate && matchText;
   });
 }
+
+/**
+ * Nota calibrada (0–10) no MESMO formato em todo lugar — campo, "→ nota" e
+ * histórico: vírgula e só as casas que existem ("8,5", "9", "8,25"). Antes o
+ * histórico mostrava "→ 8,50" e o campo "8,5".
+ */
+export function fmtCalScore(v: number | string | null | undefined): string {
+  if (v == null || v === "") return "—";
+  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : String(v);
+}

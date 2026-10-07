@@ -1,4 +1,4 @@
-import type { Event, EventCriterion, EventConformityInput } from "@workspace/api-client-react";
+import type { EventCriterion, EventConformityInput } from "@workspace/api-client-react";
 import type { useToast } from "@/hooks/use-toast";
 import type { useEventCriterionAssignments, usePublicLinkEligibleCriteria, useMyPrincipalAreas } from "@/lib/routing-api";
 
@@ -12,8 +12,6 @@ export interface ConformityEvalForm {
 
 export type ToastFn = ReturnType<typeof useToast>["toast"];
 
-export type EvalTab = "todo" | "done";
-
 export type ConformityLinkType = "cenografia" | "ferramentas";
 
 // Salva um pedaço da matriz no servidor e mostra `successTitle` no toast.
@@ -22,14 +20,6 @@ export type SaveConformityFn = (data: EventConformityInput, successTitle: string
 export type CriterionAssignmentRow = NonNullable<ReturnType<typeof useEventCriterionAssignments>["data"]>[number];
 export type PublicLinkEligibleCriterion = NonNullable<ReturnType<typeof usePublicLinkEligibleCriteria>["data"]>[number];
 export type PrincipalAreaRow = NonNullable<ReturnType<typeof useMyPrincipalAreas>["data"]>[number];
-
-export interface EvaluatorEventStat {
-  event: Event;
-  total: number;
-  submitted: number;
-  done: boolean;
-  relevant: boolean;
-}
 
 export interface AreaGroup {
   areaId: number;

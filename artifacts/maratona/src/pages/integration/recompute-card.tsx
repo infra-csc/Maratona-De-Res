@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { recomputeQuarter } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export function RecomputeCard() {
       const warnings = data.warnings ?? [];
       setRecomputeResult({ totalProcessed: data.totalProcessed, warnings });
       await qc.resetQueries();
-      toast({ title: `Ciclo recalculado — ${data.totalProcessed} colaborador(es) processado(s)${warnings.length > 0 ? ` · ${warnings.length} aviso(s)` : ""}` });
+      toast({ title: `Ciclo recalculado — ${plural(data.totalProcessed, "colaborador processado", "colaboradores processados")}${warnings.length > 0 ? ` · ${plural(warnings.length, "aviso")}` : ""}` });
     } catch (err: unknown) {
       toast({ title: "Falha ao recalcular", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
     } finally {
@@ -52,7 +53,7 @@ export function RecomputeCard() {
           <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
             {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
             <div>
-              <p>{recomputeResult.totalProcessed} colaborador(es) processado(s).</p>
+              <p>{plural(recomputeResult.totalProcessed, "colaborador processado", "colaboradores processados")}.</p>
               {recomputeResult.warnings.map((w, i) => (
                 <p key={i} className="text-xs mt-1 opacity-80">{w}</p>
               ))}

@@ -11,4 +11,10 @@ export interface PublicEvalCriterion {
   criterionName: string;
   /** @nullable */
   criterionDescription: string | null;
+  /** Já respondido pela área (por outra pessoa ou outro link) — não é cobrado e, se enviado, é recusado. */
+  closed?: boolean;
+  /** @nullable */
+  closedByName?: string | null;
+  /** @nullable */
+  closedAt?: Date | null;
 }

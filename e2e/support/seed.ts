@@ -22,6 +22,7 @@ import { createRequire } from "node:module";
 import type { PGlite } from "@electric-sql/pglite";
 import {
   ADMIN, AVALIADOR, AVALIADORA_LINK, ANA, AUDIT_EVENT, CRITERIA, DIEGO, ELISA, FABIO, FALTAS_EVENT, LINK_EVENT, REPO_ROOT, TARGET_EVENT,
+  AREA_E2E, AREA_ANA, AREA_BETO, AREA_CRITERION, AREA_EVENT, PREVIOUS_CYCLE, PREVIOUS_EVENT,
 } from "./env";
 
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "lib", "db", "migrations");
@@ -73,6 +74,7 @@ export async function seed(pg: PGlite): Promise<void> {
   statements.push(insert("areas", [
     { id: 1, name: "Operações", active: true },
     { id: 2, name: "Logística", active: true },
+    { id: AREA_E2E.id, name: AREA_E2E.name, active: true },
   ]));
 
   statements.push(insert("employees", [
@@ -88,15 +90,25 @@ export async function seed(pg: PGlite): Promise<void> {
     { id: ADMIN.id, name: ADMIN.name, email: "admin.e2e@exemplo.com", cpf_login: ADMIN.cpf, role: "admin", area_id: null },
     { id: AVALIADOR.id, name: AVALIADOR.name, email: "avaliador.e2e@exemplo.com", cpf_login: AVALIADOR.cpf, role: "avaliador", area_id: 1 },
     { id: AVALIADORA_LINK.id, name: AVALIADORA_LINK.name, email: "avaliadora.link.e2e@exemplo.com", cpf_login: AVALIADORA_LINK.cpf, role: "avaliador", area_id: 1 },
+    // avaliacao-por-area: dois avaliadores da mesma área, nenhum designado.
+    { id: AREA_ANA.id, name: AREA_ANA.name, email: "area.ana.e2e@exemplo.com", cpf_login: AREA_ANA.cpf, role: "avaliador", area_id: AREA_E2E.id },
+    { id: AREA_BETO.id, name: AREA_BETO.name, email: "area.beto.e2e@exemplo.com", cpf_login: AREA_BETO.cpf, role: "avaliador", area_id: AREA_E2E.id },
   ].map(u => ({ ...u, password_hash: bcrypt.hashSync(u.cpf_login, 8), active: true, must_change_password: false }))));
 
+  // O ciclo atual usa a avaliação POR ÁREA (cycles.area_evaluation): é o que o
+  // spec avaliacao-por-area exercita (avaliador da área responde sem designação;
+  // a primeira resposta enviada fecha o critério). Os designados dos outros
+  // specs continuam avaliando normalmente.
   statements.push(insert("cycles", [
-    { id: 1, name: "Ciclo E2E", start_date: isoDay(-200), end_date: isoDay(160), status: "open", is_current: true },
+    { id: 1, name: "Ciclo E2E", start_date: isoDay(-200), end_date: isoDay(160), status: "open", is_current: true, area_evaluation: true },
   ]));
 
   statements.push(insert("criteria", CRITERIA.map((c, i) => ({
     id: c.id, name: c.name, responsible_area_id: 1, default_weight: 50, active: true, display_order: i + 1, event_scoped: false,
   }))));
+  statements.push(insert("criteria", [{
+    id: AREA_CRITERION.id, name: AREA_CRITERION.name, responsible_area_id: AREA_E2E.id, default_weight: 50, active: true, display_order: 3, event_scoped: false,
+  }]));
 
   // Faixas de bônus (mesmos valores dos testes de rota / regra 2026).
   const FAIXAS: [string, string, number, number, number, number][] = [
@@ -151,6 +163,12 @@ export async function seed(pg: PGlite): Promise<void> {
     start_date: auditDay, end_date: auditDay, cycle_id: 1, status: "open", criteria_confirmed: true,
     results_confirmed: false, results_confirmed_at: null, results_confirmed_by: null, feedback_released: false,
   });
+  const areaDay = isoDay(-1);
+  events.push({
+    id: AREA_EVENT.id, name: AREA_EVENT.name, client_name: "Cliente Área E2E", city: "Itu", state: "SP",
+    start_date: areaDay, end_date: areaDay, cycle_id: 1, status: "open", criteria_confirmed: true,
+    results_confirmed: false, results_confirmed_at: null, results_confirmed_by: null, feedback_released: false,
+  });
   statements.push(insert("events", events));
 
   const participants: Row[] = [];
@@ -179,9 +197,24 @@ export async function seed(pg: PGlite): Promise<void> {
     eventCriteria.push({ event_id: AUDIT_EVENT.id, criterion_id: c.id, active: true, weight_override: 50 });
     calibrations.push({ event_id: AUDIT_EVENT.id, criterion_id: c.id, original_average_score: 8.5, calibrated_score: 8.5, calibration_reason: "Seed E2E", calibrated_by_user_id: ADMIN.id });
   }
+  // avaliacao-por-area: só o critério da área 3, sem designação de ninguém.
+  eventCriteria.push({ event_id: AREA_EVENT.id, criterion_id: AREA_CRITERION.id, active: true, weight_override: 50 });
   statements.push(insert("event_participants", participants));
   statements.push(insert("event_criteria", eventCriteria));
   statements.push(insert("calibrations", calibrations));
+  // Eventos já liberados (feedback_released): como a produção grava ao
+  // publicar ("Publicar final" — routes/feedback.ts, publish-final-all), cada
+  // critério leva a data/autor da publicação parcial e final e o RETRATO
+  // publicado (published_score/reason = a calibração). Sem isso a lista de
+  // Eventos mostrava "Rascunho" e "Calibrações 0/2" ao lado de "Pub. Final" —
+  // era só o seed, não a tela (a migração 0004 preencheu o retrato em produção).
+  statements.push(`UPDATE event_criteria ec
+       SET partial_published_at = e.results_confirmed_at, final_published_at = e.results_confirmed_at,
+           partial_published_by_user_id = ${ADMIN.id}, final_published_by_user_id = ${ADMIN.id},
+           published_score = cal.calibrated_score, published_reason = cal.calibration_reason
+      FROM events e, calibrations cal
+     WHERE e.id = ec.event_id AND e.feedback_released
+       AND cal.event_id = ec.event_id AND cal.criterion_id = ec.criterion_id;`);
 
   // Designação do avaliador no evento alvo: por área (sistema antigo) e por
   // critério (roteamento novo) — é o que a tela /evaluations usa para listar.
@@ -195,6 +228,30 @@ export async function seed(pg: PGlite): Promise<void> {
     // (mesma área → o admin gera UM questionário com os dois).
     ...CRITERIA.map(c => ({ event_id: LINK_EVENT.id, criterion_id: c.id, assigned_to_id: AVALIADORA_LINK.id, status: "pending" })),
   ]));
+
+  // seletor-de-ciclo: ciclo ANTERIOR fechado (antes do ciclo atual), com um
+  // evento confirmado e o resultado gravado de Ana (82) e Bruno (76).
+  const prevDay = isoDay(-300);
+  statements.push(insert("cycles", [
+    // min_events gravado no ciclo fechado (regra congelada nele, como em produção):
+    // a tela do ciclo anterior mostra "Mínimo 8 eventos" sem cair na regra geral.
+    { id: PREVIOUS_CYCLE.id, name: PREVIOUS_CYCLE.name, start_date: isoDay(-560), end_date: isoDay(-201), status: "closed", is_current: false, min_events: 8 },
+  ]));
+  statements.push(`UPDATE cycles SET closed_at = now() WHERE id = ${PREVIOUS_CYCLE.id};`);
+  statements.push(insert("events", [{
+    id: PREVIOUS_EVENT.id, name: PREVIOUS_EVENT.name, client_name: "Cliente E2E", city: "Santos", state: "SP",
+    start_date: prevDay, end_date: prevDay, cycle_id: PREVIOUS_CYCLE.id, status: "closed", criteria_confirmed: true,
+    results_confirmed: true, results_confirmed_at: `${prevDay} 20:00`, results_confirmed_by: ADMIN.id, feedback_released: true,
+  }]));
+  statements.push(insert("event_participants", [ANA.id, 2].map(emp => ({ event_id: PREVIOUS_EVENT.id, employee_id: emp, function_name: "Montador", confirmed: true }))));
+  statements.push(insert("quarterly_results", [
+    { employee_id: ANA.id, final: 82, platoon: "Verde", color: "#22c55e", bonus: 2200, status: "paid" },
+    { employee_id: 2, final: 76, platoon: "Branco Corrida", color: "#f1f5f9", bonus: 1700, status: "approved" },
+  ].map(r => ({
+    employee_id: r.employee_id, cycle_id: PREVIOUS_CYCLE.id, events_count: 1, participated_events_count: 1,
+    score_sum: r.final, gross_average: r.final, final_result: r.final, platoon: r.platoon, platoon_color: r.color,
+    bonus_value: r.bonus, eligible: true, bonus_status: r.status,
+  }))));
 
   for (const s of statements) {
     try {

@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -205,7 +206,7 @@ export function ResyncSummaryDialog({ summary, onClose }: { summary: ResyncSumma
             </div>
             {summary.skipped > 0 && (
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {summary.skipped} evento(s) pulado(s) por erro interno.
+                {plural(summary.skipped, "evento pulado", "eventos pulados")} por erro interno.
               </p>
             )}
             {summary.processed === 0 && summary.skipped === 0 && (
@@ -219,7 +220,7 @@ export function ResyncSummaryDialog({ summary, onClose }: { summary: ResyncSumma
                   <div key={ev.id} className="px-4 py-2 flex items-center justify-between gap-3" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                     <span className="font-bold uppercase text-xs truncate">{ev.name}</span>
                     <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
-                      +{ev.added} novo(s){ev.activated > 0 ? ` ↺${ev.activated} reativado(s)` : ""}{ev.deactivated > 0 ? ` -${ev.deactivated}` : ""}
+                      +{plural(ev.added, "novo", "novos")}{ev.activated > 0 ? ` ↺${plural(ev.activated, "reativado", "reativados")}` : ""}{ev.deactivated > 0 ? ` -${ev.deactivated}` : ""}
                     </span>
                   </div>
                 ))}

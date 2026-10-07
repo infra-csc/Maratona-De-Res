@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetEventsQueryKey } from "@workspace/api-client-react";
 import {
   eventCriterionAssignmentsKey, patchCriterionAssignment, useGenerateCriterionAssignments,
 } from "@/lib/routing-api";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, plural, todayBR } from "@/lib/utils";
+import { CONDENSED } from "@/lib/premium-theme";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { buildConformityRows, filterQueueEvents } from "./evaluations-admin-console/helpers";
+import { buildConformityRows, filterQueueEvents, readEventIdFromUrl } from "./evaluations-admin-console/helpers";
 import type {
   ConformityFilter, ConformityKey, ConsoleView, CritFilter, CritRow, EvaluatorsScope, QueueFilters, QueueSort, QueueTab,
 } from "./evaluations-admin-console/types";
@@ -75,7 +76,7 @@ export function AdminEvaluationsConsole() {
   } = linkState;
 
   // ---- Dados de todos os eventos + evento selecionado + enriquecimento ----
-  const { allUsers, cycleWeekends, evalIndex, enrichedEvents } = useConsoleData(selectedEventId, setSelectedEventId);
+  const { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode } = useConsoleData(selectedEventId, setSelectedEventId);
 
   const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? null;
   // Cabeçalho usado em todo texto copiado (links): "NOME DO EVENTO · dd/mm" —
@@ -88,11 +89,25 @@ export function AdminEvaluationsConsole() {
   // de uma vez — "confirmar que serão esses critérios e essas pessoas avaliando".
   const generateAssignments = useGenerateCriterionAssignments(selected?.id ?? 0);
 
-  const todoEvents = enrichedEvents.filter(e => !e.isDone);
-  const doneEvents = enrichedEvents.filter(e => e.isDone);
-  const baseTab = tab === "done" ? doneEvents : todoEvents;
+  // Abas da fila: partição única (events/rules.ts → queueTabFor). "A fazer" =
+  // aberto pela regra única (isOpenEvent) e não concluído; "A abrir" = ainda não
+  // abriu (não terminou / próximo ciclo); "Concluídos" = completo, fechado,
+  // histórico ou com publicação final.
+  const eventsOfTab = (t: QueueTab) => enrichedEvents.filter(e => e.queueTab === t);
+  const todoEvents = eventsOfTab("todo");
+  const waitingEvents = eventsOfTab("waiting");
+  const doneEvents = eventsOfTab("done");
+  const baseTab = tab === "done" ? doneEvents : tab === "waiting" ? waitingEvents : todoEvents;
+  // KPI "Eventos abertos": a regra única do app (isOpenEvent) — o mesmo número
+  // do cabeçalho de Eventos e de Ciclos.
+  const openCount = enrichedEvents.filter(e => e.isOpen).length;
+  // Ciclo por área: critérios a responder / respondidos nos eventos abertos.
+  const openEvents = enrichedEvents.filter(e => e.isOpen);
+  const answeredCount = openEvents.reduce((n, e) => n + e.done, 0);
+  const toAnswerCount = openEvents.reduce((n, e) => n + (e.total - e.done), 0);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // Hoje em Brasília (toISOString é UTC e virava o dia às 21h).
+  const todayStr = todayBR();
   const currentWeekend = cycleWeekends.find(w => w.sat <= todayStr && todayStr <= w.sun)
     ?? cycleWeekends.filter(w => w.sat <= todayStr).at(-1) ?? null;
   const currentWeekendDoneCount = currentWeekend
@@ -105,6 +120,55 @@ export function AdminEvaluationsConsole() {
 
   const queueFilters: QueueFilters = { q, areaFilter, evaluatorFilter, filterDateFrom, filterDateTo, sort, conformityFilter, noEvaluatorFilter };
   const queueEvents = filterQueueEvents(baseTab, queueFilters);
+
+  // Seleção acompanha a aba: ao trocar de aba, o painel da direita mostra o
+  // 1º evento da nova aba (ou fica vazio, se ela não tiver nenhum) — antes o
+  // painel continuava num evento que não estava na lista.
+  function changeTab(next: QueueTab) {
+    setTab(next);
+    const list = filterQueueEvents(eventsOfTab(next), queueFilters);
+    setSelectedEventId(list[0]?.id ?? null);
+  }
+
+  // Primeira carga: com ?eventId= (link "Avaliações" da tela de Eventos), a
+  // fila abre na aba do evento, com ele selecionado; sem ele, no 1º evento de
+  // "A fazer" (ou da primeira aba que tiver evento).
+  const urlEventId = useRef(readEventIdFromUrl());
+  const initialized = useRef(false);
+  const selectedFromUrl = useRef(false);
+  useEffect(() => {
+    if (initialized.current || enrichedEvents.length === 0) return;
+    const fromUrl = urlEventId.current != null ? enrichedEvents.find(e => e.id === urlEventId.current) : undefined;
+    initialized.current = true;
+    if (fromUrl) {
+      // Com ?eventId=, o evento da URL fica selecionado: o efeito abaixo ("volta
+      // para o 1º da aba") rodava no mesmo ciclo, ainda com a seleção vazia, e
+      // trocava o evento pedido pelo 1º de "A fazer" (achado na rodada 6).
+      setTab(fromUrl.queueTab);
+      setSelectedEventId(fromUrl.id);
+      selectedFromUrl.current = true;
+      return;
+    }
+    const first = (["todo", "waiting", "done"] as const).find(t => eventsOfTab(t).length > 0) ?? "todo";
+    setTab(first);
+    setSelectedEventId(filterQueueEvents(eventsOfTab(first), queueFilters)[0]?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedEvents]);
+
+  // O evento selecionado saiu da lista (ou foi limpo): volta para o 1º da aba.
+  useEffect(() => {
+    if (selectedFromUrl.current) { selectedFromUrl.current = false; return; }
+    if (!initialized.current || selectedEventId != null || view !== "assign") return;
+    const first = queueEvents[0];
+    if (first) setSelectedEventId(first.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedEvents, view]);
+
+  // Critérios/Tabela trabalham com um evento: sem seleção, o 1º do ciclo.
+  useEffect(() => {
+    if (view === "assign" || selectedEventId != null || enrichedEvents.length === 0) return;
+    setSelectedEventId(enrichedEvents[0].id);
+  }, [view, selectedEventId, enrichedEvents, setSelectedEventId]);
 
   // ---- Selected event detail (matriz de conformidade + confirmar resultados) ----
   const { selectedDetail, patchAssignment, setConformityEvaluatorMutation, setConformityEvaluatorFerramentasMutation } =
@@ -158,10 +222,10 @@ export function AdminEvaluationsConsole() {
     setBulkBusy(false);
     if (firstError == null) {
       setBulkAssignAreaId(null);
-      toast({ title: `${okCount} critério(s) atribuído(s)` });
+      toast({ title: `${plural(okCount, "critério atribuído", "critérios atribuídos")}` });
     } else {
       toast({
-        title: okCount > 0 ? `${okCount} de ${unassigned.length} critério(s) atribuído(s)` : "Erro ao atribuir critérios",
+        title: okCount > 0 ? `${okCount} de ${plural(unassigned.length, "critério atribuído", "critérios atribuídos")}` : "Erro ao atribuir critérios",
         description: firstError,
         variant: "destructive",
       });
@@ -173,22 +237,25 @@ export function AdminEvaluationsConsole() {
   const conformityRows = buildConformityRows(selectedDetail);
 
   // ---- KPIs + aba Avaliadores ----
-  const { pendingEvaluatorsCount, evaluatorCards, globalEvaluatorCards } =
+  const { pendingEvaluatorsCount, evaluatorCards, globalEvaluatorCards, globalAreaResponders, eventAreaResponders } =
     useEvaluatorStats({ enrichedEvents, selected, selectedDetail, conformityRows });
 
   return (
     <div className="space-y-5">
-      <ConsoleHeader view={view} setView={setView} isOperador={isOperador} />
+      <ConsoleHeader view={view} setView={setView} isOperador={isOperador} areaMode={cycleAreaMode} />
 
       <KpiStrip
-        todoCount={todoEvents.length}
+        openCount={openCount}
         selected={selected}
         currentWeekendDoneCount={currentWeekendDoneCount}
         pendingEvaluatorsCount={pendingEvaluatorsCount}
         noEvaluatorFilter={noEvaluatorFilter}
         setNoEvaluatorFilter={setNoEvaluatorFilter}
         setView={setView}
-        setTab={setTab}
+        setTab={changeTab}
+        areaMode={cycleAreaMode}
+        toAnswerCount={toAnswerCount}
+        answeredCount={answeredCount}
       />
 
       {enrichedEvents.length === 0 ? (
@@ -200,8 +267,9 @@ export function AdminEvaluationsConsole() {
           {/* Coluna esquerda — fila de eventos */}
           <EventQueue
             tab={tab}
-            setTab={setTab}
+            setTab={changeTab}
             todoCount={todoEvents.length}
+            waitingCount={waitingEvents.length}
             doneCount={doneEvents.length}
             filters={queueFilters}
             setQ={setQ}
@@ -223,6 +291,20 @@ export function AdminEvaluationsConsole() {
           />
 
           {/* Coluna direita — matriz de atribuição do evento selecionado */}
+          {!selected && (
+            <div data-testid="panel-empty" className="rounded-xl py-16 px-6 text-center" style={{ backgroundColor: "var(--card)", border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
+              <p className="text-[13px] font-bold uppercase" style={{ fontFamily: CONDENSED }}>
+                {baseTab.length === 0
+                  ? tab === "todo" ? "Nada a fazer agora" : tab === "waiting" ? "Nenhum evento a abrir" : "Nenhum evento concluído ainda"
+                  : "Escolha um evento na lista"}
+              </p>
+              <p className="text-[12px] mt-1">
+                {baseTab.length === 0
+                  ? tab === "todo" ? "Nenhum evento aberto está esperando avaliação." : "Esta aba não tem eventos neste ciclo."
+                  : "Os critérios e os avaliadores do evento aparecem aqui."}
+              </p>
+            </div>
+          )}
           {selected && (
             <EventAssignmentPanel
               selected={selected}
@@ -290,7 +372,8 @@ export function AdminEvaluationsConsole() {
             handleAssign={handleAssign}
             openLinkDialog={openLinkDialog}
             setConformityLinkDialog={setConformityLinkDialog}
-            setOpenConformityPicker={setOpenConformityPicker}
+            // O seletor da Matriz vive na aba de eventos: abre lá, já aberto.
+            setOpenConformityPicker={(k) => { setOpenConformityPicker(k); setView("assign"); }}
           />
         )
       ) : (
@@ -305,6 +388,9 @@ export function AdminEvaluationsConsole() {
           toast={toast}
           setEvaluatorFilter={setEvaluatorFilter}
           setView={setView}
+          areaMode={cycleAreaMode}
+          globalAreaResponders={globalAreaResponders}
+          eventAreaResponders={eventAreaResponders}
         />
       )}
 

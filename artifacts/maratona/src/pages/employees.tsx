@@ -25,6 +25,7 @@ import { BODY } from "@/lib/premium-theme";
 import { ConfirmDialog } from "@/components/shared";
 import { Textarea } from "@/components/ui/textarea";
 import { invalidateCycleResults } from "@/lib/invalidate-results";
+import { plural } from "@/lib/utils";
 import type { BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
 import { cycleStatus, getEligibilityStatus, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
 import { EmployeesFilters, EmployeesHeader, EmployeesKpis } from "./employees/employees-header";
@@ -323,7 +324,7 @@ export default function EmployeesPage() {
     try {
       await bulkEmploymentReset({ casaIds: Array.from(casaSelection) });
       await qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
-      toast({ title: "Tipos atualizados", description: `${casaSelection.size} colaborador(es) Casa. Demais marcados como Freela. Ranking recalculado.` });
+      toast({ title: "Tipos atualizados", description: `${plural(casaSelection.size, "colaborador", "colaboradores")} Casa. Demais marcados como Freela. Ranking recalculado.` });
       setResetTypeOpen(false);
     } catch (e) {
       toast({ title: "Não foi possível atualizar os tipos", description: serverErrorMessage(e, "Não foi possível atualizar os tipos. Tente novamente."), variant: "destructive" });

@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useState } from "react";
 import { bulkUpdateUserEmails } from "@workspace/api-client-react";
 import type { EmailMigrationPreviewItem } from "@workspace/api-client-react";
@@ -19,7 +20,7 @@ export function useEmailMigration(qKey: QueryKey) {
     try {
       const data = await bulkUpdateUserEmails({ dryRun });
       if (!dryRun) {
-        toast({ title: `${data.updated ?? 0} e-mail(s) atualizado(s) com sucesso` });
+        toast({ title: `${plural(data.updated ?? 0, "e-mail atualizado", "e-mails atualizados")} com sucesso` });
         qc.invalidateQueries({ queryKey: qKey });
         setEmailMigOpen(false);
         setEmailMigPreview(null);

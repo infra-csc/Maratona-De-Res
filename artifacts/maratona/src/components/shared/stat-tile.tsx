@@ -11,6 +11,8 @@ export interface StatTileProps {
   hero?: boolean;
   /** Tamanho do número: "lg" para telas com poucos indicadores. */
   size?: "md" | "lg";
+  /** Classes extras do contêiner (ex.: "col-span-2" no último cartão ímpar do celular). */
+  className?: string;
   "data-testid"?: string;
 }
 
@@ -18,11 +20,11 @@ export interface StatTileProps {
  * Indicador numérico (KPI). Usado em Análises e Ciclos para os números terem
  * a mesma hierarquia em todo o app. O `hero` usa as cores primárias do tema.
  */
-export function StatTile({ label, value, detail, hero, size = "md", ...rest }: StatTileProps) {
+export function StatTile({ label, value, detail, hero, size = "md", className, ...rest }: StatTileProps) {
   return (
     <div
       data-testid={rest["data-testid"]}
-      className="rounded-xl px-4 py-3.5 flex flex-col justify-between min-w-0"
+      className={`rounded-xl px-4 py-3.5 flex flex-col justify-between min-w-0${className ? ` ${className}` : ""}`}
       style={{
         backgroundColor: hero ? "var(--primary)" : "var(--card)",
         border: `1px solid ${hero ? "var(--primary)" : "var(--border)"}`,

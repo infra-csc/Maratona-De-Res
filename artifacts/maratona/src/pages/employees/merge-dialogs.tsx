@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { MergeEmployeeResult } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GitMerge } from "lucide-react";
@@ -23,7 +24,7 @@ export function MergeActionBar({
   return (
     <section className="sticky bottom-4 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4" style={{ backgroundColor: "var(--card)", border: `1px solid var(--primary)` }}>
       <div className="flex-1">
-        <p className="font-black uppercase text-sm">{selectedIds.size} colaboradores selecionados</p>
+        <p className="font-black uppercase text-sm">{plural(selectedIds.size, "colaborador selecionado", "colaboradores selecionados")}</p>
         <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Selecione qual é o CANÔNICO (o que permanece):</p>
         <div className="flex flex-wrap gap-2 mt-2">
           {Array.from(selectedIds).map(id => {
@@ -125,11 +126,11 @@ export function MergeResultDialog({
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="rounded-lg p-4 space-y-2 text-sm" style={{ backgroundColor: "var(--secondary)" }}>
-            <p><span className="font-black">{mergeResult?.merged.length ?? 0}</span> duplicata(s) removida(s)</p>
+            <p><span className="font-black">{mergeResult?.merged.length ?? 0}</span> {(mergeResult?.merged.length ?? 0) === 1 ? "duplicata removida" : "duplicatas removidas"}</p>
             <p><span className="font-black">{mergeResult?.movedParticipations ?? 0}</span> participações transferidas</p>
             {(mergeResult?.movedAbsences ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedAbsences}</span> penalidades/méritos transferidos</p>}
             {(mergeResult?.movedEvaluatorEvals ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedEvaluatorEvals}</span> avaliações de avaliador transferidas</p>}
-            {(mergeResult?.removedUsers ?? 0) > 0 && <p style={{ color: DANGER_TEXT }}><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
+            {(mergeResult?.removedUsers ?? 0) > 0 && <p style={{ color: DANGER_TEXT }}><span className="font-black">{mergeResult?.removedUsers}</span> {mergeResult?.removedUsers === 1 ? "conta de usuário desativada" : "contas de usuário desativadas"}</p>}
           </div>
           <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
           <div className="flex justify-end pt-2" style={{ borderTop: "1px solid var(--border)" }}>

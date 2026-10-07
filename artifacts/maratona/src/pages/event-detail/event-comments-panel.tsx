@@ -17,7 +17,8 @@ const COMMENT_ROLE_LABELS: Record<string, string> = {
 
 const COMMENT_TS_OPTS: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 
-export function EventCommentsPanel({ eventId }: { eventId: number }) {
+/** readOnly: evento de ciclo fechado (só consulta) — lê os comentários, não escreve. */
+export function EventCommentsPanel({ eventId, readOnly = false }: { eventId: number; readOnly?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -48,7 +49,7 @@ export function EventCommentsPanel({ eventId }: { eventId: number }) {
   const trimmed = message.trim();
 
   const submit = () => {
-    if (!trimmed || createComment.isPending) return;
+    if (readOnly || !trimmed || createComment.isPending) return;
     createComment.mutate({ id: eventId, data: { message: trimmed } });
   };
 
@@ -63,11 +64,11 @@ export function EventCommentsPanel({ eventId }: { eventId: number }) {
           {isLoading ? (
             <p className="text-xs font-bold uppercase text-center py-4" style={{ color: "var(--muted-foreground)" }}>Carregando...</p>
           ) : !comments || comments.length === 0 ? (
-            <p className="text-xs font-bold uppercase text-center py-4" style={{ color: "var(--muted-foreground)" }}>Nenhum comentário ainda. Seja o primeiro a comentar.</p>
+            <p className="text-xs font-bold uppercase text-center py-4" style={{ color: "var(--muted-foreground)" }}>{readOnly ? "Nenhum comentário neste evento." : "Nenhum comentário ainda. Seja o primeiro a comentar."}</p>
           ) : (
             comments.map(c => {
               const isOwner = !!user && user.id === c.userId;
-              const canDelete = isOwner || canManage;
+              const canDelete = !readOnly && (isOwner || canManage);
               return (
                 <div key={c.id} data-testid={`comment-${c.id}`} className="rounded-lg p-3 flex items-start gap-3 group" style={{ backgroundColor: "var(--secondary)" }}>
                   <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-[11px]" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
@@ -104,6 +105,11 @@ export function EventCommentsPanel({ eventId }: { eventId: number }) {
             })
           )}
         </div>
+        {readOnly ? (
+          <p className="pt-3 text-xs" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }} data-testid="comments-readonly">
+            Ciclo fechado — os comentários ficam só para consulta. Não é possível escrever ou apagar comentários neste evento.
+          </p>
+        ) : (
         <div className="flex items-start gap-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           <Textarea
             data-testid="textarea-new-comment"
@@ -127,6 +133,7 @@ export function EventCommentsPanel({ eventId }: { eventId: number }) {
             {createComment.isPending ? "Enviando..." : "Enviar"}
           </button>
         </div>
+        )}
       </div>
     </section>
   );

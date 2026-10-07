@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { CycleMovedEventsItem } from './cycleMovedEventsItem';
 
 export interface Cycle {
   id: number;
@@ -19,4 +20,29 @@ export interface Cycle {
   closedAt?: string | null;
   /** @nullable */
   createdAt?: string | null;
+  /**
+     * Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+     * @nullable
+     */
+  minEvents?: number | null;
+  /**
+     * Data prevista do pagamento do bônus (AAAA-MM-DD)
+     * @nullable
+     */
+  paymentDate?: string | null;
+  /** Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta) */
+  conformityWithoutConduta?: boolean;
+  /** Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação) */
+  areaEvaluation?: boolean;
+  /** Mínimo que vale de fato (o do ciclo ou, se vazio, o global) */
+  effectiveMinEvents?: number;
+  /**
+     * Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo
+     * (com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.
+     */
+  movedEvents?: CycleMovedEventsItem[];
+  /** Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo) */
+  movedAbsences?: number;
+  /** Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado) */
+  warnings?: string[];
 }

@@ -3,6 +3,7 @@ import { CheckCircle2, Link2 } from "lucide-react";
 import { CONDENSED, GOOD, GOOD_TEXT } from "@/lib/premium-theme";
 import { STATE_CFG } from "./helpers";
 import { InlinePicker } from "./pickers";
+import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import type { SelectedEventDetail } from "./use-event-mutations";
 import type { ConformityKey, ConformityLinkDialogState, ConformityRow, EnrichedEvent } from "./types";
 
@@ -29,9 +30,19 @@ export function ConformityAssignmentList(props: {
     setConformityLinkDialog, setConformityLinkRecipientName, setConformityLinkUrl, setConformityLinkCopied,
     setConformityEvaluatorMutation, setConformityEvaluatorFerramentasMutation,
   } = props;
+  // Evento do próximo ciclo: a API recusa link e resposta (409 EVENT_NEXT_CYCLE)
+  // até o ciclo novo existir — sem "Link", com a frase única. O responsável
+  // da Matriz pode ser escolhido já (preparação).
+  const nextCycle = selected.nextCycle;
+  const canLink = canManage && !nextCycle;
   return (
     <>
       <p className="text-[11px] font-bold uppercase tracking-wide mt-[18px] mb-2.5" style={{ color: "var(--muted-foreground)" }}>Matriz de conformidade</p>
+      {nextCycle && canManage && (
+        <p data-testid="matrix-next-cycle-note" className="mb-2.5 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
+          {NEXT_CYCLE_NOTICE}
+        </p>
+      )}
       <div className="flex flex-col gap-2.5">
         {conformityRows.map(cf => {
           const complete = cf.total > 0 && cf.filled === cf.total;
@@ -57,13 +68,13 @@ export function ConformityAssignmentList(props: {
                       <CheckCircle2 size={11} /> Ver
                     </button>
                   )}
-                  {canManage && (
+                  {canLink && (
                     <button
                       type="button"
                       onClick={() => { setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName }); setConformityLinkRecipientName(""); setConformityLinkUrl(null); setConformityLinkCopied(false); }}
                       className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase flex items-center gap-1 transition-colors hover:opacity-80"
                       style={{ border: "1px solid var(--border)" }}
-                      title="Gerar link de conformidade para freelancer"
+                      title="Gerar link de conformidade para freela"
                     >
                       <Link2 size={11} /> Link
                     </button>

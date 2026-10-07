@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ export function DedupeEvaluationsCard() {
       onSuccess: (data) => {
         toast({
           title: "Duplicatas removidas",
-          description: `${data.duplicatesRemoved} avaliação(ões) duplicada(s) apagada(s) em ${data.eventsAffected} evento(s). Resultados recalculados.`,
+          description: `${plural(data.duplicatesRemoved, "avaliação duplicada apagada", "avaliações duplicadas apagadas")} em ${plural(data.eventsAffected, "evento")}. Resultados recalculados.`,
         });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
@@ -205,7 +206,7 @@ export function FixCalibrationCriteriaCard() {
             <DialogDescription>
               {(fixCalResult?.totalUpdated ?? 0) === 0
                 ? "Nenhuma calibração precisou ser atualizada — já estão com os IDs corretos."
-                : `${fixCalResult?.totalUpdated} calibração(ões) atualizadas com sucesso.`}
+                : `${plural(fixCalResult?.totalUpdated ?? 0, "calibração atualizada", "calibrações atualizadas")} com sucesso.`}
             </DialogDescription>
           </DialogHeader>
           {fixCalResult && (fixCalResult.results?.length ?? 0) > 0 && (
@@ -250,7 +251,7 @@ export function MigrateCriteriaCatalogCard() {
       onSuccess: (data) => {
         toast({
           title: "Migração concluída",
-          description: `${data.catalogActivated} quesito(s) ativado(s), ${data.catalogDeactivated} desativado(s), ${data.catalogCreated} criado(s). ${data.eventCriteriaFixed} evento(s) atualizados. ${(data as { evaluationsRemapped?: number }).evaluationsRemapped ?? 0} avaliação(ões) remapeadas para o catálogo novo.`,
+          description: `${plural(data.catalogActivated, "quesito ativado", "quesitos ativados")}, ${plural(data.catalogDeactivated, "desativado", "desativados")}, ${plural(data.catalogCreated, "criado", "criados")}. ${plural(data.eventCriteriaFixed, "evento atualizado", "eventos atualizados")}. ${plural((data as { evaluationsRemapped?: number }).evaluationsRemapped ?? 0, "avaliação remapeada", "avaliações remapeadas")} para o catálogo novo.`,
         });
         qc.invalidateQueries();
       },
@@ -349,7 +350,7 @@ export function FixOrphanedEvaluationsCard() {
             <DialogDescription>
               {(fixOrphanedResult?.fixed ?? 0) === 0
                 ? "Nenhum quesito órfão encontrado — tudo já está correto."
-                : `${fixOrphanedResult?.fixed} quesito(s) reativados em ${fixOrphanedResult?.eventsAffected} evento(s).`}
+                : `${plural(fixOrphanedResult?.fixed ?? 0, "quesito reativado", "quesitos reativados")} em ${plural(fixOrphanedResult?.eventsAffected ?? 0, "evento")}.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

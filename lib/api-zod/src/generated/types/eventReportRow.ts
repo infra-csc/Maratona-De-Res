@@ -10,6 +10,9 @@ import type { EventReportRowTeamItem } from './eventReportRowTeamItem';
 
 export interface EventReportRow {
   id: number;
+  /** Ciclo do evento (útil no Total geral) */
+  cycleId?: number;
+  cycleName?: string;
   name: string;
   /** @nullable */
   clientName?: string | null;

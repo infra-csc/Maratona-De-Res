@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { getGetEventsQueryKey, bulkSyncEventDates, type BulkDateSyncResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -56,7 +57,7 @@ export function DateSyncCard() {
         setDateSyncServerPreview(null);
         toast({
           title: "Nenhuma data para atualizar",
-          description: `As ${data.unchanged} data(s) localizada(s) já estão corretas${data.notFound > 0 ? `; ${data.notFound} evento(s) não encontrado(s) no banco` : ""}.`,
+          description: `${data.unchanged === 1 ? "A data localizada já está correta" : `As ${data.unchanged} datas localizadas já estão corretas`}${data.notFound > 0 ? `; ${plural(data.notFound, "evento não encontrado", "eventos não encontrados")} no banco` : ""}.`,
         });
         return;
       }
@@ -77,7 +78,7 @@ export function DateSyncCard() {
       setDateSyncServerPreview(null);
       setDateSyncPreview(null);
       qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      toast({ title: `${data.updated} evento(s) atualizado(s)${data.notFound > 0 ? `, ${data.notFound} não encontrado(s)` : ""}` });
+      toast({ title: `${plural(data.updated, "evento atualizado", "eventos atualizados")}${data.notFound > 0 ? `, ${plural(data.notFound, "não encontrado", "não encontrados")}` : ""}` });
     } catch (err: unknown) {
       toast({ title: "Falha ao atualizar datas", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
     } finally {
@@ -113,7 +114,7 @@ export function DateSyncCard() {
         {dateSyncPreview && (
           <div className="space-y-3">
             <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-[var(--info)]">{dateSyncPreview.length} evento(s) encontrado(s) na planilha</span>
+              <span className="text-sm font-bold text-[var(--info)]">{plural(dateSyncPreview.length, "evento encontrado", "eventos encontrados")} na planilha</span>
               <span className="text-xs text-[var(--info)]">{dateSyncPreview[0]?.date} → {dateSyncPreview[dateSyncPreview.length - 1]?.date}</span>
             </div>
             <div className="max-h-40 overflow-y-auto border rounded-lg divide-y text-xs">
@@ -141,9 +142,9 @@ export function DateSyncCard() {
         <ConfirmDialog
           open={!!dateSyncServerPreview}
           onOpenChange={(open) => { if (!open) setDateSyncServerPreview(null); }}
-          title={`Atualizar datas de ${dateSyncServerPreview?.changeCount ?? 0} evento(s)`}
+          title={`Atualizar datas de ${plural(dateSyncServerPreview?.changeCount ?? 0, "evento")}`}
           description={dateSyncServerPreview
-            ? `Grava direto em produção: início = fim = data da planilha${dateSyncServerPreview.unchanged > 0 ? `; ${dateSyncServerPreview.unchanged} evento(s) já estão corretos e ficam como estão` : ""}${dateSyncServerPreview.notFound > 0 ? `; ${dateSyncServerPreview.notFound} linha(s) sem evento correspondente serão ignoradas` : ""}.`
+            ? `Grava direto em produção: início = fim = data da planilha${dateSyncServerPreview.unchanged > 0 ? `; ${dateSyncServerPreview.unchanged === 1 ? "1 evento já está correto e fica como está" : `${dateSyncServerPreview.unchanged} eventos já estão corretos e ficam como estão`}` : ""}${dateSyncServerPreview.notFound > 0 ? `; ${dateSyncServerPreview.notFound === 1 ? "1 linha sem evento correspondente será ignorada" : `${dateSyncServerPreview.notFound} linhas sem evento correspondente serão ignoradas`}` : ""}.`
             : undefined}
           confirmLabel="Aplicar"
           confirmText="APLICAR"
@@ -176,7 +177,7 @@ export function DateSyncCard() {
           <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
             <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
             <div>
-              <p>{dateSyncResult.updated} evento(s) atualizado(s){dateSyncResult.notFound > 0 ? `, ${dateSyncResult.notFound} ID(s) não encontrado(s) no banco` : " com sucesso."}.</p>
+              <p>{plural(dateSyncResult.updated, "evento atualizado", "eventos atualizados")}{dateSyncResult.notFound > 0 ? `, ${plural(dateSyncResult.notFound, "ID não encontrado", "IDs não encontrados")} no banco.` : " com sucesso."}</p>
               {dateSyncResult.notFoundIds.length > 0 && (
                 <p className="text-xs mt-1 opacity-70">IDs não encontrados: {dateSyncResult.notFoundIds.join(", ")}</p>
               )}

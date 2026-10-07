@@ -121,10 +121,10 @@ export function AbsencesFiltersBar({ filters, events }: { filters: AbsenceFilter
       </div>
       <div className="flex gap-3 flex-wrap items-center">
         <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: DANGER_TEXT }}>
-          <AlertTriangle size={13} /> Desconto: <span className="text-sm font-black">−{totalPenaltyPoints}</span> pts
+          <AlertTriangle size={13} aria-hidden /> {totalPenaltyPoints > 0 ? <>Desconto: <span className="text-sm font-black">−{totalPenaltyPoints}</span> pts</> : "Sem desconto"}
         </div>
         <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.15)", color: "var(--accent-text)" }}>
-          <Award size={13} /> Bônus: <span className="text-sm font-black">+{totalMeritPoints}</span> pts
+          <Award size={13} aria-hidden /> {totalMeritPoints > 0 ? <>Bônus: <span className="text-sm font-black">+{totalMeritPoints}</span> pts</> : "Sem bônus"}
         </div>
         {hasActiveFilters && (
           <button

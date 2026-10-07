@@ -3,9 +3,8 @@
 import type React from "react";
 import { AlertCircle, Check, Clock, Save } from "lucide-react";
 import { AMBER, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
-import { formatDateTime } from "./helpers";
+import { fmtCalScore, formatDateTime } from "./helpers";
 import type { CalibrationRecord } from "./derive";
-import { fmtNum } from "@/lib/utils";
 
 export type CalibrationReasonEditorProps = {
   criterionId: number;
@@ -40,7 +39,7 @@ export function CalibrationReasonEditor({
                                     <span className="text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
                                   )}
                                   {calVal != null && (
-                                    <span className="text-[11px] font-black" style={{ color: GOOD_TEXT }}>→ {fmtNum(calVal, 2)}</span>
+                                    <span className="text-[11px] font-black" style={{ color: GOOD_TEXT }}>→ {fmtCalScore(calVal)}</span>
                                   )}
                                   {cal?.calibratedAt && (
                                     <span className="text-[11px] flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }}>

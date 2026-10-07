@@ -1,16 +1,19 @@
 import { Router } from "express";
 import {
   db, quarterlyResultsTable, employeesTable, absencesTable, eventsTable,
-  eventParticipantsTable, platoonRulesTable, employeeCycleEligibilityTable,
+  eventParticipantsTable, platoonRulesTable, employeeCycleEligibilityTable, cyclesTable,
 } from "@workspace/db";
-import { eq, and, sql, exists } from "drizzle-orm";
+import { eq, and, sql, exists, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, calculateQuarterFinalResult, roundFinalResult } from "../lib/calculations.js";
-import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
+import { getCurrentCycleId, getMinEventsForEligibility, getMinEventsByCycle, eventWithinItsCycleSql } from "../lib/cycle.js";
+import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
+import { rankingScope } from "../lib/ranking-scope.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResultsBatch } from "./results.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 import { pgNum } from "../lib/pg-num.js";
+import { totalGeralByPerson, totalGeralSummary } from "../lib/total-geral.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -18,8 +21,11 @@ router.use(requireAuth);
 router.get("/ranking", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { search } = req.query;
   const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json([]); return; }
+  // ?cycleId= vazio = ciclo atual; id = aquele ciclo (anterior: só consulta).
+  const scoped = await resolveCycleScope(req.query.cycleId, { allowAll: false });
+  if (sendScopeError(res, scoped)) return;
+  if (!scoped.scope || scoped.scope.kind !== "cycle") { res.json([]); return; }
+  const { cycle, isCurrent } = scoped.scope;
 
   const [results, platoonRuleRows] = await Promise.all([
     db
@@ -40,7 +46,8 @@ router.get("/ranking", requireRole("admin", "rh", "diretoria"), async (req, res)
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
-        eq(employeesTable.active, true),
+        // Ciclo atual: só ativos. Anterior: o histórico mantém quem saiu depois.
+        isCurrent ? eq(employeesTable.active, true) : undefined,
         // O cargo GLOBAL cadastrado é a fonte da verdade (mesma regra de
         // participantCountsForScore): se o colaborador está hoje classificado
         // como "Sup Ceno *" (participação informativa), ele nunca deve
@@ -100,6 +107,130 @@ router.get("/ranking", requireRole("admin", "rh", "diretoria"), async (req, res)
 });
 
 /**
+ * GET /ranking/total — "Total geral" de Resultados & Ranking: uma linha por
+ * pessoa somando TODOS os ciclos (snapshot de quarterly_results de cada um).
+ *  - cyclesWithScore = ciclos em que teve evento com nota;
+ *  - avgFinalResult  = MÉDIA PONDERADA PELOS EVENTOS (regra do dono, 06/10):
+ *                      Σ(nota final do ciclo × eventos com nota) ÷ Σ eventos
+ *                      com nota — um ciclo com 12 eventos pesa mais que um de 3;
+ *  - eventsCount     = soma dos eventos com nota; participatedEventsCount idem;
+ *  - bonusOfficial   = bônus dos ciclos FECHADOS em que foi elegível (oficial);
+ *  - bonusProjected  = bônus do ciclo ATUAL ainda aberto (projeção, muda até
+ *                      o fechamento);
+ *  - bonusTotal      = bonusOfficial + bonusProjected (compatibilidade);
+ *  - bonusPaid       = soma do bônus marcado como pago;
+ *  - minEvents (por ciclo, em cycles[]) = o mínimo que vale em cada ciclo;
+ *  - latest          = faixa/nota do ciclo MAIS RECENTE dele (não existe faixa
+ *                      "do total": cada ciclo tem a sua).
+ * Mesmo recorte do Ranking em cada ciclo (rankingScope): no atual só ativos;
+ * nos anteriores o histórico mantém quem saiu depois. Somente leitura.
+ */
+router.get("/ranking/total", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
+  const [cycles, currentId] = await Promise.all([
+    db.select().from(cyclesTable).orderBy(desc(cyclesTable.isCurrent), sql`${cyclesTable.startDate} DESC NULLS LAST`, desc(cyclesTable.id)),
+    getCurrentCycleId(),
+  ]);
+  if (cycles.length === 0) { res.json({ cycles: [], rows: [], summary: totalGeralSummary([], () => false) }); return; }
+  const order = new Map(cycles.map((c, i) => [c.id, i])); // 0 = mais recente
+  const cycleById = new Map(cycles.map(c => [c.id, c]));
+
+  const minByCycle = await getMinEventsByCycle(cycles.map(c => c.id));
+  // Bônus oficial = ciclo fechado. O ciclo aberto (o atual, ou um anterior que
+  // ficou aberto) é projeção.
+  const isOfficial = (cycleId: number) => cycleById.get(cycleId)?.status === "closed";
+
+  const results = await db.select({
+    employeeId: quarterlyResultsTable.employeeId,
+    employeeName: employeesTable.name,
+    employeeActive: employeesTable.active,
+    cycleId: quarterlyResultsTable.cycleId,
+    finalResult: quarterlyResultsTable.finalResult,
+    platoon: quarterlyResultsTable.platoon,
+    platoonColor: quarterlyResultsTable.platoonColor,
+    bonusValue: quarterlyResultsTable.bonusValue,
+    eligible: quarterlyResultsTable.eligible,
+    bonusStatus: quarterlyResultsTable.bonusStatus,
+    eventsCount: quarterlyResultsTable.eventsCount,
+    participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+    totalAbsences: quarterlyResultsTable.totalAbsences,
+  }).from(quarterlyResultsTable)
+    .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    .where(rankingScope({ activeOnlyInCycleId: currentId }));
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const byPerson = new Map<number, typeof results>();
+  for (const r of results) {
+    if (!cycleById.has(r.cycleId)) continue;
+    const list = byPerson.get(r.employeeId) ?? [];
+    list.push(r);
+    byPerson.set(r.employeeId, list);
+  }
+
+  // Média ponderada e bônus oficial × projetado: a MESMA função do Dashboard
+  // e de Análises (lib/total-geral.ts).
+  const totalRows = [...byPerson.values()].flat().map(r => ({ employeeId: r.employeeId, cycleId: r.cycleId, finalResult: pgNum(r.finalResult), eventsCount: r.eventsCount, eligible: r.eligible, bonusValue: pgNum(r.bonusValue) }));
+  const totals = totalGeralByPerson(totalRows, isOfficial);
+  const rows = [...byPerson.entries()].map(([employeeId, list]) => {
+    const sorted = [...list].sort((a, b) => (order.get(a.cycleId) ?? 0) - (order.get(b.cycleId) ?? 0));
+    const scored = sorted.filter(r => r.eventsCount > 0);
+    const latest = sorted[0];
+    const { avgFinalResult, bonusOfficial, bonusProjected } = totals.get(employeeId)!;
+    return {
+      employeeId,
+      employeeName: latest.employeeName ?? `Colaborador #${employeeId}`,
+      employeeActive: latest.employeeActive,
+      cyclesCount: sorted.length,
+      cyclesWithScore: scored.length,
+      avgFinalResult,
+      eventsCount: sorted.reduce((s, r) => s + r.eventsCount, 0),
+      participatedEventsCount: sorted.reduce((s, r) => s + r.participatedEventsCount, 0),
+      totalAbsences: sorted.reduce((s, r) => s + r.totalAbsences, 0),
+      eligibleCycles: sorted.filter(r => r.eligible).length,
+      bonusOfficial,
+      bonusProjected,
+      bonusTotal: r2(bonusOfficial + bonusProjected),
+      bonusPaid: r2(sorted.reduce((s, r) => s + (r.bonusStatus === "paid" ? pgNum(r.bonusValue) : 0), 0)),
+      latest: {
+        cycleId: latest.cycleId,
+        cycleName: cycleById.get(latest.cycleId)!.name,
+        finalResult: pgNum(latest.finalResult),
+        platoon: latest.platoon,
+        platoonColor: latest.platoonColor,
+      },
+      cycles: sorted.map(r => {
+        const c = cycleById.get(r.cycleId)!;
+        return {
+          cycleId: r.cycleId,
+          cycleName: c.name,
+          cycleStatus: c.status,
+          isCurrent: r.cycleId === currentId,
+          finalResult: pgNum(r.finalResult),
+          platoon: r.platoon,
+          platoonColor: r.platoonColor,
+          eventsCount: r.eventsCount,
+          participatedEventsCount: r.participatedEventsCount,
+          eligible: r.eligible,
+          bonusValue: r.eligible ? pgNum(r.bonusValue) : 0,
+          bonusStatus: r.bonusStatus,
+          official: isOfficial(r.cycleId),
+        };
+      }),
+    };
+  }).sort((a, b) =>
+    (b.avgFinalResult ?? -1) - (a.avgFinalResult ?? -1)
+    || b.cyclesWithScore - a.cyclesWithScore
+    || a.employeeName.localeCompare(b.employeeName, "pt-BR"),
+  ).map((r, i) => ({ position: i + 1, ...r }));
+
+  res.json({
+    cycles: cycles.map(c => ({ id: c.id, name: c.name, status: c.status, isCurrent: c.id === currentId, minEvents: minByCycle.get(c.id) ?? null })),
+    rows,
+    // KPI do Total geral: o MESMO número de Dashboard e Análises (D4).
+    summary: totalGeralSummary(totalRows, isOfficial),
+  });
+});
+
+/**
  * Detalhe do colaborador no ranking (drill-down).
  * Mostra como foi nas provas (nota do time por evento) + penalidades + méritos.
  * Disponível para todos os papéis autenticados; o valor do bônus (dado financeiro)
@@ -114,8 +245,11 @@ router.get("/ranking-detail", async (req, res) => {
   if (!isManager && req.user?.employeeId !== employeeId) {
     res.status(403).json({ error: "Acesso negado" }); return;
   }
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
+  // ?cycleId= vazio = ciclo atual; id = o detalhe daquele ciclo (só consulta).
+  const scoped = await resolveCycleScope(req.query.cycleId, { allowAll: false });
+  if (sendScopeError(res, scoped)) return;
+  if (!scoped.scope || scoped.scope.kind !== "cycle") { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
+  const { cycle } = scoped.scope;
 
   const [[employee], [quarterResult], platoonRules, participations] = await Promise.all([
     db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1),
@@ -143,6 +277,8 @@ router.get("/ranking-detail", async (req, res) => {
       .where(and(
         eq(eventParticipantsTable.employeeId, employeeId),
         eq(eventsTable.cycleId, cycle.id),
+        // "Fora do período" (começa depois do fim do ciclo) não é deste ciclo.
+        eventWithinItsCycleSql(),
       )),
   ]);
 
@@ -247,6 +383,8 @@ router.get("/ranking-detail", async (req, res) => {
     .where(and(
       eq(absencesTable.employeeId, employeeId),
       eq(absencesTable.cycleId, cycle.id),
+      // Falta de evento "fora do período" vai com o evento para o ciclo novo.
+      eventWithinItsCycleSql(),
     ));
 
   const penaltyLabels = await loadPenaltyLabels();
@@ -285,9 +423,12 @@ router.get("/ranking-detail", async (req, res) => {
   // para refletir penalidades adicionadas após o último fechamento/recompute.
   // O snapshot (quarterResult.finalResult) pode estar desatualizado se uma penalidade
   // foi lançada depois do fechamento sem um novo recompute.
-  const liveFinalResult = rawAverage !== null
-    ? calculateQuarterFinalResult(rawAverage, penaltyPoints - meritPoints, scored.length)
-    : (quarterResult ? pgNum(quarterResult.finalResult) : null);
+  // Ciclo FECHADO: vale o resultado oficial gravado no fechamento (só consulta).
+  const liveFinalResult = cycle.status === "closed" && quarterResult
+    ? pgNum(quarterResult.finalResult)
+    : rawAverage !== null
+      ? calculateQuarterFinalResult(rawAverage, penaltyPoints - meritPoints, scored.length)
+      : (quarterResult ? pgNum(quarterResult.finalResult) : null);
 
   // Composição do bônus (só gestores — é dado financeiro). Replica a regra de
   // recomputeCycleResults + calculateTieredBonus para mostrar a conta inteira:
@@ -298,7 +439,7 @@ router.get("/ranking-detail", async (req, res) => {
   // avisa para recalcular o ciclo.
   let bonusBreakdown: Record<string, unknown> | undefined;
   if (isManager) {
-    const minEvents = await getMinEventsForEligibility();
+    const minEvents = await getMinEventsForEligibility(cycle.id);
     const scoredByDate = scored
       .filter(e => !!e.startDate)
       .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""));

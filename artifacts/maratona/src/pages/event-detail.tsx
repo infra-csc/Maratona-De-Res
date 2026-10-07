@@ -8,12 +8,15 @@ import {
   useConfirmEventResults, useUnconfirmEventResults,
   getGetEventQueryKey, getGetEventResultQueryKey, getGetEvaluationsQueryKey, getGetEventConformityQueryKey,
   getGetQuarterlyResultsQueryKey, getGetRankingQueryKey, getGetEventsQueryKey,
+  useListCycleOptions, getListCycleOptionsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { BODY } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
+import { eventPeriodPosition } from "@/lib/utils";
+import { isNextCycleEvent, opensLabelFor } from "./events/rules";
 import { matchCriterionByName, parseImportedConformityRatio, parseImportedCriteriaScores } from "./event-detail/helpers";
 import type { ConformityForm, ImportedCriterionScore, ResultsDialogMode } from "./event-detail/types";
 import { EventHeader } from "./event-detail/event-header";
@@ -56,13 +59,26 @@ export default function EventDetailPage() {
 
   const { toast } = useToast();
   const qc = useQueryClient();
-  const canManage = !!user && ["admin", "rh"].includes(user.role);
+
+  // Evento de ciclo FECHADO (ou de um ciclo que não é o atual): só consulta,
+  // como a API (409 em qualquer escrita). Exceção igual à da API: evento
+  // "fora do período" de um ciclo fechado (vai para o próximo ciclo) segue editável.
+  const { data: cycleOptions } = useListCycleOptions({ query: { queryKey: getListCycleOptionsQueryKey(), staleTime: 5 * 60_000 } });
+  const eventCycle = event ? (cycleOptions?.find(c => c.id === event.cycleId) ?? null) : null;
+  const readOnlyCycle = !!event && !!eventCycle && (eventCycle.status === "closed"
+    ? eventPeriodPosition(event, eventCycle) !== "after"
+    : !eventCycle.isCurrent);
+
+  const canManage = !readOnlyCycle && !!user && ["admin", "rh"].includes(user.role);
   const isOperador = hasRole(user, "operador");
   // Gestão de equipe (adicionar/remover participante) também é permitida ao
   // papel "operador" — que NÃO pode confirmar resultados financeiros, editar
   // nota histórica, nem ver/gerenciar a Matriz de Conformidade (só canManage).
-  const canManageTeam = canManage || isOperador;
-  const canManageConformity = canManage || (!!user && user.id === event?.conformityEvaluatorUserId);
+  const canManageTeam = !readOnlyCycle && (canManage || isOperador);
+  // Evento do PRÓXIMO ciclo: a API recusa respostas da Matriz (409 EVENT_NEXT_CYCLE)
+  // até o ciclo novo existir — a Matriz fica só leitura; o responsável pode ser escolhido.
+  const nextCycle = !!event && !event.isHistorical && isNextCycleEvent(event, eventCycle);
+  const canManageConformity = !readOnlyCycle && !nextCycle && (canManage || (!!user && user.id === event?.conformityEvaluatorUserId));
 
   // ── Matriz de Conformidade: o formulário fica aqui porque os cards do topo o leem ──
   const { data: conformityData } = useGetEventConformity(id, {
@@ -211,6 +227,10 @@ export default function EventDetailPage() {
       <EventHeader
         event={event}
         canManage={canManage}
+        readOnlyCycle={readOnlyCycle ? (eventCycle ?? null) : null}
+        nextCycle={nextCycle}
+        opensLabel={event.isHistorical ? null : opensLabelFor(event, eventCycle)}
+        canSeeTimeline={!!user && ["admin", "rh"].includes(user.role)}
         resultsConfirmBusy={resultsConfirmBusy}
         resultsDialog={resultsDialog}
         setResultsDialog={setResultsDialog}
@@ -259,13 +279,15 @@ export default function EventDetailPage() {
             importedConformityRatio={importedConformityRatio}
             importedConformityAllValue={importedConformityAllValue}
             conformityPenalty={result?.conformityPenalty}
+            readOnly={readOnlyCycle}
+            nextCycle={nextCycle && !readOnlyCycle}
           />
         )}
 
         {/* ── Performance Individual ── */}
         {hasPerformanceTable && <PerformanceSection participants={participantResults} />}
 
-        {!event.isHistorical && <EventCommentsPanel eventId={id} />}
+        {!event.isHistorical && <EventCommentsPanel eventId={id} readOnly={readOnlyCycle} />}
         <EventActivityLog eventId={id} />
       </div>
     </div>

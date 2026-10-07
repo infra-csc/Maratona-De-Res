@@ -58,5 +58,7 @@ export interface EventDetail {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  /** O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta) */
+  conformityWithoutConduta?: boolean;
   conformity?: EventConformity | null;
 }

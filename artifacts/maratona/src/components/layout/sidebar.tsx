@@ -142,7 +142,9 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
 
             return (
               <div key={group.name} className="space-y-1.5">
-                {(!collapsed || isMobile) && (
+                {/* Avaliador tem um item só (Avaliações): sem título de seção —
+                    "Gestão" em cima dele não descrevia nada do que ele faz. */}
+                {(!collapsed || isMobile) && user?.role !== "avaliador" && (
                   <p className="px-2 text-[11px] font-bold uppercase tracking-[0.15em] mb-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
                     {group.name}
                   </p>

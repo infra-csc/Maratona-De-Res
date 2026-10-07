@@ -6,7 +6,8 @@ import { PageHeader, EmptyState, LoadingState, StatusBadge } from "@/components/
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { fmtDate } from "@/lib/utils";
+import { todayBR } from "@/lib/utils";
+import { fmtEventDate, isNextCycleEvent, isOpenEvent, opensLabelFor, NEXT_CYCLE_BADGE, NEXT_CYCLE_NOTICE } from "./events/rules";
 import { CycleStatus, CycleStatTiles, cyclePeriod, apiErrorMessage, brl, n1 } from "./cycles";
 
 const BONUS_STATUS: Record<string, { label: string; variant: "ok" | "warn" | "danger" | "info" | "neutral" }> = {
@@ -42,8 +43,8 @@ function Section({ title, subtitle, actions, children }: { title: string; subtit
 }
 
 function csvCell(v: string | number | null | undefined): string {
-  const s = v == null ? "" : String(v);
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const text = v == null ? "" : String(v);
+  return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 function exportRankingCsv(history: CycleHistory) {
@@ -87,13 +88,28 @@ export default function CycleHistoryPage() {
   return <HistoryView history={data} />;
 }
 
+/**
+ * Situação do evento na avaliação, com as mesmas regras da lista de Eventos e
+ * da Central: "Próximo ciclo", "Abre em DD/MM", "Aberto" ou "Fechado".
+ */
+function eventSituation(e: CycleHistory["events"][number], cycle: CycleHistory["cycle"], today: string): { label: string; variant: "ok" | "warn" | "info" | "neutral"; title?: string } {
+  if (!e.isHistorical && isNextCycleEvent(e, cycle)) return { label: NEXT_CYCLE_BADGE, variant: "info", title: NEXT_CYCLE_NOTICE };
+  const opens = e.isHistorical ? null : opensLabelFor(e, cycle, today);
+  if (opens && e.status === "open") return { label: opens, variant: "info", title: "A avaliação abre sozinha no dia seguinte ao fim do evento." };
+  if (isOpenEvent(e, cycle, today)) return { label: "Aberto", variant: "warn", title: "Aberto para avaliação" };
+  return { label: "Fechado", variant: "neutral" };
+}
+
 function HistoryView({ history }: { history: CycleHistory }) {
   const { cycle, ranking, events } = history;
+  const today = todayBR();
+  // Ranking só é "final" com o ciclo fechado; aberto, ele muda até o fechamento.
+  const rankingFinal = cycle.status === "closed";
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    const s = search.trim().toLocaleLowerCase("pt-BR");
-    return s ? ranking.filter(r => r.employeeName.toLocaleLowerCase("pt-BR").includes(s)) : ranking;
+    const term = search.trim().toLocaleLowerCase("pt-BR");
+    return term ? ranking.filter(r => r.employeeName.toLocaleLowerCase("pt-BR").includes(term)) : ranking;
   }, [ranking, search]);
 
   // Distribuição por faixa (a faixa é gravada no resultado do ciclo, então
@@ -130,7 +146,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
       <CycleStatTiles cycle={cycle} />
 
       {faixas.length > 0 && (
-        <Section title="Distribuição por faixa" subtitle="Quantos colaboradores terminaram em cada faixa e o bônus somado dos elegíveis.">
+        <Section title="Distribuição por faixa" subtitle={rankingFinal ? "Quantos colaboradores terminaram em cada faixa e o bônus somado dos elegíveis." : "Quantos colaboradores estão em cada faixa agora e o bônus projetado dos elegíveis (muda até o fechamento)."}>
           <ul className="px-5 pb-4 space-y-2" data-testid="list-faixas">
             {faixas.map(f => (
               <li key={f.name} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-[13px]">
@@ -148,8 +164,10 @@ function HistoryView({ history }: { history: CycleHistory }) {
       )}
 
       <Section
-        title="Ranking final"
-        subtitle={cycle.isCurrent
+        title={rankingFinal ? "Ranking final" : "Ranking parcial"}
+        subtitle={!rankingFinal
+          ? "Nota, faixa e bônus projetado de cada colaborador — mudam até o fechamento do ciclo. Mesmos colaboradores do Ranking (ativos)."
+          : cycle.isCurrent
           ? "Nota final, faixa e bônus de cada colaborador. Mesmos colaboradores do Ranking (ativos)."
           : "Nota final, faixa e bônus de cada colaborador neste ciclo. Quem foi desligado depois continua aqui."}
         actions={ranking.length > 0 && (
@@ -180,7 +198,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
                   <th scope="col" className={`${TH} text-right`} style={thStyle}>Eventos</th>
                   <th scope="col" className={`${TH} text-right`} style={thStyle}>Faltas</th>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Elegível</th>
-                  <th scope="col" className={`${TH} text-right`} style={thStyle}>Bônus</th>
+                  <th scope="col" className={`${TH} text-right`} style={thStyle}>{rankingFinal ? "Bônus" : "Bônus projetado"}</th>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Pagamento</th>
                 </tr>
               </thead>
@@ -219,7 +237,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
         )}
       </Section>
 
-      <Section title="Eventos do ciclo" subtitle={`${events.length} evento(s). Só os confirmados entram na nota.`}>
+      <Section title="Eventos do ciclo" subtitle={`${events.length} ${events.length === 1 ? "evento" : "eventos"}. Só os confirmados entram na nota.`}>
         {events.length === 0 ? (
           <div className="px-5 pb-5"><EmptyState compact icon={CalendarRange} title="Nenhum evento neste ciclo" /></div>
         ) : (
@@ -231,15 +249,20 @@ function HistoryView({ history }: { history: CycleHistory }) {
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Evento</th>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Cliente</th>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Local</th>
+                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Situação</th>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Resultados</th>
                 </tr>
               </thead>
               <tbody>
-                {events.map(e => (
-                  <tr key={e.id}>
+                {events.map(e => {
+                  const sit = eventSituation(e, cycle, today);
+                  // Ano aparece quando o período toca outro ano (fmtEventDate, como em Eventos).
+                  const otherYear = [e.startDate, e.endDate].some(d => !!d && d.slice(0, 4) !== today.slice(0, 4));
+                  return (
+                  <tr key={e.id} data-testid={`row-history-event-${e.id}`}>
                     <td className="py-2 px-3 whitespace-nowrap tabular-nums" style={tdStyle}>
-                      {fmtDate(e.startDate)}{e.endDate && e.endDate !== e.startDate ? ` a ${fmtDate(e.endDate)}` : ""}
-                      <span className="sr-only"> de {e.startDate.slice(0, 4)}</span>
+                      {fmtEventDate(e.startDate, today, otherYear)}{e.endDate && e.endDate !== e.startDate ? ` a ${fmtEventDate(e.endDate, today, otherYear)}` : ""}
+                      {!otherYear && <span className="sr-only"> de {e.startDate.slice(0, 4)}</span>}
                     </td>
                     <td className="py-2 px-3" style={tdStyle}>
                       <Link href={`/events/${e.id}`} className="font-semibold hover:underline underline-offset-2">{e.name}</Link>
@@ -247,13 +270,17 @@ function HistoryView({ history }: { history: CycleHistory }) {
                     </td>
                     <td className="py-2 px-3" style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{e.clientName ?? "—"}</td>
                     <td className="py-2 px-3 whitespace-nowrap" style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{[e.city, e.state].filter(Boolean).join("/") || "—"}</td>
+                    <td className="py-2 px-3 whitespace-nowrap" style={tdStyle} title={sit.title}>
+                      <StatusBadge variant={sit.variant} size="sm" label={sit.label} />
+                    </td>
                     <td className="py-2 px-3" style={tdStyle}>
                       {e.resultsConfirmed
                         ? <StatusBadge variant="ok" size="sm" label="Confirmados" />
-                        : <StatusBadge variant="warn" size="sm" label={e.status === "open" ? "Evento aberto" : "Não confirmados"} />}
+                        : <StatusBadge variant="neutral" size="sm" label="Não confirmados" />}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

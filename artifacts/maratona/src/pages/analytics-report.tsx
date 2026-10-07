@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
+import { useCycleScope } from "@/components/cycle-select";
 import { useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey, type AnalyticsOverview } from "@workspace/api-client-react";
 import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
 import { EmptyState, LoadingState } from "@/components/shared";
@@ -7,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
+import { bonusSplit } from "@/lib/bonus-split";
+import { funnelSteps } from "@/lib/bonus-funnel";
 
 /*
  * Relatório do ciclo para imprimir ou salvar em PDF (Análises → Exportar).
@@ -82,26 +85,50 @@ function Kpi({ label, value, detail }: { label: string; value: string; detail?: 
   );
 }
 
+/**
+ * Mínimo de eventos em texto: o do ciclo; no Total geral, o de cada ciclo
+ * quando eles diferem (ex.: 8 no ciclo de jun–set, 7 no de out–dez).
+ */
+export function minEventsText(rs: AnalyticsOverview["ruleSet"]): string {
+  const list = rs.minEventsByCycle ?? [];
+  const distinct = [...new Set(list.map(m => m.minEvents))];
+  if (distinct.length <= 1) return `${distinct[0] ?? rs.minEvents}`;
+  return `o mínimo de cada ciclo (${list.map(m => `${m.cycleName}: ${m.minEvents}`).join("; ")})`;
+}
+
+/** A matriz de conformidade em texto, conforme a Conduta está ou não nela. */
+function conformityItemsText(rs: AnalyticsOverview["ruleSet"]): string {
+  if (rs.condutaInMatrix === "none") return 'Três itens (EPI, estaiamento e aterramento, guarda de equipamentos): neste ciclo a Conduta saiu da matriz — é avaliada no critério Proatividade/Conduta — e conta como "Sim".';
+  if (rs.condutaInMatrix === "some") return 'Quatro itens (EPI, estaiamento e aterramento, guarda de equipamentos, conduta) nos ciclos com Conduta; nos ciclos sem ela, três itens e a Conduta conta como "Sim".';
+  return "Quatro itens (EPI, estaiamento e aterramento, guarda de equipamentos, conduta).";
+}
+
 /** Frases do resumo executivo, montadas só com o que os dados sustentam. */
 function summaryLines(d: AnalyticsOverview): string[] {
   const k = d.kpis;
   const out: string[] = [];
-  out.push(`${plural(k.eventsConfirmed, "evento confirmado", "eventos confirmados")} de ${k.eventsTotal} no ciclo (${pct(k.eventsConfirmed, k.eventsTotal)}%). Só os confirmados entram na nota e no bônus.`);
+  const isAll = d.scope?.kind === "all";
+  const closed = !isAll && d.scope?.status === "closed";
+  const where = isAll ? "em todos os ciclos" : "no ciclo";
+  out.push(`${plural(k.eventsConfirmed, "evento confirmado", "eventos confirmados")} de ${k.eventsTotal} ${where} (${pct(k.eventsConfirmed, k.eventsTotal)}%). Só os confirmados entram na nota e no bônus.`);
   if (k.avgFinalResult != null) out.push(`Nota final média de ${n1(k.avgFinalResult)} entre ${plural(k.collaborators, "colaborador", "colaboradores")} do ranking; a nota média dos eventos é ${n1(k.avgEventScore)}.`);
-  out.push(`${plural(k.eligible, "pessoa elegível", "pessoas elegíveis")} ao bônus e ${plural(k.withBonus, "com bônus", "com bônus")} hoje, somando ${brl(k.bonusTotal)} projetados. ${plural(k.reachedMinEvents, "pessoa atingiu", "pessoas atingiram")} o mínimo de ${k.minEvents} eventos.`);
+  const minText = minEventsText(d.ruleSet);
+  out.push(`${plural(k.eligible, isAll ? "participação elegível" : "pessoa elegível", isAll ? "participações elegíveis" : "pessoas elegíveis")} ao bônus e ${plural(k.withBonus, "com bônus", "com bônus")}${closed || isAll ? "" : " hoje"}, somando ${bonusSplit(k, brl, { label: "", detail: "" }).sentence}. ${plural(k.reachedMinEvents, isAll ? "participação atingiu" : "pessoa atingiu", isAll ? "participações atingiram" : "pessoas atingiram")} ${/^\d+$/.test(minText) ? `o mínimo de ${minText} eventos` : minText}.`);
   const weakest = d.criteria[0];
   const strongest = d.criteria[d.criteria.length - 1];
   if (weakest && strongest && weakest !== strongest) out.push(`Critério mais fraco: ${weakest.name} (${n1(weakest.avgScore)}); mais forte: ${strongest.name} (${n1(strongest.avgScore)}).`);
   const worst = [...d.conformity].filter(c => c.naoPct != null && c.nao > 0).sort((a, b) => (b.naoPct ?? 0) - (a.naoPct ?? 0))[0];
   if (worst) out.push(`Na matriz de conformidade, "${worst.label}" teve mais "Não": ${n1(worst.naoPct)}% das respostas.`);
-  if (k.avgCalibrationShift != null) out.push(`A calibração moveu as notas em média ${k.avgCalibrationShift > 0 ? "+" : ""}${n1(k.avgCalibrationShift)} ponto(s) em ${plural(k.calibratedCriteria, "critério", "critérios")}.`);
+  if (k.avgCalibrationShift != null) out.push(`A calibração moveu as notas em média ${k.avgCalibrationShift > 0 ? "+" : ""}${n1(k.avgCalibrationShift)} ${Math.abs(k.avgCalibrationShift) === 1 ? "ponto" : "pontos"} em ${plural(k.calibratedCriteria, "critério", "critérios")}.`);
   if (d.nearNextFaixa.length > 0) out.push(`${plural(d.nearNextFaixa.length, "elegível está", "elegíveis estão")} a até 3 pontos da próxima faixa que paga bônus.`);
   return out;
 }
 
 export default function AnalyticsReportPage() {
-  const { data, isLoading, isError, error } = useGetAnalyticsOverview({
-    query: { queryKey: getGetAnalyticsOverviewQueryKey(), staleTime: 60_000 },
+  // Mesmo ciclo escolhido nas Análises (?ciclo=): atual, anterior ou Total geral.
+  const scope = useCycleScope();
+  const { data, isLoading, isError, error } = useGetAnalyticsOverview(scope.params, {
+    query: { queryKey: getGetAnalyticsOverviewQueryKey(scope.params), staleTime: 60_000 },
   });
   const printed = useRef(false);
   // Exportar → "Relatório em PDF" abre esta página com ?imprimir=1: chama a
@@ -111,8 +138,9 @@ export default function AnalyticsReportPage() {
     if (!new URLSearchParams(window.location.search).has("imprimir")) return;
     const t = window.setTimeout(() => {
       printed.current = true;
-      // Tira o ?imprimir da URL: recarregar a página não abre a impressão de novo.
-      window.history.replaceState(window.history.state, "", window.location.pathname);
+      // Tira só o ?imprimir da URL (o ?ciclo= fica): recarregar não abre a impressão de novo.
+      const qs = new URLSearchParams(window.location.search); qs.delete("imprimir");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs.toString() ? `?${qs}` : ""}`);
       window.print();
     }, 400);
     return () => window.clearTimeout(t);
@@ -123,14 +151,14 @@ export default function AnalyticsReportPage() {
     return (
       <div className="px-6 py-10">
         <EmptyState icon={AlertTriangle} title="Não foi possível montar o relatório" description={(error as { message?: string } | null)?.message ?? "Tente novamente em instantes."}
-          action={<Button variant="outline" asChild><Link href="/analytics">Voltar para Análises</Link></Button>} />
+          action={<Button variant="outline" asChild><Link href={scope.withCycle("/analytics")}>Voltar para Análises</Link></Button>} />
       </div>
     );
   }
-  return <Report data={data} />;
+  return <Report data={data} backHref={scope.withCycle("/analytics")} />;
 }
 
-function Report({ data }: { data: AnalyticsOverview }) {
+function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string }) {
   const { user } = useAuth();
   const k = data.kpis;
   const rs = data.ruleSet;
@@ -145,7 +173,7 @@ function Report({ data }: { data: AnalyticsOverview }) {
     <div className="px-4 md:px-6 py-6" style={{ fontFamily: BODY }}>
       {/* Barra de ações (fora do papel) */}
       <div className="no-print max-w-[860px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/analytics" className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
           <ArrowLeft size={14} aria-hidden /> Voltar para Análises
         </Link>
         <div className="flex items-center gap-3">
@@ -176,7 +204,13 @@ function Report({ data }: { data: AnalyticsOverview }) {
             <Kpi label="Nota média dos eventos" value={n1(k.avgEventScore)} detail={`${k.eventsScored} com nota oficial`} />
             <Kpi label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
             <Kpi label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus`} />
-            <Kpi label="Bônus projetado" value={brl(k.bonusTotal)} detail="Soma dos elegíveis" />
+            {(() => {
+              const b = bonusSplit(k, brl, { label: "Bônus projetado", detail: "Soma dos elegíveis" });
+              // Duas partes: dois indicadores rotulados (nunca a soma como número principal).
+              return b.both
+                ? <><Kpi label="Bônus oficial" value={brl(b.official!)} detail="Ciclos fechados" /><Kpi label="Bônus projetado" value={brl(b.projected!)} detail="Ciclo aberto — muda até o fechamento" /></>
+                : <Kpi label={b.label} value={brl(b.single ?? k.bonusTotal)} detail={b.detail} />;
+            })()}
             <Kpi label="Avaliações enviadas" value={String(k.evaluationsSubmitted)} detail="Notas enviadas pelos avaliadores" />
             <Kpi label="Critérios calibrados" value={String(k.calibratedCriteria)} detail={k.avgCalibrationShift != null ? `ajuste médio ${n1(k.avgCalibrationShift)} pts` : undefined} />
             <Kpi label="Penalidades / méritos" value={`${k.penaltiesCount} / ${k.meritsCount}`} detail="lançamentos no ciclo" />
@@ -199,7 +233,11 @@ function Report({ data }: { data: AnalyticsOverview }) {
         <Section title="Faixas e bônus" lead="Onde cada colaborador do ranking está hoje e o bônus projetado dos elegíveis." breakBefore>
           <Table head={["Faixa", "Nota", "Pessoas", "Bônus projetado"]} align={["l", "r", "r", "r"]}
             rows={data.faixas.map(f => [f.name, f.minScore != null ? `${lim(f.minScore)}–${lim(f.maxScore)}` : "—", <span key="v"><Bar value={f.count} max={maxFaixa} />{f.count}</span>, f.bonusTotal > 0 ? brl(f.bonusTotal) : "—"])} />
-          <Table head={["Funil do bônus", "Pessoas", "% do total"]} rows={data.funnel.map(f => [f.label, f.count, `${pct(f.count, data.funnel[0]?.count ?? 0)}%`])} />
+          {(() => {
+            const isAll = data.scope?.kind === "all";
+            const funnel = funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents });
+            return <Table head={["Funil do bônus", isAll ? "Participações" : "Pessoas", "% do total"]} rows={funnel.map(f => [f.label, f.count, `${pct(f.count, funnel[0]?.count ?? 0)}%`])} />;
+          })()}
         </Section>
 
         <Section title="Perto da próxima faixa" lead="Elegíveis a até 3 pontos da próxima faixa que paga bônus.">
@@ -234,10 +272,10 @@ function Report({ data }: { data: AnalyticsOverview }) {
           <ol className="space-y-2.5 text-[13px] leading-relaxed list-decimal pl-5">
             <li><strong>O que conta.</strong> Só eventos com resultados confirmados pelo RH entram na nota, na elegibilidade e no bônus. Concorrem os colaboradores da casa; freelas não entram no ranking e a participação como "Sup Ceno" é informativa.</li>
             <li><strong>Nota do evento (performance).</strong> Cada critério recebe nota de 0 a 10. Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério. A nota do evento é a média ponderada pelos pesos dos critérios, convertida para 0 a 100.</li>
-            <li><strong>Matriz de conformidade.</strong> Quatro itens (EPI, estaiamento e aterramento, guarda de equipamentos, conduta). Cada "Sim" vale {fmtNum(rs.conformityItemPoints, 0)} pontos e item sem resposta conta como "Sim". O que falta para 100 vira desconto de {fmtNum(rs.conformityPenaltyFactor * 100, 0)}%: cada "Não" tira {fmtNum(rs.conformityPenaltyPerNo, 0)} pontos da nota do evento, que fica entre 0 e 100.</li>
+            <li><strong>Matriz de conformidade.</strong> {conformityItemsText(rs)} Cada "Sim" vale {fmtNum(rs.conformityItemPoints, 0)} pontos e item sem resposta conta como "Sim". O que falta para 100 vira desconto de {fmtNum(rs.conformityPenaltyFactor * 100, 0)}%: cada "Não" tira {fmtNum(rs.conformityPenaltyPerNo, 0)} pontos da nota do evento, que fica entre 0 e 100.</li>
             <li><strong>Nota final do ciclo.</strong> Média das notas dos eventos confirmados, menos (penalidades − méritos) dividido pelo número de eventos, entre 0 e 100. Nota 0 legítima conta na média; evento sem nota nenhuma fica de fora.</li>
-            <li><strong>Elegibilidade.</strong> É preciso ter pelo menos {rs.minEvents} eventos confirmados no ciclo. O RH pode definir a elegibilidade de um colaborador manualmente, registrando o motivo.</li>
-            <li><strong>Bônus.</strong> A nota final define a faixa. O bônus é o prêmio base da faixa mais, para cada evento além dos {rs.minEvents} primeiros (em ordem de data), o valor por evento extra da <em>mesma</em> faixa. Faixa que não paga bônus zera tudo, inclusive os extras.
+            <li><strong>Elegibilidade.</strong> {/^\d+$/.test(minEventsText(rs)) ? <>É preciso ter participado de pelo menos {minEventsText(rs)} eventos confirmados no ciclo.</> : <>Vale {minEventsText(rs)} de eventos confirmados participados.</>} O RH pode definir a elegibilidade de um colaborador manualmente, registrando o motivo.</li>
+            <li><strong>Bônus.</strong> A nota final define a faixa. O bônus é o prêmio base da faixa mais, para cada evento além do mínimo do ciclo ({minEventsText(rs)}; em ordem de data), o valor por evento extra da <em>mesma</em> faixa. Faixa que não paga bônus zera tudo, inclusive os extras.
               {firstPaying && <> Exemplo: nota na faixa {firstPaying.name} com 3 eventos extras = {brl(firstPaying.bonusValue)} + 3 × {brl(firstPaying.bonusPerExtraEvent)} = {brl((firstPaying.bonusValue ?? 0) + 3 * (firstPaying.bonusPerExtraEvent ?? 0))}.</>}
             </li>
           </ol>

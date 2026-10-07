@@ -3,7 +3,7 @@
 import type React from "react";
 import { Check, Save } from "lucide-react";
 import { CONDENSED, WARNING, GOOD } from "@/lib/premium-theme";
-import { fieldStyle } from "./helpers";
+import { fieldStyle, fmtCalScore } from "./helpers";
 import type { DerivedCriteria } from "./derive";
 import { EvaluatorScores } from "./evaluator-scores";
 import { CalibrationReasonEditor } from "./calibration-reason-editor";
@@ -99,7 +99,8 @@ export function CriterionRow({
                         const cal = getCalibration(c.criterionId);
                         // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
                         const calVal = cal ? Number(cal.calibratedScore) : null;
-                        const scoreVal = calScores[c.criterionId] ?? (calVal != null ? String(calVal) : "");
+                        // Nota salva no padrão brasileiro ("8,5", não "8.5"); inteiro fica sem casas.
+                        const scoreVal = calScores[c.criterionId] ?? (calVal != null ? fmtCalScore(calVal) : "");
                         const isSaving = savingCritId === c.criterionId;
                         const isFinalPublished = !!c.finalPublishedAt;
                         const peso = c.weightOverride ?? c.originalWeight ?? 0;

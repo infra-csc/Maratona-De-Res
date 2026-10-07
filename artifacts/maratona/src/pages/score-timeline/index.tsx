@@ -1,3 +1,4 @@
+import { plural, faixaEdge } from "@/lib/utils";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useGetScoreTimeline, getGetScoreTimelineQueryKey } from "@workspace/api-client-react";
 import { Check, ChevronsUpDown, History, Search, SearchX, UserMinus, UserX, X } from "lucide-react";
@@ -356,7 +357,7 @@ export default function ScoreTimelinePage() {
               ))}
               {days.length > shownDays && (
                 <div className="flex justify-center">
-                  <Button variant="outline" onClick={() => setShownDays(n => n + PAGE_DAYS)}>Ver mais {Math.min(PAGE_DAYS, days.length - shownDays)} dias</Button>
+                  <Button variant="outline" onClick={() => setShownDays(n => n + PAGE_DAYS)}>Ver mais {plural(Math.min(PAGE_DAYS, days.length - shownDays), "dia")}</Button>
                 </div>
               )}
             </div>
@@ -458,7 +459,7 @@ function SearchPicker({ id, value, onChange, options, placeholder, emptyText, al
                 </CommandItem>
                 {options.map(o => (
                   <CommandItem key={o.id} value={`${o.label} ${o.id}`} onSelect={() => { onChange(o.id); setOpen(false); }}>
-                    {o.color !== undefined && <span aria-hidden className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: o.color ?? "var(--muted-foreground)" }} />}
+                    {o.color !== undefined && <span aria-hidden className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: o.color ?? "var(--muted-foreground)", ...faixaEdge(o.color) }} />}
                     <span className="flex-1 truncate">{o.label}</span>
                     {o.hint && <span className="ml-2 text-[12px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>{o.hint}</span>}
                     {o.id === value && <Check size={14} className="ml-2" aria-hidden />}

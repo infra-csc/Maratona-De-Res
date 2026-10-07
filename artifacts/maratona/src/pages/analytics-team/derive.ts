@@ -9,6 +9,8 @@ import type { AnalyticsOverview, EventsReport } from "@workspace/api-client-reac
 export interface Highlight { label: string; detail?: string; value: number }
 
 export interface TeamStory {
+  /** current = ciclo atual; past = ciclo anterior (consulta); all = Total geral (todos os ciclos). */
+  scopeKind: "current" | "past" | "all";
   cycleName: string;
   period: string | null;
   teamScore: number | null;
@@ -36,7 +38,7 @@ export interface TeamStory {
 const TOP = 3;
 
 
-export function buildTeamStory(data: AnalyticsOverview, report: EventsReport | undefined, fmtDay: (iso: string) => string): TeamStory {
+export function buildTeamStory(data: AnalyticsOverview, report: EventsReport | undefined, fmtDay: (iso: string) => string, scopeKind: TeamStory["scopeKind"] = "current"): TeamStory {
   const k = data.kpis;
 
   // Critérios: fortes = acima da média geral dos critérios; a melhorar = abaixo.
@@ -103,6 +105,7 @@ export function buildTeamStory(data: AnalyticsOverview, report: EventsReport | u
   const bestWeekend = trend.length ? trend.reduce((best, t) => (t.avgScore > best.avgScore ? t : best)) : null;
 
   return {
+    scopeKind,
     cycleName: data.cycle.name,
     period: data.cycle.startDate && data.cycle.endDate ? `${fmtDay(data.cycle.startDate)} a ${fmtDay(data.cycle.endDate)}` : null,
     teamScore: k.avgEventScore ?? null,

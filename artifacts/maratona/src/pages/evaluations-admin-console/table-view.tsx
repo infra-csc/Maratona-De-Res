@@ -1,9 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 import { Clock, Link2, Lock, UserCheck } from "lucide-react";
 import { CONDENSED, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { STATE_CFG, fmtDT } from "./helpers";
 import { EventCombobox, InlinePicker } from "./pickers";
+import { AreaModeOldDesignation, AreaModeResponder } from "./area-mode-bits";
+import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import type { ConformityKey, ConformityLinkDialogState, ConformityRow, CritRow, EnrichedEvent } from "./types";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
@@ -28,13 +30,18 @@ export function TableView(props: {
   } = props;
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3">
         <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>Acompanhamento —</span>
         <EventCombobox events={enrichedEvents} value={selected.id} onChange={setSelectedEventId} />
         <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>
-          · {selected.done} de {selected.total} critérios completos
+          · {selected.done} de {plural(selected.total, "critério completo", "critérios completos")}
         </span>
       </div>
+      {selected.areaMode && (
+        <p className="mb-3 text-[12px] rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }} data-testid="table-area-mode-note">
+          <strong style={{ color: "var(--foreground)" }}>No ciclo por área, só o avaliador da área responde</strong> — ninguém precisa ser designado. Ajustes na Calibração.
+        </p>
+      )}
       <div className="rounded-xl overflow-hidden overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] min-w-[820px]" style={{ backgroundColor: "var(--secondary)" }}>
           {["Critério", "Área", "Avaliador", "Enviado em", "Status", "Ação"].map((h, i) => (
@@ -46,16 +53,27 @@ export function TableView(props: {
         ) : selected.criteria.map(c => {
           const cfg = STATE_CFG[c.state];
           const pickerOpen = openPickerCriterionId === c.criterionId;
+          // Por área, ficar sem designado é o normal: sem linha rosada nem "Sem avaliador" vermelho.
+          const missing = c.assignedToId == null && !c.areaMode;
           return (
-            <div key={c.criterionId} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: c.assignedToId == null ? "rgba(229,72,77,0.05)" : "transparent" }}>
+            <div key={c.criterionId} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: missing ? "rgba(229,72,77,0.05)" : "transparent" }}>
               <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{c.criterionName}</div>
               <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>{c.areaName}</div>
               <div className="px-3.5 py-3">
-                <div className="font-semibold text-xs" style={{ color: c.assignedToId == null ? DANGER_TEXT : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
-                {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
-                  <div className="flex items-center gap-1 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                    <UserCheck size={8} /> {c.formSubmitterName}
-                  </div>
+                {c.areaMode ? (
+                  <>
+                    <AreaModeResponder c={c} />
+                    <AreaModeOldDesignation c={c} />
+                  </>
+                ) : (
+                  <>
+                    <div className="font-semibold text-xs" style={{ color: missing ? DANGER_TEXT : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
+                    {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
+                      <div className="flex items-center gap-1 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                        <UserCheck size={8} /> {c.formSubmitterName}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="px-3.5 py-3 font-bold text-[11px]" style={{ color: "var(--muted-foreground)" }}>
@@ -69,13 +87,13 @@ export function TableView(props: {
                 <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
               </div>
               <div className="px-3.5 py-3 text-right relative flex items-center justify-end gap-2">
-                {canManage && c.assignedToId != null && (
+                {canManage && c.assignedToId != null && !selected.nextCycle && (
                   <button
                     type="button"
                     onClick={() => openLinkDialog(c)}
                     className="rounded-lg px-2 py-1.5 text-[11px] font-bold uppercase flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-80"
                     style={{ border: "1px solid var(--border)" }}
-                    title="Gerar link para freelancer"
+                    title="Gerar link para freela"
                   >
                     <Link2 size={10} /> Link
                   </button>
@@ -89,6 +107,9 @@ export function TableView(props: {
                     >
                       <Lock size={9} /> Bloqueado
                     </span>
+                  ) : c.areaMode ? (
+                    // Por área: ninguém é designado — sem "Atribuir"/"Gerenciar".
+                    c.assignedToId == null || selected.nextCycle ? <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>—</span> : null
                   ) : (
                     <button
                       type="button"
@@ -141,7 +162,7 @@ export function TableView(props: {
                 </span>
               </div>
               <div className="px-3.5 py-3 text-right flex items-center justify-end gap-2">
-                {canManage && hasEvaluator && (
+                {canManage && hasEvaluator && !selected.nextCycle && (
                   <button
                     type="button"
                     onClick={() => setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName })}
@@ -152,6 +173,7 @@ export function TableView(props: {
                     <Link2 size={10} /> Link
                   </button>
                 )}
+                {/* Responsável da Matriz: dá para escolher também no evento do próximo ciclo (preparação). */}
                 {canManage && (
                   <button
                     type="button"
@@ -172,7 +194,11 @@ export function TableView(props: {
         })}
       </div>
       <p className="text-[11.5px] mt-3" style={{ color: "var(--muted-foreground)" }}>
-        Clique em <b style={{ color: "var(--foreground)" }}>Atribuir</b> numa linha sem avaliador para escolher quem responde. Use o seletor acima para trocar de evento.
+        {selected.nextCycle
+          ? <>{NEXT_CYCLE_NOTICE} Use o seletor acima para trocar de evento.</>
+          : selected.areaMode
+          ? <>Nos critérios, qualquer avaliador da área responde — não há o que atribuir. Na Matriz de conformidade, use <b style={{ color: "var(--foreground)" }}>Atribuir</b> para escolher quem responde. Use o seletor acima para trocar de evento.</>
+          : <>Clique em <b style={{ color: "var(--foreground)" }}>Atribuir</b> numa linha sem avaliador para escolher quem responde. Use o seletor acima para trocar de evento.</>}
       </p>
     </div>
   );

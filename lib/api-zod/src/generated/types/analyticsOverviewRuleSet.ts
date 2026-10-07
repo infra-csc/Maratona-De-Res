@@ -5,13 +5,22 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { AnalyticsOverviewRuleSetCondutaInMatrix } from './analyticsOverviewRuleSetCondutaInMatrix';
+import type { AnalyticsOverviewRuleSetMinEventsByCycleItem } from './analyticsOverviewRuleSetMinEventsByCycleItem';
 
 /**
  * Parâmetros das regras de negócio em vigor
  */
 export type AnalyticsOverviewRuleSet = {
+  /** Mínimo do ciclo (no Total geral, o do ciclo mais recente — use minEventsByCycle) */
   minEvents: number;
   conformityItemPoints: number;
   conformityPenaltyFactor: number;
   conformityPenaltyPerNo: number;
+  /** Itens que o avaliador responde na matriz (4; 3 quando a Conduta saiu da matriz) */
+  conformityItemsAsked: number;
+  /** A Conduta está na matriz dos eventos do recorte (all), em nenhum (none, ciclo sem Conduta) ou em parte (some, Total geral misturando ciclos) */
+  condutaInMatrix: AnalyticsOverviewRuleSetCondutaInMatrix;
+  /** Mínimo de eventos de cada ciclo do recorte */
+  minEventsByCycle: AnalyticsOverviewRuleSetMinEventsByCycleItem[];
 };

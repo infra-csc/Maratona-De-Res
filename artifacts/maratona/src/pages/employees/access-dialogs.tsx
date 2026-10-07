@@ -103,10 +103,10 @@ export function BulkAccessDialog({
           ) : (
             <>
               <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                <strong style={{ color: "var(--foreground)" }}>{result.createdCount}</strong> acesso(s) gerado(s) com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
+                <strong style={{ color: "var(--foreground)" }}>{result.createdCount}</strong> {result.createdCount === 1 ? "acesso gerado" : "acessos gerados"} com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
               </p>
               {result.conflicts.length > 0 && (
-                <p className="text-xs" style={{ color: DANGER_TEXT }}>{result.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
+                <p className="text-xs" style={{ color: DANGER_TEXT }}>{result.conflicts.length === 1 ? "1 colaborador já possuía acesso e foi ignorado." : `${result.conflicts.length} colaboradores já possuíam acesso e foram ignorados.`}</p>
               )}
               <button
                 data-testid="button-download-credentials-csv"

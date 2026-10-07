@@ -3,6 +3,7 @@ import type { EventConformity, EventDetail } from "@workspace/api-client-react";
 import { Clock, X } from "lucide-react";
 import { CONDENSED, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { fmtDT } from "./helpers";
+import { cenografiaItemCount } from "../evaluations/constants";
 import type { ConformityKey, CritRow } from "./types";
 import { fmtNum } from "@/lib/utils";
 
@@ -93,7 +94,7 @@ export function ViewConformityDialog({ viewConformity, setViewConformity, confor
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>
-              {viewConformity === "cenografia" ? "Cenografia · 5 itens" : "Ferramentas e Case · 1 item"}
+              {viewConformity === "cenografia" ? `Cenografia · ${cenografiaItemCount(selectedDetail?.conformityWithoutConduta)} itens` : "Ferramentas e Case · 1 item"}
             </p>
             <h3 className="font-black uppercase text-[16px] leading-tight" style={{ fontFamily: CONDENSED }}>
               {viewConformity === "cenografia" ? "Matriz de Conformidade" : "Guarda de Ferramentas"}
@@ -117,7 +118,8 @@ export function ViewConformityDialog({ viewConformity, setViewConformity, confor
               {([
                 { label: "Uso de EPI", val: conformity.epi, comment: conformity.epiComment },
                 { label: "Estaiamentos", val: conformity.estaiamentos, comment: conformity.estaiamentosComment },
-                { label: "Conduta", val: conformity.conduta, comment: conformity.condutaComment },
+                // Ciclo sem "Conduta" na matriz: a pergunta não existe (nem aparece).
+                ...(selectedDetail?.conformityWithoutConduta ? [] : [{ label: "Conduta", val: conformity.conduta, comment: conformity.condutaComment }]),
               ] as { label: string; val: boolean | null | undefined; comment: string | null | undefined }[]).map(item => (
                 <div key={item.label} className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
                   <div className="flex items-center justify-between gap-2">

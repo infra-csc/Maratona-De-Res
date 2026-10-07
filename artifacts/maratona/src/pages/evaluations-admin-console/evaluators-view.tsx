@@ -1,12 +1,69 @@
+import { plural } from "@/lib/utils";
 import type { Dispatch, SetStateAction } from "react";
-import { ClipboardCheck } from "lucide-react";
-import { CONDENSED, AMBER_TEXT } from "@/lib/premium-theme";
+import { ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { CONDENSED, AMBER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { initials } from "./helpers";
 import { EventCombobox } from "./pickers";
 import type { ToastFn } from "./use-event-mutations";
-import type { ConsoleView, EnrichedEvent, EvaluatorsScope, EventEvaluatorCard, GlobalEvaluatorCard } from "./types";
+import type { AreaResponderRow, ConsoleView, EnrichedEvent, EvaluatorsScope, EventEvaluatorCard, GlobalEvaluatorCard } from "./types";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
+
+/**
+ * Ciclo por área: quem respondeu, agrupado por área — nome, quantos critérios
+ * respondeu e em quais eventos (visão global). Sem "atribuir" nem "cobrar":
+ * qualquer avaliador da área responde.
+ */
+function AreaRespondersList({ rows, scope }: { rows: AreaResponderRow[]; scope: EvaluatorsScope }) {
+  if (rows.length === 0) {
+    return (
+      <div data-testid="area-responders-empty" className="text-center py-12 px-6 rounded-xl space-y-1.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+        <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>
+          {scope === "all" ? "Ninguém respondeu ainda neste ciclo" : "Ninguém respondeu ainda neste evento"}
+        </p>
+        <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>No ciclo por área, qualquer avaliador da área responde. Quem enviar aparece aqui, com a área e os critérios.</p>
+      </div>
+    );
+  }
+  const areas = [...new Set(rows.map(r => r.area))];
+  return (
+    <div className="space-y-4" data-testid="area-responders">
+      {areas.map(area => {
+        const list = rows.filter(r => r.area === area);
+        return (
+          <section key={area} className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <h3 className="px-4 py-2.5 text-[11px] font-black uppercase tracking-wide flex items-center justify-between gap-2" style={{ fontFamily: CONDENSED, backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
+              <span>{area}</span>
+              <span>{plural(list.reduce((n, r) => n + r.answered, 0), "critério respondido", "critérios respondidos")}</span>
+            </h3>
+            <ul>
+              {list.map(r => (
+                <li key={r.key} className="px-4 py-3 flex items-start gap-3" style={{ borderTop: "1px solid var(--border)" }} data-testid="area-responder-row">
+                  <span className="w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
+                    <span className="font-black text-[12px]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{initials(r.name)}</span>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                      <span className="font-black uppercase text-[14px] leading-tight break-words" style={{ fontFamily: CONDENSED }}>{r.name}</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: GOOD_TEXT }}>
+                        <CheckCircle2 size={11} aria-hidden /> {plural(r.answered, "critério respondido", "critérios respondidos")}
+                      </span>
+                    </div>
+                    {scope === "all" && (
+                      <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--muted-foreground)" }}>
+                        {plural(r.events.length, "evento", "eventos")}: {r.events.map(e => e.name).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 /** Aba Avaliadores — visão global (todos os eventos do ciclo) ou por evento. */
 export function EvaluatorsView(props: {
@@ -20,11 +77,17 @@ export function EvaluatorsView(props: {
   toast: ToastFn;
   setEvaluatorFilter: SetState<string>;
   setView: SetState<ConsoleView>;
+  /** Ciclo por área: ninguém é designado — a aba mostra quem RESPONDEU, por área. */
+  areaMode?: boolean;
+  globalAreaResponders?: AreaResponderRow[];
+  eventAreaResponders?: AreaResponderRow[];
 }) {
   const {
     evaluatorsScope, setEvaluatorsScope, enrichedEvents, selected, setSelectedEventId,
     globalEvaluatorCards, evaluatorCards, toast, setEvaluatorFilter, setView,
+    areaMode = false, globalAreaResponders = [], eventAreaResponders = [],
   } = props;
+  const responders = evaluatorsScope === "all" ? globalAreaResponders : eventAreaResponders;
   return (
     <div>
       {/* Toggle Todos / Este Evento */}
@@ -50,15 +113,21 @@ export function EvaluatorsView(props: {
         {evaluatorsScope === "event" && (
           <EventCombobox events={enrichedEvents} value={selected?.id ?? null} onChange={setSelectedEventId} />
         )}
-        {evaluatorsScope === "all" && (
+        {evaluatorsScope === "all" && !areaMode && (
           <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-            {globalEvaluatorCards.length} avaliador(es) · {globalEvaluatorCards.filter(c => c.submitted < c.assigned).length} com pendência
+            {plural(globalEvaluatorCards.length, "avaliador", "avaliadores")} · {globalEvaluatorCards.filter(c => c.submitted < c.assigned).length} com pendência
+          </span>
+        )}
+        {areaMode && (
+          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+            {plural(new Set(responders.map(r => r.name)).size, "pessoa respondeu", "pessoas responderam")} · {plural(responders.reduce((n, r) => n + r.answered, 0), "critério", "critérios")}
           </span>
         )}
       </div>
 
-      {/* ── Visão global: todos os eventos ── */}
-      {evaluatorsScope === "all" ? (
+      {areaMode ? (
+        <AreaRespondersList rows={responders} scope={evaluatorsScope} />
+      ) : evaluatorsScope === "all" ? (
         globalEvaluatorCards.length === 0 ? (
           <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador atribuído no ciclo.</p>
@@ -97,7 +166,7 @@ export function EvaluatorsView(props: {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => toast({ title: `${av.assigned - av.submitted} pendência(s) no ciclo`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${av.assigned} critério(s).` })}
+                    onClick={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} no ciclo`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério")}.` })}
                     className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
                     style={{ border: "1px solid var(--border)" }}
                   >
@@ -155,7 +224,7 @@ export function EvaluatorsView(props: {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => toast({ title: `${av.assigned - av.submitted} pendência(s) neste evento`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${av.assigned} critério(s) atribuído(s).` })}
+                    onClick={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} neste evento`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério atribuído", "critérios atribuídos")}.` })}
                     className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
                     style={{ border: "1px solid var(--border)" }}
                   >

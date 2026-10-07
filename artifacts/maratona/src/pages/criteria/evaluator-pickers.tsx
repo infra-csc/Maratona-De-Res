@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useSetAreaConformityRouting, getGetConformityRoutingQueryKey } from "@workspace/api-client-react";
+import { useSetAreaConformityRouting, getGetConformityRoutingQueryKey, useGetCurrentCycle } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { Check, UserCheck, AlertCircle } from "lucide-react";
+import { Check, UserCheck, AlertCircle, Users } from "lucide-react";
 import { useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
 import { DANGER_TEXT } from "@/lib/premium-theme";
@@ -38,15 +38,23 @@ export function EvaluatorPickerCell({
 
   const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
   const current = currentRouting?.defaultEvaluatorName ?? null;
+  // Ciclo atual POR ÁREA: ninguém é designado — sem avaliador padrão é o normal
+  // (qualquer avaliador da área responde), não um alerta.
+  const { data: cycle } = useGetCurrentCycle();
+  const areaMode = !!cycle?.areaEvaluation && cycle.status !== "closed";
 
   return (
     <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
       <PopoverTrigger asChild>
-        <button type="button" className="flex items-center gap-1.5 text-left" title="Clique para definir o avaliador padrão">
+        <button type="button" className="flex items-center gap-1.5 text-left" title={areaMode && !current ? "No ciclo por área, qualquer avaliador da área do critério responde. O avaliador padrão só vale num ciclo com designação. Clique para definir." : "Clique para definir o avaliador padrão"}>
           {current ? (
             <span className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80">
               <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent-text)" }} />
               {current}
+            </span>
+          ) : areaMode ? (
+            <span data-testid={`criterion-area-mode-any-${criterionId}`} className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: "var(--muted-foreground)" }}>
+              <Users size={12} className="shrink-0" aria-hidden /> Qualquer avaliador da área (ciclo por área)
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: DANGER_TEXT }}>

@@ -91,7 +91,7 @@ test("falta e mérito lançados em /absences mudam a nota final, a faixa e o bô
   });
 
   await test.step("antes dos lançamentos: Diego com nota 90, Quênia, bônus R$ 3.200", async () => {
-    await conferirResultado(page, testInfo, { nota: "90,0", faixa: "Quênia", bonus: /Bônus\s*R\$\s*3\.200/ });
+    await conferirResultado(page, testInfo, { nota: "90,0", faixa: "Quênia", bonus: /Bônus projetado\s*R\$\s*3\.200/ });
   });
 
   await test.step(`admin lança falta (${FALTA.label}, −${FALTA.points}) para o Diego`, async () => {
@@ -99,7 +99,7 @@ test("falta e mérito lançados em /absences mudam a nota final, a faixa e o bô
   });
 
   await test.step("com a falta: nota 83,75 (90 − 50/8), faixa Verde, bônus R$ 2.200", async () => {
-    await conferirResultado(page, testInfo, { nota: "83,8", faixa: "Verde", bonus: /Bônus\s*R\$\s*2\.200/ });
+    await conferirResultado(page, testInfo, { nota: "83,8", faixa: "Verde", bonus: /Bônus projetado\s*R\$\s*2\.200/ });
   });
 
   await test.step(`admin lança mérito (${MERITO.label}, +${MERITO.points}) para o Diego`, async () => {
@@ -107,7 +107,7 @@ test("falta e mérito lançados em /absences mudam a nota final, a faixa e o bô
   });
 
   await test.step("com falta e mérito: nota 86,9 (90 − 25/8), faixa Azul, bônus R$ 2.700; o detalhe lista os dois", async () => {
-    await conferirResultado(page, testInfo, { nota: "86,9", faixa: "Azul", bonus: /Bônus\s*R\$\s*2\.700/ });
+    await conferirResultado(page, testInfo, { nota: "86,9", faixa: "Azul", bonus: /Bônus projetado\s*R\$\s*2\.700/ });
     await page.getByTestId(`card-ranking-${DIEGO.id}`).click();
     const detalhe = page.getByRole("dialog");
     await expect(detalhe.getByRole("heading", { name: DIEGO.name })).toBeVisible();

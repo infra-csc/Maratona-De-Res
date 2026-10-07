@@ -10,10 +10,11 @@ import { SortIcon, FaixaBadge } from "./badges";
 import { PlatoonDistributionPanel } from "./platoon-distribution-panel";
 import { EmployeeDetailSheet } from "./employee-detail-sheet";
 
-export function ConsolidationTab({ isManager }: { isManager: boolean }) {
+export function ConsolidationTab({ isManager, cycleId, readOnly = false, cycleClosed = false }: { isManager: boolean; cycleId?: string; readOnly?: boolean; /** Ciclo fechado: bônus OFICIAL; aberto, PROJETADO. */ cycleClosed?: boolean }) {
   const { toast } = useToast();
-  const { data: results, isLoading } = useGetQuarterlyResults(undefined, {
-    query: { queryKey: getGetQuarterlyResultsQueryKey() },
+  const params = cycleId ? { cycleId } : undefined;
+  const { data: results, isLoading } = useGetQuarterlyResults(params, {
+    query: { queryKey: getGetQuarterlyResultsQueryKey(params) },
   });
   const rows = results ?? [];
   const [search, setSearch] = useState("");
@@ -46,7 +47,7 @@ export function ConsolidationTab({ isManager }: { isManager: boolean }) {
 
   async function handleExport() {
     try {
-      const data = await exportQuarterlyResults();
+      const data = await exportQuarterlyResults(params);
       const blob = new Blob([data.data], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -97,11 +98,11 @@ export function ConsolidationTab({ isManager }: { isManager: boolean }) {
         <div className="text-center py-24 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
           <Table2 size={44} className="mx-auto mb-4 opacity-20" />
           <h3 className="text-xl font-black uppercase tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>Nenhum dado consolidado</h3>
-          <p className="max-w-md mx-auto" style={{ color: "var(--muted-foreground)" }}>Não há resultados gerados para o ciclo atual.</p>
+          <p className="max-w-md mx-auto" style={{ color: "var(--muted-foreground)" }}>{readOnly ? "Não há resultados gerados neste ciclo." : "Não há resultados gerados para o ciclo atual."}</p>
         </div>
       ) : (
         <div className="space-y-3.5">
-          <PlatoonDistributionPanel rows={eligibleFilteredRows} />
+          <PlatoonDistributionPanel rows={eligibleFilteredRows} cycleClosed={cycleClosed} />
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -206,7 +207,7 @@ export function ConsolidationTab({ isManager }: { isManager: boolean }) {
         </div>
       )}
 
-      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
+      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} cycleId={cycleId} readOnly={readOnly} />
     </div>
   );
 }

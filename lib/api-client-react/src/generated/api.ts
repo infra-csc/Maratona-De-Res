@@ -58,9 +58,11 @@ import type {
   CollaboratorsWithoutAccessPreview,
   ConfirmResultsBulkInput,
   ConfirmResultsBulkResult,
+  ConflictError,
   ConformityEvaluatorInput,
   ConformityEvaluatorRedirectInput,
   ConformityPublicTokenInput,
+  ConformityRedirectResult,
   CreateCycleInput,
   Criterion,
   CriterionAssignmentUpdate,
@@ -112,14 +114,20 @@ import type {
   EventTeamResult,
   EventUpdate,
   EventsReport,
+  ExportAbsencesParams,
+  ExportCajuBonusesParams,
   ExportEventResultsParams,
+  ExportQuarterlyResultsParams,
+  ExportRankingParams,
   FixCalibrationCriteria200,
   FixOrphanedEvaluations200,
+  ForbiddenError,
   ForceCloseInput,
   GenerateAssignmentsResult,
   GeneratePinResult,
   GetAbsencesParams,
   GetAnalyticsEventsReportParams,
+  GetAnalyticsOverviewParams,
   GetAuditLogsParams,
   GetCalibrationAuditParams,
   GetCalibrationCommentsParams,
@@ -127,10 +135,14 @@ import type {
   GetCasaPinsParams,
   GetCollaboratorsWithoutAccessParams,
   GetCycleEligibilityParams,
+  GetDashboardPlatoonDistributionParams,
+  GetDashboardSummaryParams,
+  GetDashboardTopEmployeesParams,
   GetEmployeesParams,
   GetEvaluationConsoleParams,
   GetEvaluationsParams,
   GetEventsParams,
+  GetMyAreaEvaluationsParams,
   GetQuarterlyResultsParams,
   GetRankingDetailParams,
   GetRankingParams,
@@ -151,6 +163,7 @@ import type {
   MergeUserInput,
   MergeUserResult,
   MigrateCriteriaCatalog200,
+  MyAreaEvaluations,
   MyPerformance,
   NormalizeDatesInput,
   NormalizeDatesResult,
@@ -166,6 +179,7 @@ import type {
   PublicEvalConformityInput,
   PublicEvalInfo,
   PublicEvalSubmitInput,
+  PublicEvalSubmitResult,
   PublicLinkEligibleCriterion,
   PublicToken,
   PublicTokenCreated,
@@ -180,6 +194,7 @@ import type {
   QuarterlyResult,
   RankingDetail,
   RankingEntry,
+  RankingTotal,
   ReplaceAllPlatoonRulesInput,
   ReplaceAllPlatoonRulesResult,
   ResetDataInput,
@@ -899,6 +914,9 @@ export const getGetUsersByAreaUrl = (areaId: number,) => {
 }
 
 /**
+ * Avaliador: só as áreas que ele usa na avaliação (a do cadastro, as em que é principal, Cenografia/
+ * Ferramentas quando responde a matriz de algum evento e a área de redirecionamento dos critérios dele);
+ * outra área → 403.
  * @summary List active users in a given area (for redirect dropdowns)
  */
 export const getUsersByArea = async (areaId: number, options?: Parameters<typeof customFetch>[1]): Promise<UserSummary[]> => {
@@ -923,7 +941,7 @@ export const getGetUsersByAreaQueryKey = (areaId: number,) => {
     }
 
 
-export const getGetUsersByAreaQueryOptions = <TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<unknown>>(areaId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetUsersByAreaQueryOptions = <TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<void>>(areaId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -942,14 +960,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUsersByAreaQueryResult = NonNullable<Awaited<ReturnType<typeof getUsersByArea>>>
-export type GetUsersByAreaQueryError = ErrorType<unknown>
+export type GetUsersByAreaQueryError = ErrorType<void>
 
 
 /**
  * @summary List active users in a given area (for redirect dropdowns)
  */
 
-export function useGetUsersByArea<TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<unknown>>(
+export function useGetUsersByArea<TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<void>>(
  areaId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -2358,7 +2376,7 @@ return customFetch<MergeEmployeeResult>(getMergeEmployeeUrl(id),
 
 export const getMergeEmployeeMutationKey = () => ['mergeEmployee'] as const;
 
-export const getMergeEmployeeMutationOptions = <TError = ErrorType<unknown>,
+export const getMergeEmployeeMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,MergeEmployeeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,MergeEmployeeMutationVariables, TContext> => {
 
@@ -2387,13 +2405,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type MergeEmployeeMutationResult = NonNullable<Awaited<ReturnType<typeof mergeEmployee>>>
     export type MergeEmployeeMutationBody = BodyType<MergeEmployeeInput>
-    export type MergeEmployeeMutationError = ErrorType<unknown>
+    export type MergeEmployeeMutationError = ErrorType<ConflictError>
     export type MergeEmployeeMutationVariables = {id: number;data: BodyType<MergeEmployeeInput>}
 
     /**
  * @summary Merge duplicate employees into a canonical record
  */
-export const useMergeEmployee = <TError = ErrorType<unknown>,
+export const useMergeEmployee = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,MergeEmployeeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof mergeEmployee>>,
@@ -2447,7 +2465,7 @@ return customFetch<CycleExclusionResult>(getSetEmployeeCycleExclusionUrl(id),
 
 export const getSetEmployeeCycleExclusionMutationKey = () => ['setEmployeeCycleExclusion'] as const;
 
-export const getSetEmployeeCycleExclusionMutationOptions = <TError = ErrorType<unknown>,
+export const getSetEmployeeCycleExclusionMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext> => {
 
@@ -2476,13 +2494,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetEmployeeCycleExclusionMutationResult = NonNullable<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>>
     export type SetEmployeeCycleExclusionMutationBody = BodyType<CycleExclusionInput>
-    export type SetEmployeeCycleExclusionMutationError = ErrorType<unknown>
+    export type SetEmployeeCycleExclusionMutationError = ErrorType<ConflictError>
     export type SetEmployeeCycleExclusionMutationVariables = {id: number;data: BodyType<CycleExclusionInput>}
 
     /**
  * @summary Tira o colaborador do ciclo atual (ou devolve). Só admin; recalcula o ciclo.
  */
-export const useSetEmployeeCycleExclusion = <TError = ErrorType<unknown>,
+export const useSetEmployeeCycleExclusion = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmployeeCycleExclusion>>, TError,SetEmployeeCycleExclusionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setEmployeeCycleExclusion>>,
@@ -2586,6 +2604,7 @@ export const getGetEventsUrl = (params?: GetEventsParams,) => {
 }
 
 /**
+ * Eventos de um ciclo (padrão o atual) ou de todos (cycleId=all; cada evento traz o seu cycleId).
  * @summary List events
  */
 export const getEvents = async (params?: GetEventsParams, options?: Parameters<typeof customFetch>[1]): Promise<Event[]> => {
@@ -2610,7 +2629,7 @@ export const getGetEventsQueryKey = (params?: GetEventsParams,) => {
     }
 
 
-export const getGetEventsQueryOptions = <TData = Awaited<ReturnType<typeof getEvents>>, TError = ErrorType<unknown>>(params?: GetEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetEventsQueryOptions = <TData = Awaited<ReturnType<typeof getEvents>>, TError = ErrorType<void>>(params?: GetEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -2629,14 +2648,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getEvents>>>
-export type GetEventsQueryError = ErrorType<unknown>
+export type GetEventsQueryError = ErrorType<void>
 
 
 /**
  * @summary List events
  */
 
-export function useGetEvents<TData = Awaited<ReturnType<typeof getEvents>>, TError = ErrorType<unknown>>(
+export function useGetEvents<TData = Awaited<ReturnType<typeof getEvents>>, TError = ErrorType<void>>(
  params?: GetEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -4433,7 +4452,7 @@ export const getRedirectConformityEvaluatorUrl = (id: number,) => {
  * @summary Redirect (delegate) the Cenografia conformity evaluator to another user in area 13
  */
 export const redirectConformityEvaluator = async (id: number,
-    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: Parameters<typeof customFetch>[1]): Promise<EventDetail> => {
+    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: Parameters<typeof customFetch>[1]): Promise<ConformityRedirectResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -4449,7 +4468,7 @@ export const redirectConformityEvaluator = async (id: number,
     }
     return headers;
   };
-return customFetch<EventDetail>(getRedirectConformityEvaluatorUrl(id),
+return customFetch<ConformityRedirectResult>(getRedirectConformityEvaluatorUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -4611,7 +4630,7 @@ export const getRedirectConformityEvaluatorFerramentasUrl = (id: number,) => {
  * @summary Redirect (delegate) the Ferramentas e Case evaluator to another user in area 16
  */
 export const redirectConformityEvaluatorFerramentas = async (id: number,
-    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: Parameters<typeof customFetch>[1]): Promise<EventDetail> => {
+    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: Parameters<typeof customFetch>[1]): Promise<ConformityRedirectResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -4627,7 +4646,7 @@ export const redirectConformityEvaluatorFerramentas = async (id: number,
     }
     return headers;
   };
-return customFetch<EventDetail>(getRedirectConformityEvaluatorFerramentasUrl(id),
+return customFetch<ConformityRedirectResult>(getRedirectConformityEvaluatorFerramentasUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -4808,7 +4827,7 @@ return customFetch<EventConformity>(getSetEventConformityUrl(id),
 
 export const getSetEventConformityMutationKey = () => ['setEventConformity'] as const;
 
-export const getSetEventConformityMutationOptions = <TError = ErrorType<unknown>,
+export const getSetEventConformityMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,SetEventConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,SetEventConformityMutationVariables, TContext> => {
 
@@ -4837,13 +4856,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetEventConformityMutationResult = NonNullable<Awaited<ReturnType<typeof setEventConformity>>>
     export type SetEventConformityMutationBody = BodyType<EventConformityInput>
-    export type SetEventConformityMutationError = ErrorType<unknown>
+    export type SetEventConformityMutationError = ErrorType<ConflictError>
     export type SetEventConformityMutationVariables = {id: number;data: BodyType<EventConformityInput>}
 
     /**
  * @summary Create or update event conformity matrix
  */
-export const useSetEventConformity = <TError = ErrorType<unknown>,
+export const useSetEventConformity = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,SetEventConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setEventConformity>>,
@@ -5063,7 +5082,7 @@ return customFetch<EventDetail>(getUpdateEventAssignmentsUrl(id),
 
 export const getUpdateEventAssignmentsMutationKey = () => ['updateEventAssignments'] as const;
 
-export const getUpdateEventAssignmentsMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateEventAssignmentsMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,UpdateEventAssignmentsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,UpdateEventAssignmentsMutationVariables, TContext> => {
 
@@ -5092,13 +5111,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateEventAssignmentsMutationResult = NonNullable<Awaited<ReturnType<typeof updateEventAssignments>>>
     export type UpdateEventAssignmentsMutationBody = BodyType<EventAssignmentsUpdate>
-    export type UpdateEventAssignmentsMutationError = ErrorType<unknown>
+    export type UpdateEventAssignmentsMutationError = ErrorType<ConflictError>
     export type UpdateEventAssignmentsMutationVariables = {id: number;data: BodyType<EventAssignmentsUpdate>}
 
     /**
  * @summary Set per-area evaluator assignments for an event
  */
-export const useUpdateEventAssignments = <TError = ErrorType<unknown>,
+export const useUpdateEventAssignments = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,UpdateEventAssignmentsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateEventAssignments>>,
@@ -6394,6 +6413,95 @@ export const useUpdateCriterion = <TError = ErrorType<unknown>,
       return useMutation(getUpdateCriterionMutationOptions(options));
     }
 
+export const getGetMyAreaEvaluationsUrl = (params?: GetMyAreaEvaluationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/evaluations/my-area?${stringifiedParams}` : `/evaluations/my-area`
+}
+
+/**
+ * Eventos com critérios confirmados em que o usuário tem critério da área
+ * do cadastro (users.areaId — a primeira resposta enviada da área fecha o
+ * critério), critério designado (fluxo antigo) ou a Matriz de
+ * Conformidade. Sem from/to/eventId, só o ciclo atual. Admin/RH podem
+ * consultar outra área com areaId.
+ * @summary Tela do avaliador numa chamada só — eventos e critérios da área do cadastro (e os designados)
+ */
+export const getMyAreaEvaluations = async (params?: GetMyAreaEvaluationsParams, options?: Parameters<typeof customFetch>[1]): Promise<MyAreaEvaluations> => {
+
+  return customFetch<MyAreaEvaluations>(getGetMyAreaEvaluationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyAreaEvaluationsQueryKey = (params?: GetMyAreaEvaluationsParams,) => {
+    return [
+    `/evaluations/my-area`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMyAreaEvaluationsQueryOptions = <TData = Awaited<ReturnType<typeof getMyAreaEvaluations>>, TError = ErrorType<ErrorEnvelope>>(params?: GetMyAreaEvaluationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAreaEvaluations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyAreaEvaluationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyAreaEvaluations>>> = ({ signal }) => getMyAreaEvaluations(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyAreaEvaluations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyAreaEvaluationsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyAreaEvaluations>>>
+export type GetMyAreaEvaluationsQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Tela do avaliador numa chamada só — eventos e critérios da área do cadastro (e os designados)
+ */
+
+export function useGetMyAreaEvaluations<TData = Awaited<ReturnType<typeof getMyAreaEvaluations>>, TError = ErrorType<ErrorEnvelope>>(
+ params?: GetMyAreaEvaluationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAreaEvaluations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyAreaEvaluationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetEvaluationsUrl = (params?: GetEvaluationsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6520,7 +6628,7 @@ return customFetch<Evaluation>(getCreateEvaluationUrl(),
 
 export const getCreateEvaluationMutationKey = () => ['createEvaluation'] as const;
 
-export const getCreateEvaluationMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateEvaluationMutationOptions = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEvaluation>>, TError,CreateEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createEvaluation>>, TError,CreateEvaluationMutationVariables, TContext> => {
 
@@ -6549,13 +6657,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateEvaluationMutationResult = NonNullable<Awaited<ReturnType<typeof createEvaluation>>>
     export type CreateEvaluationMutationBody = BodyType<EvaluationInput>
-    export type CreateEvaluationMutationError = ErrorType<unknown>
+    export type CreateEvaluationMutationError = ErrorType<ForbiddenError | ConflictError>
     export type CreateEvaluationMutationVariables = {data: BodyType<EvaluationInput>}
 
     /**
  * @summary Create or upsert evaluation
  */
-export const useCreateEvaluation = <TError = ErrorType<unknown>,
+export const useCreateEvaluation = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEvaluation>>, TError,CreateEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createEvaluation>>,
@@ -6609,7 +6717,7 @@ return customFetch<Evaluation>(getUpdateEvaluationUrl(id),
 
 export const getUpdateEvaluationMutationKey = () => ['updateEvaluation'] as const;
 
-export const getUpdateEvaluationMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateEvaluationMutationOptions = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEvaluation>>, TError,UpdateEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateEvaluation>>, TError,UpdateEvaluationMutationVariables, TContext> => {
 
@@ -6638,13 +6746,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateEvaluationMutationResult = NonNullable<Awaited<ReturnType<typeof updateEvaluation>>>
     export type UpdateEvaluationMutationBody = BodyType<EvaluationUpdate>
-    export type UpdateEvaluationMutationError = ErrorType<unknown>
+    export type UpdateEvaluationMutationError = ErrorType<ForbiddenError | ConflictError>
     export type UpdateEvaluationMutationVariables = {id: number;data: BodyType<EvaluationUpdate>}
 
     /**
  * @summary Update evaluation
  */
-export const useUpdateEvaluation = <TError = ErrorType<unknown>,
+export const useUpdateEvaluation = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEvaluation>>, TError,UpdateEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateEvaluation>>,
@@ -6653,6 +6761,82 @@ export const useUpdateEvaluation = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateEvaluationMutationOptions(options));
+    }
+
+export const getDeleteEvaluationDraftUrl = (id: number,) => {
+
+
+
+
+  return `/evaluations/${id}`
+}
+
+/**
+ * Para limpar o rascunho que ficou "órfão" quando outra pessoa da área enviou primeiro
+ * (modo por área). Avaliação enviada não se apaga (409). Ciclo fechado → 409 code CLOSED_CYCLE.
+ * @summary Apaga um RASCUNHO (só o dono do rascunho, ou admin/RH)
+ */
+export const deleteEvaluationDraft = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeleteEvaluationDraftUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteEvaluationDraftMutationKey = () => ['deleteEvaluationDraft'] as const;
+
+export const getDeleteEvaluationDraftMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEvaluationDraft>>, TError,DeleteEvaluationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEvaluationDraft>>, TError,DeleteEvaluationDraftMutationVariables, TContext> => {
+
+const mutationKey = getDeleteEvaluationDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEvaluationDraft>>, DeleteEvaluationDraftMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteEvaluationDraft(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEvaluationDraftMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEvaluationDraft>>>
+
+    export type DeleteEvaluationDraftMutationError = ErrorType<ErrorEnvelope | ConflictError>
+    export type DeleteEvaluationDraftMutationVariables = {id: number}
+
+    /**
+ * @summary Apaga um RASCUNHO (só o dono do rascunho, ou admin/RH)
+ */
+export const useDeleteEvaluationDraft = <TError = ErrorType<ErrorEnvelope | ConflictError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEvaluationDraft>>, TError,DeleteEvaluationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEvaluationDraft>>,
+        TError,
+        DeleteEvaluationDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteEvaluationDraftMutationOptions(options));
     }
 
 export const getSubmitEvaluationUrl = (id: number,) => {
@@ -6683,7 +6867,7 @@ export const submitEvaluation = async (id: number, options?: Parameters<typeof c
 
 export const getSubmitEvaluationMutationKey = () => ['submitEvaluation'] as const;
 
-export const getSubmitEvaluationMutationOptions = <TError = ErrorType<unknown>,
+export const getSubmitEvaluationMutationOptions = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitEvaluation>>, TError,SubmitEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof submitEvaluation>>, TError,SubmitEvaluationMutationVariables, TContext> => {
 
@@ -6712,13 +6896,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SubmitEvaluationMutationResult = NonNullable<Awaited<ReturnType<typeof submitEvaluation>>>
 
-    export type SubmitEvaluationMutationError = ErrorType<unknown>
+    export type SubmitEvaluationMutationError = ErrorType<ForbiddenError | ConflictError>
     export type SubmitEvaluationMutationVariables = {id: number}
 
     /**
  * @summary Submit evaluation
  */
-export const useSubmitEvaluation = <TError = ErrorType<unknown>,
+export const useSubmitEvaluation = <TError = ErrorType<ForbiddenError | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitEvaluation>>, TError,SubmitEvaluationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitEvaluation>>,
@@ -7101,7 +7285,7 @@ return customFetch<Absence>(getCreateAbsenceUrl(),
 
 export const getCreateAbsenceMutationKey = () => ['createAbsence'] as const;
 
-export const getCreateAbsenceMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateAbsenceMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAbsence>>, TError,CreateAbsenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createAbsence>>, TError,CreateAbsenceMutationVariables, TContext> => {
 
@@ -7130,13 +7314,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateAbsenceMutationResult = NonNullable<Awaited<ReturnType<typeof createAbsence>>>
     export type CreateAbsenceMutationBody = BodyType<AbsenceInput>
-    export type CreateAbsenceMutationError = ErrorType<unknown>
+    export type CreateAbsenceMutationError = ErrorType<ConflictError>
     export type CreateAbsenceMutationVariables = {data: BodyType<AbsenceInput>}
 
     /**
  * @summary Register absence
  */
-export const useCreateAbsence = <TError = ErrorType<unknown>,
+export const useCreateAbsence = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAbsence>>, TError,CreateAbsenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createAbsence>>,
@@ -8206,20 +8390,31 @@ export const useDeletePlatoonRule = <TError = ErrorType<unknown>,
       return useMutation(getDeletePlatoonRuleMutationOptions(options));
     }
 
-export const getGetDashboardSummaryUrl = () => {
+export const getGetDashboardSummaryUrl = (params?: GetDashboardSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/dashboard/summary`
+  return stringifiedParams.length > 0 ? `/dashboard/summary?${stringifiedParams}` : `/dashboard/summary`
 }
 
 /**
+ * Números do ciclo (padrão o atual). Com cycleId=all, eventos, média, bônus
+ * e penalidades somam todos os ciclos; as pendências operacionais
+ * (avaliações, eventos com pendência, zona de risco) continuam sendo do
+ * ciclo atual (operationalCycleId).
  * @summary Get dashboard summary
  */
-export const getDashboardSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<DashboardSummary> => {
+export const getDashboardSummary = async (params?: GetDashboardSummaryParams, options?: Parameters<typeof customFetch>[1]): Promise<DashboardSummary> => {
 
-  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(),
+  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8232,23 +8427,23 @@ export const getDashboardSummary = async ( options?: Parameters<typeof customFet
 
 
 
-export const getGetDashboardSummaryQueryKey = () => {
+export const getGetDashboardSummaryQueryKey = (params?: GetDashboardSummaryParams,) => {
     return [
-    `/dashboard/summary`
+    `/dashboard/summary`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<void>>(params?: GetDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary(params, { signal, ...requestOptions });
 
 
 
@@ -8258,19 +8453,19 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetDashboardSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardSummary>>>
-export type GetDashboardSummaryQueryError = ErrorType<unknown>
+export type GetDashboardSummaryQueryError = ErrorType<void>
 
 
 /**
  * @summary Get dashboard summary
  */
 
-export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<void>>(
+ params?: GetDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardSummaryQueryOptions(options)
+  const queryOptions = getGetDashboardSummaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -8367,20 +8562,32 @@ export function useGetAnalyticsEventsReport<TData = Awaited<ReturnType<typeof ge
 
 
 
-export const getGetAnalyticsOverviewUrl = () => {
+export const getGetAnalyticsOverviewUrl = (params?: GetAnalyticsOverviewParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/analytics/overview`
+  return stringifiedParams.length > 0 ? `/analytics/overview?${stringifiedParams}` : `/analytics/overview`
 }
 
 /**
- * @summary Indicadores do ciclo atual para a tela de Análises (gestores)
+ * Com cycleId=all: todos os eventos e resultados de todos os ciclos. As
+ * contagens de pessoas viram participações (uma pessoa conta uma vez por
+ * ciclo; kpis.distinctCollaborators = pessoas diferentes), o funil usa o
+ * mínimo de eventos de cada ciclo e nearNextFaixa vem vazio (projeção só
+ * faz sentido num ciclo). cycle.id = 0 no Total geral.
+ * @summary Indicadores de um ciclo (padrão o atual) ou do Total geral para a tela de Análises (gestores)
  */
-export const getAnalyticsOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<AnalyticsOverview> => {
+export const getAnalyticsOverview = async (params?: GetAnalyticsOverviewParams, options?: Parameters<typeof customFetch>[1]): Promise<AnalyticsOverview> => {
 
-  return customFetch<AnalyticsOverview>(getGetAnalyticsOverviewUrl(),
+  return customFetch<AnalyticsOverview>(getGetAnalyticsOverviewUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8393,23 +8600,23 @@ export const getAnalyticsOverview = async ( options?: Parameters<typeof customFe
 
 
 
-export const getGetAnalyticsOverviewQueryKey = () => {
+export const getGetAnalyticsOverviewQueryKey = (params?: GetAnalyticsOverviewParams,) => {
     return [
-    `/analytics/overview`
+    `/analytics/overview`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAnalyticsOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAnalyticsOverview>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAnalyticsOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAnalyticsOverview>>, TError = ErrorType<void>>(params?: GetAnalyticsOverviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAnalyticsOverviewQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetAnalyticsOverviewQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalyticsOverview>>> = ({ signal }) => getAnalyticsOverview({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalyticsOverview>>> = ({ signal }) => getAnalyticsOverview(params, { signal, ...requestOptions });
 
 
 
@@ -8423,15 +8630,15 @@ export type GetAnalyticsOverviewQueryError = ErrorType<void>
 
 
 /**
- * @summary Indicadores do ciclo atual para a tela de Análises (gestores)
+ * @summary Indicadores de um ciclo (padrão o atual) ou do Total geral para a tela de Análises (gestores)
  */
 
 export function useGetAnalyticsOverview<TData = Awaited<ReturnType<typeof getAnalyticsOverview>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetAnalyticsOverviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetAnalyticsOverviewQueryOptions(options)
+  const queryOptions = getGetAnalyticsOverviewQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -8444,20 +8651,28 @@ export function useGetAnalyticsOverview<TData = Awaited<ReturnType<typeof getAna
 
 
 
-export const getGetDashboardPlatoonDistributionUrl = () => {
+export const getGetDashboardPlatoonDistributionUrl = (params?: GetDashboardPlatoonDistributionParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/dashboard/platoon-distribution`
+  return stringifiedParams.length > 0 ? `/dashboard/platoon-distribution?${stringifiedParams}` : `/dashboard/platoon-distribution`
 }
 
 /**
+ * Com cycleId=all, conta os resultados de todos os ciclos (uma pessoa conta uma vez por ciclo).
  * @summary Get platoon distribution
  */
-export const getDashboardPlatoonDistribution = async ( options?: Parameters<typeof customFetch>[1]): Promise<PlatoonDistribution[]> => {
+export const getDashboardPlatoonDistribution = async (params?: GetDashboardPlatoonDistributionParams, options?: Parameters<typeof customFetch>[1]): Promise<PlatoonDistribution[]> => {
 
-  return customFetch<PlatoonDistribution[]>(getGetDashboardPlatoonDistributionUrl(),
+  return customFetch<PlatoonDistribution[]>(getGetDashboardPlatoonDistributionUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8470,23 +8685,23 @@ export const getDashboardPlatoonDistribution = async ( options?: Parameters<type
 
 
 
-export const getGetDashboardPlatoonDistributionQueryKey = () => {
+export const getGetDashboardPlatoonDistributionQueryKey = (params?: GetDashboardPlatoonDistributionParams,) => {
     return [
-    `/dashboard/platoon-distribution`
+    `/dashboard/platoon-distribution`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardPlatoonDistributionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardPlatoonDistributionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>(params?: GetDashboardPlatoonDistributionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPlatoonDistributionQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPlatoonDistributionQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>> = ({ signal }) => getDashboardPlatoonDistribution({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>> = ({ signal }) => getDashboardPlatoonDistribution(params, { signal, ...requestOptions });
 
 
 
@@ -8504,11 +8719,11 @@ export type GetDashboardPlatoonDistributionQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardPlatoonDistribution<TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardPlatoonDistributionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardPlatoonDistributionQueryOptions(options)
+  const queryOptions = getGetDashboardPlatoonDistributionQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -8521,20 +8736,30 @@ export function useGetDashboardPlatoonDistribution<TData = Awaited<ReturnType<ty
 
 
 
-export const getGetDashboardTopEmployeesUrl = () => {
+export const getGetDashboardTopEmployeesUrl = (params?: GetDashboardTopEmployeesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/dashboard/top-employees`
+  return stringifiedParams.length > 0 ? `/dashboard/top-employees?${stringifiedParams}` : `/dashboard/top-employees`
 }
 
 /**
+ * Com cycleId=all, uma linha por pessoa: finalResult = média das notas
+ * finais dos ciclos com nota, eventsCount = soma, bonusValue = soma dos
+ * ciclos elegíveis e platoon = faixa do ciclo mais recente.
  * @summary Get top 10 employees
  */
-export const getDashboardTopEmployees = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuarterlyResult[]> => {
+export const getDashboardTopEmployees = async (params?: GetDashboardTopEmployeesParams, options?: Parameters<typeof customFetch>[1]): Promise<QuarterlyResult[]> => {
 
-  return customFetch<QuarterlyResult[]>(getGetDashboardTopEmployeesUrl(),
+  return customFetch<QuarterlyResult[]>(getGetDashboardTopEmployeesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8547,23 +8772,23 @@ export const getDashboardTopEmployees = async ( options?: Parameters<typeof cust
 
 
 
-export const getGetDashboardTopEmployeesQueryKey = () => {
+export const getGetDashboardTopEmployeesQueryKey = (params?: GetDashboardTopEmployeesParams,) => {
     return [
-    `/dashboard/top-employees`
+    `/dashboard/top-employees`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardTopEmployeesQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardTopEmployeesQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>(params?: GetDashboardTopEmployeesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardTopEmployeesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardTopEmployeesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardTopEmployees>>> = ({ signal }) => getDashboardTopEmployees({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardTopEmployees>>> = ({ signal }) => getDashboardTopEmployees(params, { signal, ...requestOptions });
 
 
 
@@ -8581,11 +8806,11 @@ export type GetDashboardTopEmployeesQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardTopEmployees<TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardTopEmployeesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardTopEmployeesQueryOptions(options)
+  const queryOptions = getGetDashboardTopEmployeesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -9136,7 +9361,7 @@ return customFetch<QuarterEligibility>(getSetCycleEligibilityUrl(),
 
 export const getSetCycleEligibilityMutationKey = () => ['setCycleEligibility'] as const;
 
-export const getSetCycleEligibilityMutationOptions = <TError = ErrorType<unknown>,
+export const getSetCycleEligibilityMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,SetCycleEligibilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,SetCycleEligibilityMutationVariables, TContext> => {
 
@@ -9165,13 +9390,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetCycleEligibilityMutationResult = NonNullable<Awaited<ReturnType<typeof setCycleEligibility>>>
     export type SetCycleEligibilityMutationBody = BodyType<QuarterEligibilityInput>
-    export type SetCycleEligibilityMutationError = ErrorType<unknown>
+    export type SetCycleEligibilityMutationError = ErrorType<ConflictError>
     export type SetCycleEligibilityMutationVariables = {data: BodyType<QuarterEligibilityInput>}
 
     /**
  * @summary Set cycle eligibility for an employee
  */
-export const useSetCycleEligibility = <TError = ErrorType<unknown>,
+export const useSetCycleEligibility = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,SetCycleEligibilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setCycleEligibility>>,
@@ -9247,6 +9472,83 @@ export function useGetCurrentCycle<TData = Awaited<ReturnType<typeof getCurrentC
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCurrentCycleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListCycleOptionsUrl = () => {
+
+
+
+
+  return `/cycles/options`
+}
+
+/**
+ * @summary Opções do seletor de ciclo (atual primeiro, depois os anteriores do mais recente ao mais antigo), qualquer papel logado
+ */
+export const listCycleOptions = async ( options?: Parameters<typeof customFetch>[1]): Promise<Cycle[]> => {
+
+  return customFetch<Cycle[]>(getListCycleOptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCycleOptionsQueryKey = () => {
+    return [
+    `/cycles/options`
+    ] as const;
+    }
+
+
+export const getListCycleOptionsQueryOptions = <TData = Awaited<ReturnType<typeof listCycleOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCycleOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCycleOptionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCycleOptions>>> = ({ signal }) => listCycleOptions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCycleOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCycleOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCycleOptions>>>
+export type ListCycleOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Opções do seletor de ciclo (atual primeiro, depois os anteriores do mais recente ao mais antigo), qualquer papel logado
+ */
+
+export function useListCycleOptions<TData = Awaited<ReturnType<typeof listCycleOptions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCycleOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCycleOptionsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -9467,7 +9769,7 @@ return customFetch<Cycle>(getUpdateCycleUrl(id),
 
 export const getUpdateCycleMutationKey = () => ['updateCycle'] as const;
 
-export const getUpdateCycleMutationOptions = <TError = ErrorType<void>,
+export const getUpdateCycleMutationOptions = <TError = ErrorType<void | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,UpdateCycleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,UpdateCycleMutationVariables, TContext> => {
 
@@ -9496,13 +9798,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateCycleMutationResult = NonNullable<Awaited<ReturnType<typeof updateCycle>>>
     export type UpdateCycleMutationBody = BodyType<UpdateCycleInput>
-    export type UpdateCycleMutationError = ErrorType<void>
+    export type UpdateCycleMutationError = ErrorType<void | ConflictError>
     export type UpdateCycleMutationVariables = {id: number;data: BodyType<UpdateCycleInput>}
 
     /**
  * @summary Edita nome e período (ciclo fechado só troca o nome)
  */
-export const useUpdateCycle = <TError = ErrorType<void>,
+export const useUpdateCycle = <TError = ErrorType<void | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,UpdateCycleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateCycle>>,
@@ -9736,6 +10038,90 @@ export function useGetRanking<TData = Awaited<ReturnType<typeof getRanking>>, TE
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankingQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRankingTotalUrl = () => {
+
+
+
+
+  return `/ranking/total`
+}
+
+/**
+ * Somente leitura. cyclesWithScore = ciclos com evento com nota;
+ * avgFinalResult = média PONDERADA pelos eventos com nota
+ * (Σ nota final × eventos ÷ Σ eventos); eventsCount = soma dos eventos com
+ * nota; bonusOfficial = bônus dos ciclos fechados; bonusProjected = bônus
+ * do ciclo aberto (projeção); bonusTotal = os dois somados; bonusPaid =
+ * soma do bônus pago; latest = faixa do ciclo mais recente (não há faixa
+ * do total). Mesmo recorte do Ranking em cada ciclo (no atual só ativos).
+ * @summary Total geral de Resultados & Ranking (uma linha por pessoa, somando todos os ciclos)
+ */
+export const getRankingTotal = async ( options?: Parameters<typeof customFetch>[1]): Promise<RankingTotal> => {
+
+  return customFetch<RankingTotal>(getGetRankingTotalUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRankingTotalQueryKey = () => {
+    return [
+    `/ranking/total`
+    ] as const;
+    }
+
+
+export const getGetRankingTotalQueryOptions = <TData = Awaited<ReturnType<typeof getRankingTotal>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankingTotal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRankingTotalQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRankingTotal>>> = ({ signal }) => getRankingTotal({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRankingTotal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRankingTotalQueryResult = NonNullable<Awaited<ReturnType<typeof getRankingTotal>>>
+export type GetRankingTotalQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Total geral de Resultados & Ranking (uma linha por pessoa, somando todos os ciclos)
+ */
+
+export function useGetRankingTotal<TData = Awaited<ReturnType<typeof getRankingTotal>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankingTotal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRankingTotalQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -10089,6 +10475,8 @@ export const getTriggerSyncUrl = () => {
 }
 
 /**
+ * Traz os eventos do ciclo atual pela DATA DE INÍCIO (mesmo critério de eventPeriodPosition). Evento já
+ * existente de ciclo FECHADO não é tocado (vem em skippedClosedCycle).
  * @summary Trigger external sync
  */
 export const triggerSync = async ( options?: Parameters<typeof customFetch>[1]): Promise<SyncResult> => {
@@ -10108,7 +10496,7 @@ export const triggerSync = async ( options?: Parameters<typeof customFetch>[1]):
 
 export const getTriggerSyncMutationKey = () => ['triggerSync'] as const;
 
-export const getTriggerSyncMutationOptions = <TError = ErrorType<unknown>,
+export const getTriggerSyncMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof triggerSync>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof triggerSync>>, TError,void, TContext> => {
 
@@ -10137,13 +10525,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type TriggerSyncMutationResult = NonNullable<Awaited<ReturnType<typeof triggerSync>>>
 
-    export type TriggerSyncMutationError = ErrorType<unknown>
+    export type TriggerSyncMutationError = ErrorType<ConflictError>
 
 
     /**
  * @summary Trigger external sync
  */
-export const useTriggerSync = <TError = ErrorType<unknown>,
+export const useTriggerSync = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof triggerSync>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof triggerSync>>,
@@ -10548,7 +10936,7 @@ return customFetch<HistoricalImportResult>(getImportHistoricalResultsUrl(),
 
 export const getImportHistoricalResultsMutationKey = () => ['importHistoricalResults'] as const;
 
-export const getImportHistoricalResultsMutationOptions = <TError = ErrorType<unknown>,
+export const getImportHistoricalResultsMutationOptions = <TError = ErrorType<void | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,ImportHistoricalResultsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,ImportHistoricalResultsMutationVariables, TContext> => {
 
@@ -10577,13 +10965,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportHistoricalResultsMutationResult = NonNullable<Awaited<ReturnType<typeof importHistoricalResults>>>
     export type ImportHistoricalResultsMutationBody = BodyType<HistoricalImportInput>
-    export type ImportHistoricalResultsMutationError = ErrorType<unknown>
+    export type ImportHistoricalResultsMutationError = ErrorType<void | ConflictError>
     export type ImportHistoricalResultsMutationVariables = {data: BodyType<HistoricalImportInput>}
 
     /**
  * @summary Import historical event results (no per-criterion evaluation, score applied directly). Always previews (dryRun) unless dryRun=false and there are zero validation errors.
  */
-export const useImportHistoricalResults = <TError = ErrorType<unknown>,
+export const useImportHistoricalResults = <TError = ErrorType<void | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,ImportHistoricalResultsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof importHistoricalResults>>,
@@ -10636,7 +11024,7 @@ return customFetch<SurveyImportResult>(getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey = () => ['importSurvey'] as const;
 
-export const getImportSurveyMutationOptions = <TError = ErrorType<unknown>,
+export const getImportSurveyMutationOptions = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,ImportSurveyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,ImportSurveyMutationVariables, TContext> => {
 
@@ -10665,13 +11053,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof importSurvey>>>
     export type ImportSurveyMutationBody = BodyType<SurveyImportInput>
-    export type ImportSurveyMutationError = ErrorType<unknown>
+    export type ImportSurveyMutationError = ErrorType<ConflictError>
     export type ImportSurveyMutationVariables = {data: BodyType<SurveyImportInput>}
 
     /**
  * @summary Import the evaluator survey spreadsheet (one row = one evaluator's answer for one event). Creates avaliador users (deduped by name), never auto-creates events (every spreadsheet event must be linked to an existing event via linkOverrides), converts numeric 0-10 answers into real per-criterion evaluations for non-historical events, turns the four Sim/Não questions into event_conformities (worst case wins), and stores historical-event comments as importedNotes only. Also runs the criteria catalog migration (activate "Carga na Saída do Galpão", deactivate 3 retired criteria) inside the commit transaction. Always previews (dryRun) unless dryRun=false and there are zero validation errors and every group is linked.
  */
-export const useImportSurvey = <TError = ErrorType<unknown>,
+export const useImportSurvey = <TError = ErrorType<ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,ImportSurveyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof importSurvey>>,
@@ -10854,20 +11242,27 @@ export function useExportEventResults<TData = Awaited<ReturnType<typeof exportEv
 
 
 
-export const getExportQuarterlyResultsUrl = () => {
+export const getExportQuarterlyResultsUrl = (params?: ExportQuarterlyResultsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/exports/quarterly-results`
+  return stringifiedParams.length > 0 ? `/exports/quarterly-results?${stringifiedParams}` : `/exports/quarterly-results`
 }
 
 /**
  * @summary Export quarterly results CSV
  */
-export const exportQuarterlyResults = async ( options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
+export const exportQuarterlyResults = async (params?: ExportQuarterlyResultsParams, options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportQuarterlyResultsUrl(),
+  return customFetch<CsvExport>(getExportQuarterlyResultsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -10880,23 +11275,23 @@ export const exportQuarterlyResults = async ( options?: Parameters<typeof custom
 
 
 
-export const getExportQuarterlyResultsQueryKey = () => {
+export const getExportQuarterlyResultsQueryKey = (params?: ExportQuarterlyResultsParams,) => {
     return [
-    `/exports/quarterly-results`
+    `/exports/quarterly-results`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExportQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>(params?: ExportQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportQuarterlyResultsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getExportQuarterlyResultsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportQuarterlyResults>>> = ({ signal }) => exportQuarterlyResults({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportQuarterlyResults>>> = ({ signal }) => exportQuarterlyResults(params, { signal, ...requestOptions });
 
 
 
@@ -10914,11 +11309,11 @@ export type ExportQuarterlyResultsQueryError = ErrorType<unknown>
  */
 
 export function useExportQuarterlyResults<TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ExportQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportQuarterlyResultsQueryOptions(options)
+  const queryOptions = getExportQuarterlyResultsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -10931,20 +11326,27 @@ export function useExportQuarterlyResults<TData = Awaited<ReturnType<typeof expo
 
 
 
-export const getExportRankingUrl = () => {
+export const getExportRankingUrl = (params?: ExportRankingParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/exports/ranking`
+  return stringifiedParams.length > 0 ? `/exports/ranking?${stringifiedParams}` : `/exports/ranking`
 }
 
 /**
  * @summary Export ranking CSV
  */
-export const exportRanking = async ( options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
+export const exportRanking = async (params?: ExportRankingParams, options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportRankingUrl(),
+  return customFetch<CsvExport>(getExportRankingUrl(params),
   {
     ...options,
     method: 'GET'
@@ -10957,23 +11359,23 @@ export const exportRanking = async ( options?: Parameters<typeof customFetch>[1]
 
 
 
-export const getExportRankingQueryKey = () => {
+export const getExportRankingQueryKey = (params?: ExportRankingParams,) => {
     return [
-    `/exports/ranking`
+    `/exports/ranking`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExportRankingQueryOptions = <TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportRankingQueryOptions = <TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>(params?: ExportRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportRankingQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getExportRankingQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportRanking>>> = ({ signal }) => exportRanking({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportRanking>>> = ({ signal }) => exportRanking(params, { signal, ...requestOptions });
 
 
 
@@ -10991,11 +11393,11 @@ export type ExportRankingQueryError = ErrorType<unknown>
  */
 
 export function useExportRanking<TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ExportRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportRankingQueryOptions(options)
+  const queryOptions = getExportRankingQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -11008,20 +11410,27 @@ export function useExportRanking<TData = Awaited<ReturnType<typeof exportRanking
 
 
 
-export const getExportCajuBonusesUrl = () => {
+export const getExportCajuBonusesUrl = (params?: ExportCajuBonusesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/exports/caju-bonuses`
+  return stringifiedParams.length > 0 ? `/exports/caju-bonuses?${stringifiedParams}` : `/exports/caju-bonuses`
 }
 
 /**
  * @summary Export Caju bonus report CSV
  */
-export const exportCajuBonuses = async ( options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
+export const exportCajuBonuses = async (params?: ExportCajuBonusesParams, options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportCajuBonusesUrl(),
+  return customFetch<CsvExport>(getExportCajuBonusesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -11034,23 +11443,23 @@ export const exportCajuBonuses = async ( options?: Parameters<typeof customFetch
 
 
 
-export const getExportCajuBonusesQueryKey = () => {
+export const getExportCajuBonusesQueryKey = (params?: ExportCajuBonusesParams,) => {
     return [
-    `/exports/caju-bonuses`
+    `/exports/caju-bonuses`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExportCajuBonusesQueryOptions = <TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportCajuBonusesQueryOptions = <TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>(params?: ExportCajuBonusesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportCajuBonusesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getExportCajuBonusesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCajuBonuses>>> = ({ signal }) => exportCajuBonuses({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCajuBonuses>>> = ({ signal }) => exportCajuBonuses(params, { signal, ...requestOptions });
 
 
 
@@ -11068,11 +11477,11 @@ export type ExportCajuBonusesQueryError = ErrorType<unknown>
  */
 
 export function useExportCajuBonuses<TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ExportCajuBonusesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportCajuBonusesQueryOptions(options)
+  const queryOptions = getExportCajuBonusesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -11085,20 +11494,27 @@ export function useExportCajuBonuses<TData = Awaited<ReturnType<typeof exportCaj
 
 
 
-export const getExportAbsencesUrl = () => {
+export const getExportAbsencesUrl = (params?: ExportAbsencesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/exports/absences`
+  return stringifiedParams.length > 0 ? `/exports/absences?${stringifiedParams}` : `/exports/absences`
 }
 
 /**
  * @summary Export absences CSV
  */
-export const exportAbsences = async ( options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
+export const exportAbsences = async (params?: ExportAbsencesParams, options?: Parameters<typeof customFetch>[1]): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportAbsencesUrl(),
+  return customFetch<CsvExport>(getExportAbsencesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -11111,23 +11527,23 @@ export const exportAbsences = async ( options?: Parameters<typeof customFetch>[1
 
 
 
-export const getExportAbsencesQueryKey = () => {
+export const getExportAbsencesQueryKey = (params?: ExportAbsencesParams,) => {
     return [
-    `/exports/absences`
+    `/exports/absences`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExportAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportAbsencesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getExportAbsencesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAbsences>>> = ({ signal }) => exportAbsences({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAbsences>>> = ({ signal }) => exportAbsences(params, { signal, ...requestOptions });
 
 
 
@@ -11145,11 +11561,11 @@ export type ExportAbsencesQueryError = ErrorType<unknown>
  */
 
 export function useExportAbsences<TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportAbsencesQueryOptions(options)
+  const queryOptions = getExportAbsencesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -13599,7 +14015,7 @@ return customFetch<EventCriterionAssignmentRow>(getUpdateCriterionAssignmentUrl(
 
 export const getUpdateCriterionAssignmentMutationKey = () => ['updateCriterionAssignment'] as const;
 
-export const getUpdateCriterionAssignmentMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+export const getUpdateCriterionAssignmentMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext> => {
 
@@ -13628,13 +14044,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateCriterionAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof updateCriterionAssignment>>>
     export type UpdateCriterionAssignmentMutationBody = BodyType<CriterionAssignmentUpdate>
-    export type UpdateCriterionAssignmentMutationError = ErrorType<ErrorEnvelope>
+    export type UpdateCriterionAssignmentMutationError = ErrorType<ErrorEnvelope | ConflictError>
     export type UpdateCriterionAssignmentMutationVariables = {id: number;criterionId: number;data: BodyType<CriterionAssignmentUpdate>}
 
     /**
  * @summary Confirma, reatribui, redireciona ou atribui (principal da área) um critério do evento
  */
-export const useUpdateCriterionAssignment = <TError = ErrorType<ErrorEnvelope>,
+export const useUpdateCriterionAssignment = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateCriterionAssignment>>,
@@ -13655,6 +14071,8 @@ export const getGetCriterionRedirectOptionsUrl = (id: number,
 }
 
 /**
+ * Ciclo com avaliação por área: só usuários da área do critério. Avaliador: só de critério que é dele
+ * (designado, da área do cadastro, da área designada no evento ou da área em que é principal); outro → 403.
  * @summary Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
  */
 export const getCriterionRedirectOptions = async (id: number,
@@ -13847,7 +14265,7 @@ return customFetch<PublicTokenCreated>(getCreatePublicTokenUrl(id),
 
 export const getCreatePublicTokenMutationKey = () => ['createPublicToken'] as const;
 
-export const getCreatePublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+export const getCreatePublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext> => {
 
@@ -13876,13 +14294,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreatePublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createPublicToken>>>
     export type CreatePublicTokenMutationBody = BodyType<PublicTokenInput>
-    export type CreatePublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreatePublicTokenMutationError = ErrorType<ErrorEnvelope | ConflictError>
     export type CreatePublicTokenMutationVariables = {id: number;data: BodyType<PublicTokenInput>}
 
     /**
  * @summary Gera link público do questionário do avaliador logado
  */
-export const useCreatePublicToken = <TError = ErrorType<ErrorEnvelope>,
+export const useCreatePublicToken = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createPublicToken>>,
@@ -13936,7 +14354,7 @@ return customFetch<PublicTokenCreated>(getCreateAdminPublicTokenUrl(id),
 
 export const getCreateAdminPublicTokenMutationKey = () => ['createAdminPublicToken'] as const;
 
-export const getCreateAdminPublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+export const getCreateAdminPublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext> => {
 
@@ -13965,13 +14383,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateAdminPublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createAdminPublicToken>>>
     export type CreateAdminPublicTokenMutationBody = BodyType<AdminPublicTokenInput>
-    export type CreateAdminPublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreateAdminPublicTokenMutationError = ErrorType<ErrorEnvelope | ConflictError>
     export type CreateAdminPublicTokenMutationVariables = {id: number;data: BodyType<AdminPublicTokenInput>}
 
     /**
  * @summary Admin/RH/Diretoria/Operador — gera link público para o questionário de um avaliador designado
  */
-export const useCreateAdminPublicToken = <TError = ErrorType<ErrorEnvelope>,
+export const useCreateAdminPublicToken = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createAdminPublicToken>>,
@@ -14557,7 +14975,7 @@ export const getSubmitPublicEvalUrl = (token: string,) => {
  * @summary Envia as notas do questionário pelo link público (público, sem autenticação)
  */
 export const submitPublicEval = async (token: string,
-    publicEvalSubmitInput: PublicEvalSubmitInput, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+    publicEvalSubmitInput: PublicEvalSubmitInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicEvalSubmitResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -14573,7 +14991,7 @@ export const submitPublicEval = async (token: string,
     }
     return headers;
   };
-return customFetch<OkResponse>(getSubmitPublicEvalUrl(token),
+return customFetch<PublicEvalSubmitResult>(getSubmitPublicEvalUrl(token),
   {
     ...options,
     method: 'POST',
@@ -14588,7 +15006,7 @@ return customFetch<OkResponse>(getSubmitPublicEvalUrl(token),
 
 export const getSubmitPublicEvalMutationKey = () => ['submitPublicEval'] as const;
 
-export const getSubmitPublicEvalMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+export const getSubmitPublicEvalMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext> => {
 
@@ -14617,13 +15035,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SubmitPublicEvalMutationResult = NonNullable<Awaited<ReturnType<typeof submitPublicEval>>>
     export type SubmitPublicEvalMutationBody = BodyType<PublicEvalSubmitInput>
-    export type SubmitPublicEvalMutationError = ErrorType<ErrorEnvelope>
+    export type SubmitPublicEvalMutationError = ErrorType<ErrorEnvelope | ConflictError>
     export type SubmitPublicEvalMutationVariables = {token: string;data: BodyType<PublicEvalSubmitInput>}
 
     /**
  * @summary Envia as notas do questionário pelo link público (público, sem autenticação)
  */
-export const useSubmitPublicEval = <TError = ErrorType<ErrorEnvelope>,
+export const useSubmitPublicEval = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitPublicEval>>,
@@ -14677,7 +15095,7 @@ return customFetch<OkResponse>(getSubmitPublicEvalConformityUrl(token),
 
 export const getSubmitPublicEvalConformityMutationKey = () => ['submitPublicEvalConformity'] as const;
 
-export const getSubmitPublicEvalConformityMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+export const getSubmitPublicEvalConformityMutationOptions = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext> => {
 
@@ -14706,13 +15124,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SubmitPublicEvalConformityMutationResult = NonNullable<Awaited<ReturnType<typeof submitPublicEvalConformity>>>
     export type SubmitPublicEvalConformityMutationBody = BodyType<PublicEvalConformityInput>
-    export type SubmitPublicEvalConformityMutationError = ErrorType<ErrorEnvelope>
+    export type SubmitPublicEvalConformityMutationError = ErrorType<ErrorEnvelope | ConflictError>
     export type SubmitPublicEvalConformityMutationVariables = {token: string;data: BodyType<PublicEvalConformityInput>}
 
     /**
  * @summary Envia o formulário de conformidade pelo link público (público, sem autenticação)
  */
-export const useSubmitPublicEvalConformity = <TError = ErrorType<ErrorEnvelope>,
+export const useSubmitPublicEvalConformity = <TError = ErrorType<ErrorEnvelope | ConflictError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitPublicEvalConformity>>,

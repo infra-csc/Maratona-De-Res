@@ -8,4 +8,9 @@
 
 export type GetRankingDetailParams = {
 employeeId: number;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
 };

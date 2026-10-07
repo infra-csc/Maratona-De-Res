@@ -2,6 +2,7 @@ import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
 import { CheckCircle, Lock, Rocket } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { CONDENSED, AMBER_TEXT } from "@/lib/premium-theme";
+import { plural } from "@/lib/utils";
 import { displayCriterionName } from "./helpers";
 import type { ConformityEvalForm } from "./types";
 
@@ -33,7 +34,7 @@ export function ConfirmLaunchDialog({
             <Rocket size={22} className="text-accent-text" /> Confirmar lançamento
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            Você está prestes a submeter {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
+            Você está prestes a lançar {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
             {" "}<strong>{eventName}</strong>. Após o lançamento, as notas ficam
             {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
           </AlertDialogDescription>
@@ -51,7 +52,7 @@ export function ConfirmLaunchDialog({
                 return (
                   <div key={c.criterionId} className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[11px] font-bold uppercase text-foreground truncate">{displayCriterionName(c.criterionName)}</span>
+                      <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
                       {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
                       {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
                     </div>
@@ -104,18 +105,32 @@ interface EvaluationSummaryPanelProps extends Omit<ConfirmLaunchDialogProps, "op
   pendingToFill: number;
   confirmLaunchOpen: boolean;
   setConfirmLaunchOpen: (open: boolean) => void;
+  // Critérios já respondidos por outra pessoa (modo por área) → nome completo e nota de quem respondeu.
+  closedNames?: Map<number, { name: string; score: number | null }>;
+  // Critérios que ainda posso enviar (sem os fechados) — vão no modal.
+  launchCriteria: EventCriterion[];
+  /** Ciclo sem "Conduta" na matriz: o resumo não mostra a pergunta. */
+  withoutConduta: boolean;
+  /** Matriz de Cenografia respondida por OUTRA pessoa: não é pendência minha; vazio = "não respondida". */
+  cenografiaByOther?: string | null;
 }
 
-// Painel lateral fixo "Resumo da Avaliação": progresso, resumo das notas
-// (critérios + perguntas da matriz) e o fluxo de lançamento.
+// Painel "Resumo da Avaliação": progresso, resumo das notas (critérios +
+// perguntas da matriz) e o fluxo de lançamento. No celular e em telas médias
+// ele vem DEPOIS do formulário, e o botão de lançar fica fixo no rodapé.
 export function EvaluationSummaryPanel({
   isEvaluator, myCriteria, getEval, currentScore, comments, progressPct, totalItems, totalCompleted, completedCount,
   extraConformityItemsTotal, extraConformityItemsCompleted, isFerramentasEvaluatorForEvent, isConformityEvaluatorForEvent,
   conformityEvalForm, allEvaled, allReady, pendingToFill, launching, confirmLaunchOpen, setConfirmLaunchOpen,
-  toSubmitCount, eventName, onLaunch,
+  toSubmitCount, eventName, onLaunch, closedNames, launchCriteria, withoutConduta, cenografiaByOther,
 }: EvaluationSummaryPanelProps) {
+  // Item da matriz que ficou vazio: pendência minha (âmbar) ou, se a matriz foi
+  // respondida por outra pessoa, só "não respondida" (neutro).
+  const emptyMark = (label = "pendente") => cenografiaByOther !== undefined && cenografiaByOther !== null
+    ? <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">não respondida</span>
+    : <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>{label}</span>;
   return (
-    <div className="order-1 lg:order-none sticky top-16 md:top-2 lg:top-6 space-y-6 z-10">
+    <div className="@4xl:sticky @4xl:top-4 space-y-6">
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="bg-secondary px-5 py-4 border-b border-border">
           <h3 className="text-lg font-black uppercase tracking-tight text-foreground" style={{ fontFamily: CONDENSED }}>Resumo da Avaliação</h3>
@@ -132,8 +147,8 @@ export function EvaluationSummaryPanel({
           </div>
           <p className="text-[11px] text-muted-foreground">
             {extraConformityItemsTotal > 0
-              ? `${totalCompleted} de ${totalItems} itens concluídos — ${completedCount} de ${myCriteria.length} critérios submetidos e ${extraConformityItemsCompleted} de ${extraConformityItemsTotal} perguntas da matriz respondidas.`
-              : `${completedCount} de ${myCriteria.length} critérios submetidos.`}
+              ? `${totalCompleted} de ${plural(totalItems, "item concluído", "itens concluídos")} — ${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")} e ${cenografiaByOther ? `matriz respondida por ${cenografiaByOther}.` : `${extraConformityItemsCompleted} de ${plural(extraConformityItemsTotal, "pergunta da matriz respondida", "perguntas da matriz respondidas")}.`}`
+              : `${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")}${closedNames && closedNames.size > 0 ? ` (${closedNames.size} ${closedNames.size === 1 ? "fechado por quem respondeu primeiro" : "fechados por quem respondeu primeiro"})` : ""}.`}
           </p>
         </div>
 
@@ -154,11 +169,26 @@ export function EvaluationSummaryPanel({
                 const isDraft = ev?.status === "draft";
                 const commentText = comments[c.criterionId] ?? ev?.comments ?? "";
                 const missingComment = !isSubmitted && hasScore && !commentText.trim();
+                const closedBy = closedNames?.get(c.criterionId);
+                if (closedBy != null) {
+                  return (
+                    <div key={c.criterionId} className="flex items-start justify-between gap-3" data-testid={`summary-closed-${c.criterionId}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] font-bold uppercase text-muted-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
+                        <Lock size={11} className="shrink-0 text-muted-foreground" aria-label="Fechado" />
+                      </div>
+                      <span className="shrink-0 text-right text-[11px] font-bold text-muted-foreground max-w-[55%] leading-snug" title={`Respondido por ${closedBy.name}`}>
+                        {closedBy.score != null && <span className="text-sm font-black text-foreground">{closedBy.score}</span>}
+                        {closedBy.score != null ? " · " : ""}por {closedBy.name}
+                      </span>
+                    </div>
+                  );
+                }
                 return (
                   <div key={c.criterionId} className="space-y-0.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-bold uppercase text-foreground truncate">{displayCriterionName(c.criterionName)}</span>
+                        <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
                         {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
                         {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
                       </div>
@@ -176,7 +206,7 @@ export function EvaluationSummaryPanel({
               })}
               {isFerramentasEvaluatorForEvent && (
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground truncate">Guarda de Equipamentos</span>
+                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">Guarda de Equipamentos</span>
                   {conformityEvalForm.guardaEquipamentos === null ? (
                     <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>pendente</span>
                   ) : (
@@ -187,26 +217,25 @@ export function EvaluationSummaryPanel({
               {isConformityEvaluatorForEvent && [
                 { label: "EPI", val: conformityEvalForm.epi },
                 { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
-                { label: "Conduta", val: conformityEvalForm.conduta },
-                { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse },
+                ...(withoutConduta ? [] : [{ label: "Conduta", val: conformityEvalForm.conduta }]),
+                // Destaque não é conformidade: "Não" é a resposta comum, não uma falha.
+                { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse, neutral: true },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground truncate">{item.label}</span>
+                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{item.label}</span>
                   {item.val === null ? (
-                    <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>pendente</span>
+                    emptyMark()
                   ) : (
-                    <span className={`shrink-0 text-sm font-black ${item.val ? "text-accent-text" : "text-destructive"}`}>{item.val ? "Sim" : "Não"}</span>
+                    <span className={`shrink-0 text-sm font-black ${item.val ? "text-accent-text" : "neutral" in item ? "text-foreground" : "text-destructive"}`}>{item.val ? "Sim" : "Não"}</span>
                   )}
                 </div>
               ))}
               {isConformityEvaluatorForEvent && (
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground truncate">Faltas/Atrasos</span>
+                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">Faltas/Atrasos</span>
                   {conformityEvalForm.absencesReport.trim() ? (
                     <span className="shrink-0 text-sm font-black text-accent-text">Respondido</span>
-                  ) : (
-                    <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>pendente</span>
-                  )}
+                  ) : emptyMark()}
                 </div>
               )}
             </div>
@@ -218,30 +247,32 @@ export function EvaluationSummaryPanel({
         {/* Submission — evaluators only */}
         {isEvaluator && myCriteria.length > 0 && (
           <div className="p-5">
+            {/* No celular o botão de lançar é o fixo do rodapé — aqui só no tablet/computador. */}
             {allEvaled ? (
               <div className="flex items-center justify-center gap-2 text-accent-text bg-accent/15 border border-accent rounded-lg p-3 font-bold uppercase text-sm">
-                <CheckCircle size={16} /> Você já concluiu sua avaliação
+                <CheckCircle size={16} /> {closedNames && closedNames.size === myCriteria.length ? "Sua área já respondeu este evento" : "Você já concluiu sua avaliação"}
               </div>
             ) : allReady ? (
               <button
                 data-testid="button-submit-eval"
+                type="button"
                 onClick={() => setConfirmLaunchOpen(true)}
                 disabled={launching}
-                className="w-full bg-primary text-primary-foreground border border-primary rounded-lg py-4 font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                className="hidden md:flex w-full bg-primary text-primary-foreground border border-primary rounded-lg py-4 font-bold text-sm uppercase tracking-wider items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
               >
                 <Rocket size={16} /> Lançar Avaliação
               </button>
             ) : (
-              <button disabled className="w-full bg-secondary border border-border rounded-lg py-4 font-bold text-sm uppercase tracking-wider opacity-60 cursor-not-allowed">
+              <button type="button" disabled className="hidden md:block w-full bg-secondary border border-border rounded-lg py-4 font-bold text-sm uppercase tracking-wider opacity-60 cursor-not-allowed">
                 {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
               </button>
             )}
 
             {!allEvaled && (
-              <p className="text-[11px] text-center text-muted-foreground mt-3 leading-relaxed">
+              <p className="text-[11px] text-center text-muted-foreground md:mt-3 leading-relaxed">
                 {allReady
-                  ? <>Ao lançar, suas notas são <strong>submetidas e bloqueadas</strong>. Salvar rascunho é opcional.</>
-                  : <>Dê nota, preencha o comentário e grave o áudio de cada critério. <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
+                  ? <>Ao lançar, suas notas são <strong>lançadas e bloqueadas</strong>. Salvar rascunho é opcional.</>
+                  : <>Dê nota e preencha o comentário de cada critério (o áudio é opcional). <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
               </p>
             )}
 
@@ -253,7 +284,7 @@ export function EvaluationSummaryPanel({
               eventName={eventName}
               onLaunch={onLaunch}
               isEvaluator={isEvaluator}
-              myCriteria={myCriteria}
+              myCriteria={launchCriteria}
               getEval={getEval}
               currentScore={currentScore}
             />

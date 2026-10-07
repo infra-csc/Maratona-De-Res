@@ -16,15 +16,15 @@ export function FerramentasForm({ answer, onAnswer, comment, onComment }: {
       </div>
       <div className="px-5 py-4" id="ferr-answer">
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm leading-snug flex-1">Todos os equipamentos e ferramentas retornaram?</p>
+          <p className="text-sm leading-snug flex-1" id="ferr-answer-q">Todos os equipamentos e ferramentas retornaram?</p>
           <div className="flex items-center gap-2 shrink-0">
             {isNao && <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>-10 pts</span>}
-            <YesNoToggle value={answer} onChange={onAnswer} />
+            <YesNoToggle value={answer} onChange={onAnswer} labelledBy="ferr-answer-q" />
           </div>
         </div>
         {answer !== null && (
           <div className="mt-3 space-y-1">
-            <label className="text-[11px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+            <label htmlFor="ferr-comment" className="text-[11px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
               Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: DANGER_TEXT }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
             </label>
             <textarea

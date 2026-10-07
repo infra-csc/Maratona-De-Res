@@ -3,19 +3,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Trophy, Award, AlertTriangle, MapPin, History } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { cn, fmtDate, fmtNum } from "@/lib/utils";
+import { cn, fmtDate, fmtNum, faixaEdge } from "@/lib/utils";
 import { CONDENSED, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { contrastingTextColor, fmtBRL } from "./helpers";
 import { BonusBreakdownSection } from "./bonus-breakdown-section";
+import { fmtBound } from "./badges";
+
+/** Pontos com sinal ("+2", "−1,5"); zero sai "0", sem sinal (antes "-0"/"+0"). */
+function signedPoints(v: number): string {
+  if (!v) return "0";
+  const abs = Number.isInteger(v) ? fmtNum(Math.abs(v), 0) : fmtNum(Math.abs(v), 1);
+  return `${v > 0 ? "+" : "−"}${abs}`;
+}
 
 export function EmployeeDetailSheet({
   employeeId,
   onClose,
+  cycleId,
+  readOnly = false,
 }: {
   employeeId: number | null;
   onClose: () => void;
+  /** Ciclo escolhido no seletor (undefined = atual). */
+  cycleId?: string;
+  /** Ciclo anterior: sem convite a recalcular. */
+  readOnly?: boolean;
 }) {
-  const detailParams = { employeeId: employeeId ?? 0 };
+  const detailParams = cycleId ? { employeeId: employeeId ?? 0, cycleId } : { employeeId: employeeId ?? 0 };
   // Linha do tempo da nota: só admin e RH (a rota também barra).
   const { user } = useAuth();
   const canSeeTimeline = hasRole(user, "admin") || hasRole(user, "rh");
@@ -48,7 +62,7 @@ export function EmployeeDetailSheet({
                 <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
                   {detail.employee.name}
                 </DialogTitle>
-                {canSeeTimeline && (
+                {canSeeTimeline && !readOnly && (
                   <Link
                     href={`/linha-do-tempo?colaborador=${detail.employee.id}`}
                     className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold uppercase hover:underline underline-offset-2"
@@ -66,12 +80,13 @@ export function EmployeeDetailSheet({
                       style={{
                         backgroundColor: (detail.summary as any).platoonColor ?? "var(--secondary)",
                         color: (detail.summary as any).platoonColor ? contrastingTextColor((detail.summary as any).platoonColor) : "var(--muted-foreground)",
+                        ...faixaEdge((detail.summary as any).platoonColor),
                       }}
                     >
                       {(detail.summary as any).platoon}
                       {(detail.summary as any).platoonMinScore != null && (detail.summary as any).platoonMaxScore != null && (
                         <span className="opacity-60 text-[11px] font-bold">
-                          {(detail.summary as any).platoonMinScore}–{(detail.summary as any).platoonMaxScore}
+                          {fmtBound(Number((detail.summary as any).platoonMinScore))}–{fmtBound(Number((detail.summary as any).platoonMaxScore))}
                         </span>
                       )}
                     </span>
@@ -125,14 +140,14 @@ export function EmployeeDetailSheet({
                   <AlertTriangle size={16} className="shrink-0" style={{ color: DANGER_TEXT }} />
                   <div>
                     <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>-{detail.summary.penaltyPoints}</p>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: detail.summary.penaltyPoints > 0 ? DANGER_TEXT : "var(--muted-foreground)" }}>{signedPoints(-detail.summary.penaltyPoints)}</p>
                   </div>
                 </div>
                 <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
                   <Award size={16} className="shrink-0" style={{ color: GOOD_TEXT }} />
                   <div>
                     <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>+{detail.summary.meritPoints}</p>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: detail.summary.meritPoints > 0 ? GOOD_TEXT : "var(--muted-foreground)" }}>{signedPoints(detail.summary.meritPoints)}</p>
                   </div>
                 </div>
               </section>
@@ -193,7 +208,7 @@ export function EmployeeDetailSheet({
               </div>
 
               <div className="space-y-6 min-w-0">
-              {detail.summary.bonusBreakdown && <BonusBreakdownSection bd={detail.summary.bonusBreakdown} />}
+              {detail.summary.bonusBreakdown && <BonusBreakdownSection bd={detail.summary.bonusBreakdown} readOnly={readOnly} />}
 
               {!detail.summary.bonusBreakdown && detail.summary.bonusValue != null && (
                 detail.summary.bonusValue > 0 ? (

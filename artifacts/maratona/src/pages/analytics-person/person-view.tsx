@@ -19,12 +19,14 @@ import { Card, FaixaChip, SmallLabel } from "./ui";
 const dmy = (iso: string | null | undefined) => (iso ? fmtDate(iso.slice(0, 10), { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
 /** Análise detalhada do ciclo de um colaborador. */
-export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview, teamEventAvg, report, reportLoading, reportError, onRetryReport, canTimeline, onPick }: {
+export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview, teamEventAvg, report, reportLoading, reportError, onRetryReport, canTimeline, onPick, cycleId }: {
   detail: RankingDetail; rows: QuarterlyResult[]; faixas: Faixa[];
   /** Mínimo de eventos do bônus pela visão geral; null = não carregou. */
   minEvents: number | null;
   teamEventAvg: number | null; report: EventsReport | undefined; reportLoading: boolean; reportError: boolean; onRetryReport: () => void;
   canTimeline: boolean; onPick: (id: number) => void;
+  /** Ciclo anterior escolhido no seletor (undefined = atual): a evolução é a daquele ciclo. */
+  cycleId?: number;
 }) {
   const s = detail.summary;
   const bd = s.bonusBreakdown;
@@ -41,8 +43,12 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
   const rank = rankOf(rows, detail.employee.id);
   const myRow = rows.find(r => r.employeeId === detail.employee.id) ?? null;
   const teamAvg = mean(rows.map(r => r.finalResult));
-  // Sem evento com nota não há nota final (o servidor devolve a gravada, que é 0 ou antiga).
-  const final = n > 0 ? (s.finalResult ?? null) : null;
+  // Resultado GRAVADO no ciclo sem nenhuma nota por evento no sistema (ex.:
+  // resultado importado/histórico de um ciclo fechado): vale a nota gravada,
+  // dita como tal — antes aparecia "Sem evento com nota" ao lado de um 82.
+  const storedOnly = n === 0 && s.isQuarterClosed && (myRow?.eventsCount ?? 0) > 0 && s.finalResult != null;
+  // Sem evento com nota (e sem resultado gravado) não há nota final.
+  const final = n > 0 || storedOnly ? (s.finalResult ?? null) : null;
   const faixa = impact.faixa ?? faixas.find(f => f.name === s.platoon) ?? null;
   const eligible = bd?.eligible ?? null;
   const step = nextStepOf(final, faixas, eligible, bd?.extraEvents.length ?? 0);
@@ -51,7 +57,11 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
   const participated = s.participatedEventsCount ?? myRow?.participatedEventsCount ?? null;
   // Resultado gravado no ciclo × conta ao vivo do detalhe.
   const storedFinal = myRow?.finalResult ?? null;
-  const pendingRecalc = s.isQuarterClosed && final != null && storedFinal != null && Math.abs(storedFinal - final) >= 0.05;
+  // Ciclo anterior (só consulta): o texto fala do que FICOU, não do que falta.
+  const past = cycleId != null;
+  // Média bruta: a do detalhe; só com o resultado gravado, a gravada.
+  const gross = s.grossAverage ?? (storedOnly ? (myRow?.grossAverage ?? null) : null);
+  const pendingRecalc = !storedOnly && s.isQuarterClosed && final != null && storedFinal != null && Math.abs(storedFinal - final) >= 0.05;
   // Ligação lançamento → evento pelo NOME: /ranking-detail não devolve o eventId das penalidades/méritos.
   const launchesByEvent = useMemo(() => {
     const m = new Map<string, { pen: number; mer: number }>();
@@ -83,6 +93,7 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
               {rank && <StatusBadge variant="neutral" icon={Trophy} label={`${rank.position}º de ${rank.total} no ranking`} />}
               {eligible === true && <StatusBadge variant="ok" label="Elegível ao bônus" />}
               {eligible === false && <StatusBadge variant="warn" label="Não elegível ao bônus" />}
+              {storedOnly && <StatusBadge variant="info" icon={Info} label="Resultado gravado" srLabel="Nota final gravada no ciclo, sem as notas por evento no sistema (resultado importado)" />}
               {!s.isQuarterClosed && <StatusBadge variant="info" icon={Info} label="Sem resultado gravado" srLabel="Sem resultado gravado no ciclo para este colaborador: a nota é a conta de hoje; elegibilidade e bônus aparecem depois do recálculo" />}
               {pendingRecalc && <StatusBadge variant="info" icon={Info} label="Recálculo pendente" srLabel={`Recálculo pendente: a nota de hoje (${n1(final)}) difere da gravada no último recálculo do ciclo (${n1(storedFinal)}), que é a usada no ranking e no bônus`} />}
             </div>
@@ -101,8 +112,10 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
               <p className="text-[64px] sm:text-[76px] font-black leading-[0.85] tabular-nums" style={{ fontFamily: CONDENSED }} data-testid="person-final">{n1(final)}</p>
             </div>
             <p className="text-[13px] pb-1 md:pb-0" style={{ color: "var(--muted-foreground)" }}>
-              {final == null ? <>Sem evento com nota no ciclo</> : <>
-                Média bruta <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(s.grossAverage)}</strong>
+              {final == null ? <>Sem evento com nota no ciclo</> : storedOnly ? <>
+                Nota gravada no ciclo ({plural(myRow?.eventsCount ?? 0, "evento", "eventos")} com nota);<br className="hidden md:block" /> as notas por evento não estão no sistema
+              </> : <>
+                Média bruta <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(gross)}</strong>
                 {teamAvg != null && <><br className="hidden md:block" /><span className="md:hidden"> · </span>equipe <strong className="tabular-nums" style={{ color: "var(--foreground)" }}>{n1(teamAvg)}</strong> <span className="tabular-nums" style={{ color: final - teamAvg >= 0 ? GOOD_TEXT : DANGER_TEXT }}>({signed(final - teamAvg)})</span></>}
               </>}
             </p>
@@ -115,9 +128,9 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
             <p className="mt-3 text-[13px] leading-relaxed" data-testid="person-next-faixa">
               {step ? (
                 <>
-                  Faltam <strong className="tabular-nums">{n1(step.gap)}</strong> {step.gap === 1 ? "ponto" : "pontos"} para <strong>{step.faixa.name}</strong> (a partir de {n1(step.entry)})
-                  {step.faixa.bonusValue > 0 && <>, que {eligible ? <>pagaria <strong>{brl(step.bonus)}</strong> de bônus</> : <>paga <strong>{brl(step.faixa.bonusValue)}</strong> de prêmio base</>}</>}.
-                  <span style={{ color: "var(--muted-foreground)" }}> Com {plural(n, "evento", "eventos")} na nota, isso equivale a cerca de {fmtNum(step.gap * n, 1)} pontos a mais na soma das notas (ou de penalidade a menos).</span>
+                  {past ? "Ficou a" : "Faltam"} <strong className="tabular-nums">{n1(step.gap)}</strong> {step.gap === 1 ? "ponto" : "pontos"} {past ? "de" : "para"} <strong>{step.faixa.name}</strong> (a partir de {n1(step.entry)})
+                  {step.faixa.bonusValue > 0 && <>, que {eligible ? <>{past ? "teria pago" : "pagaria"} <strong>{brl(step.bonus)}</strong> de bônus</> : <>paga <strong>{brl(step.faixa.bonusValue)}</strong> de prêmio base</>}</>}.
+                  {n > 0 && <span style={{ color: "var(--muted-foreground)" }}> Com {plural(n, "evento", "eventos")} na nota, isso equivale a cerca de {fmtNum(step.gap * n, 1)} pontos a mais na soma das notas (ou de penalidade a menos).</span>}
                 </>
               ) : <>Está na faixa mais alta.</>}
             </p>
@@ -127,11 +140,12 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
 
       {/* ── Indicadores ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <StatTile label="Média bruta" value={n1(s.grossAverage)} detail={s.scoreSum != null ? `Soma ${fmtNum(s.scoreSum, 2)} ÷ ${plural(n, "evento", "eventos")}` : "Sem evento na nota"} />
+        <StatTile label="Média bruta" value={n1(gross)} detail={s.scoreSum != null ? `Soma ${fmtNum(s.scoreSum, 2)} ÷ ${plural(n, "evento", "eventos")}` : storedOnly ? "Gravada no ciclo" : "Sem evento na nota"} />
         <StatTile label="Eventos participados" data-testid="person-participated"
           value={<>{participated ?? "—"}<span className="text-[16px] font-bold" style={{ color: "var(--muted-foreground)" }}> / {minEvents ?? "—"}</span></>}
           detail={`${plural(n, "evento", "eventos")} na nota · ${participated == null || minEvents == null ? "mínimo do bônus indisponível"
-            : participated >= minEvents ? "atingiu o mínimo do bônus" : `faltam ${minEvents - participated} para o mínimo do bônus`}`} />
+            : participated >= minEvents ? "atingiu o mínimo do bônus"
+            : past ? `ficou ${minEvents - participated} abaixo do mínimo do bônus` : `faltam ${minEvents - participated} para o mínimo do bônus`}`} />
         <StatTile label="Penalidades" value={<span style={{ color: s.penaltyPoints > 0 ? DANGER_TEXT : undefined }}>{s.penaltyPoints > 0 ? `−${pts(s.penaltyPoints)}` : "0"}</span>}
           detail={s.penaltyPoints > 0 ? (impact.verified ? `${signed(-impact.lostPoints)} na nota final` : plural(detail.penalties.length, "lançamento", "lançamentos")) : "Nenhuma no ciclo"} />
         <StatTile label="Méritos" value={<span style={{ color: s.meritPoints > 0 ? GOOD_TEXT : undefined }}>{s.meritPoints > 0 ? `+${pts(s.meritPoints)}` : "0"}</span>}
@@ -173,7 +187,7 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
       {/* ── Equipe + evolução ── */}
       <div className={`grid gap-5 items-start ${canTimeline ? "xl:grid-cols-2" : ""}`}>
         <TeamCompareCard detail={detail} rows={rows} faixas={faixas} teamAvg={teamAvg} onPick={onPick} n={n} final={final} participated={participated} />
-        {canTimeline && <EvolutionCard employeeId={detail.employee.id} name={detail.employee.name} final={final} faixas={faixas} />}
+        {canTimeline && <EvolutionCard employeeId={detail.employee.id} name={detail.employee.name} final={final} faixas={faixas} cycleId={cycleId} />}
       </div>
     </div>
   );
@@ -600,8 +614,8 @@ function TeamCompareCard({ detail, rows, faixas, teamAvg, onPick, n, final, part
 }
 
 // ── Evolução (linha do tempo; só admin e RH) ──────────────────────────────
-function EvolutionCard({ employeeId, name, final, faixas }: { employeeId: number; name: string; final: number | null; faixas: Faixa[] }) {
-  const params = { employeeId };
+function EvolutionCard({ employeeId, name, final, faixas, cycleId }: { employeeId: number; name: string; final: number | null; faixas: Faixa[]; cycleId?: number }) {
+  const params = cycleId ? { employeeId, cycleId } : { employeeId };
   const q = useGetScoreTimeline(params, { query: { queryKey: getGetScoreTimelineQueryKey(params), staleTime: 30_000 } });
   const entries = (q.data?.entries ?? []).filter(e => e.kind !== "info" && e.finalAfter != null && (e.employeeId == null || e.employeeId === employeeId));
   const moves = entries
@@ -613,7 +627,7 @@ function EvolutionCard({ employeeId, name, final, faixas }: { employeeId: number
     <Card
       title="Evolução da nota final"
       subtitle="A nota depois de cada mudança no ciclo: evento que entrou, penalidade, mérito, publicação de calibração. Linhas pontilhadas: início de cada faixa."
-      action={
+      action={cycleId ? undefined :
         <Link href={`/linha-do-tempo?colaborador=${employeeId}`} className="shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={{ border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: CONDENSED }} data-testid="link-person-timeline">
           <History size={13} aria-hidden /> Linha do tempo

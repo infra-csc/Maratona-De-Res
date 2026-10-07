@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { fmtNum } from "@/lib/utils";
+import { fmtNum, plural } from "@/lib/utils";
 import {
   useGetAreas,
   useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria,
@@ -142,9 +142,9 @@ export function useCriteriaManagement({ qc, toast, canManage, allUsers, evalInde
           toast({ title: "Já está sincronizado", description: "Este evento já usa somente os critérios ativos." });
         } else {
           const parts: string[] = [];
-          if (added > 0) parts.push(`${added} adicionado(s)`);
-          if (reactivated > 0) parts.push(`${reactivated} reativado(s)`);
-          if (removed > 0) parts.push(`${removed} desativado(s)`);
+          if (added > 0) parts.push(plural(added, "adicionado", "adicionados"));
+          if (reactivated > 0) parts.push(plural(reactivated, "reativado", "reativados"));
+          if (removed > 0) parts.push(plural(removed, "desativado", "desativados"));
           toast({ title: "Critérios sincronizados", description: parts.join(", ") + "." });
         }
       },

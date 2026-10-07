@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { Dispatch, SetStateAction } from "react";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { Copy, X, RotateCcw } from "lucide-react";
@@ -22,7 +23,7 @@ export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllC
         <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
             <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }} title={selected?.name}>{selected?.name}</h3>
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{batchRunning ? "Gerando links..." : `${batchLinks.filter(l => l.url).length} link(s) prontos`}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{batchRunning ? "Gerando links..." : plural(batchLinks.filter(l => l.url).length, "link pronto", "links prontos")}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {batchLinks.some(l => l.url) && (

@@ -84,7 +84,9 @@ export function TeamSection({ id, event, canManageTeam, updateParticipant, onAdd
       {(!event.participants || event.participants.length === 0) ? (
         <div className="py-8 text-center text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador alocado.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4 items-stretch">
+        // Colunas pela largura real (com o menu aberto a 768 sobravam ~200px por
+        // cartão e o nome quebrava no meio: "PEREIR A").
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4 p-4 items-stretch">
           {event.participants.slice().sort((a, b) => {
             const aScores = a.countsForScore !== false ? 0 : 1;
             const bScores = b.countsForScore !== false ? 0 : 1;

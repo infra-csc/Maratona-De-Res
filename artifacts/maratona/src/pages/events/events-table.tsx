@@ -1,13 +1,16 @@
 // Tabela de eventos (cabeçalho ordenável + linhas) e a legenda/contagem abaixo dela.
-import type { User } from "@workspace/api-client-react";
+import type { Cycle, User } from "@workspace/api-client-react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { PremiumCard, CONDENSED, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { cn } from "@/lib/utils";
-import { EventRow, type EventRowActions } from "./event-row";
+import { cn, plural } from "@/lib/utils";
+import { EventRow, EventCard, type EventRowActions } from "./event-row";
 import { nextColSort, isColActive, isColAsc } from "./url-filters";
+import { useWideScreen } from "./use-wide-screen";
 import type { EventItem } from "./types";
 
-const GRID_COLS = "1fr 90px 56px 130px 130px 110px 80px 120px 72px";
+// Data com 112px: cabe o selo "Fora do período" embaixo da data sem invadir "Part.".
+// Status com 140px: cabe "Abre em DD/MM" e "Próximo ciclo" sem invadir os botões.
+const GRID_COLS = "1fr 112px 56px 120px 120px 104px 80px 140px 72px";
 
 const COLUMNS = ["name", "date", "participants", "evaluated", "calibr", "matrix", "score"] as const;
 const COLUMN_LABELS: Record<(typeof COLUMNS)[number], string> = {
@@ -20,9 +23,26 @@ type EventsTableProps = EventRowActions & {
   user: User | null;
   sortBy: string;
   setSortBy: (v: string) => void;
+  /** Ciclo anterior / Total geral: linhas só de consulta. */
+  readOnly?: boolean;
+  /** Total geral: nome do ciclo de cada evento (selo na coluna Data). */
+  cycleLabelOf?: (ev: EventItem) => string | null;
+  /** Ciclo de cada evento (selo "Fora do período"). */
+  cycleOf?: (ev: EventItem) => Cycle | null;
 };
 
-export function EventsTable({ events, user, sortBy, setSortBy, ...actions }: EventsTableProps) {
+export function EventsTable({ events, user, sortBy, setSortBy, readOnly = false, cycleLabelOf, cycleOf, ...actions }: EventsTableProps) {
+  const wide = useWideScreen();
+  // Celular e tablet: cartões (a tabela de 9 colunas não cabe).
+  if (!wide) return (
+    <ul className="grid gap-2.5 md:grid-cols-2" data-testid="events-cards" aria-label="Eventos">
+      {events.map((ev) => (
+        <li key={ev.id}>
+          <EventCard ev={ev} user={user} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} {...actions} />
+        </li>
+      ))}
+    </ul>
+  );
   return (
     <PremiumCard className="overflow-hidden">
       {/* Table header */}
@@ -70,7 +90,7 @@ export function EventsTable({ events, user, sortBy, setSortBy, ...actions }: Eve
 
       {/* Rows */}
       {events.map((ev) => (
-        <EventRow key={ev.id} ev={ev} user={user} gridCols={GRID_COLS} {...actions} />
+        <EventRow key={ev.id} ev={ev} user={user} gridCols={GRID_COLS} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} {...actions} />
       ))}
     </PremiumCard>
   );
@@ -81,11 +101,17 @@ const LEGEND = [
   { color: "var(--accent-text)", label: "Avaliado" },
   { color: AMBER_TEXT, label: "Em andamento" },
   { color: "var(--border)", label: "Aguardando" },
+  { color: "var(--status-info)", label: "Abre em DD/MM · Próximo ciclo" },
   { color: DANGER_TEXT, label: "Aguardando RH" },
 ];
 
-/** Legenda das cores da barra lateral + "N de M eventos". */
-export function EventsLegend({ shown, total }: { shown: number; total: number }) {
+/**
+ * Legenda das cores da barra lateral + "N de M eventos". `scopeLabel`: "no
+ * ciclo" num ciclo, "em todos os ciclos" no Total geral. `afterEnd` = quantos
+ * da lista são do próximo ciclo (mesma contagem do cabeçalho e de Ciclos).
+ */
+export function EventsLegend({ shown, total, scopeLabel = "no ciclo", afterEnd = 0 }: { shown: number; total: number; scopeLabel?: string; afterEnd?: number }) {
+  const afterNote = afterEnd > 0 ? ` (${afterEnd} fora do período)` : "";
   return (
     <div className="flex items-center gap-5 mt-4 px-1 flex-wrap">
       {LEGEND.map(l => (
@@ -96,8 +122,8 @@ export function EventsLegend({ shown, total }: { shown: number; total: number })
       ))}
       <span className="ml-auto text-[11px]" style={{ color: "var(--muted-foreground)" }}>
         {shown === total
-          ? `${total} eventos no ciclo`
-          : `${shown} de ${total} eventos`}
+          ? `${plural(total, "evento", "eventos")} ${scopeLabel}${afterNote}`
+          : `${shown} de ${plural(total, "evento", "eventos")}${afterNote}`}
       </span>
     </div>
   );

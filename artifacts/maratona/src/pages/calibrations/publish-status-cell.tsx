@@ -32,7 +32,7 @@ export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, 
           {cal.pendingPublish && <PendingBlock cal={cal} c={c} />}
           {canFinalize && (
             <div>
-              <p className="text-[10px] font-bold uppercase mb-0.5 text-center" style={{ color: "var(--muted-foreground)", letterSpacing: "0.04em" }}>Publicar como</p>
+              <p className="text-[11px] font-bold uppercase mb-0.5 text-center" style={{ color: "var(--muted-foreground)", letterSpacing: "0.04em" }}>Publicar como</p>
               <div role="group" aria-label="Publicar como" className="flex items-stretch rounded overflow-hidden w-full" style={{ border: "1px solid var(--border)" }}>
                 <button
                   type="button"

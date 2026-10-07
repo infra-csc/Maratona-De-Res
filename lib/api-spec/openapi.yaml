@@ -155,6 +155,10 @@ paths:
       operationId: getUsersByArea
       tags: [users]
       summary: List active users in a given area (for redirect dropdowns)
+      description: |
+        Avaliador: só as áreas que ele usa na avaliação (a do cadastro, as em que é principal, Cenografia/
+        Ferramentas quando responde a matriz de algum evento e a área de redirecionamento dos critérios dele);
+        outra área → 403.
       parameters:
         - name: areaId
           in: path
@@ -170,6 +174,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/UserSummary"
+        "400":
+          description: Área inválida
+        "403":
+          description: Avaliador pedindo área que não usa
 
   /users/{id}:
     get:
@@ -511,6 +519,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MergeEmployeeResult"
+        "409":
+          description: O cadastro duplicado tem dados de ciclo FECHADO (code CLOSED_CYCLE; closedCycleData lista o quê) — a junção não é feita
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /employees/{id}/cycle-exclusion:
     put:
@@ -536,6 +550,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CycleExclusionResult"
+        "409":
+          description: Pagamento já decidido, ou ciclo atual FECHADO (code CLOSED_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /employees/{id}/history:
     get:
@@ -563,11 +583,19 @@ paths:
       operationId: getEvents
       tags: [events]
       summary: List events
+      description: Eventos de um ciclo (padrão o atual) ou de todos (cycleId=all; cada evento traz o seu cycleId).
       parameters:
         - name: status
           in: query
           schema:
             type: string
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+          schema:
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -577,6 +605,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Event"
+        "400":
+          description: cycleId inválido
+        "404":
+          description: Ciclo não encontrado
     post:
       operationId: createEvent
       tags: [events]
@@ -1076,11 +1108,13 @@ paths:
               $ref: "#/components/schemas/ConformityEvaluatorRedirectInput"
       responses:
         "200":
-          description: OK
+          description: |
+            Avaliador (quem repassa): só { ok, conformityEvaluatorUserId } — nunca o detalhe do evento.
+            Admin/RH: { ok, ...EventDetail }.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EventDetail"
+                $ref: "#/components/schemas/ConformityRedirectResult"
 
   /events/{id}/conformity-evaluator-ferramentas:
     post:
@@ -1124,11 +1158,13 @@ paths:
               $ref: "#/components/schemas/ConformityEvaluatorRedirectInput"
       responses:
         "200":
-          description: OK
+          description: |
+            Avaliador (quem repassa): só { ok, conformityEvaluatorFerramentasUserId } — nunca o detalhe do evento.
+            Admin/RH: { ok, ...EventDetail }.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EventDetail"
+                $ref: "#/components/schemas/ConformityRedirectResult"
 
   /events/{id}/conformity:
     get:
@@ -1179,6 +1215,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventConformity"
+        "409":
+          description: Matriz ainda não abriu para o avaliador, ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /events/{id}/criteria:
     get:
@@ -1258,6 +1300,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventDetail"
+        "409":
+          description: |
+            Evento já tem avaliações; ciclo fechado (code CLOSED_CYCLE); ou ciclo com avaliação por área e
+            avaliador designado para uma área que não é a do cadastro dele (code AREA_MODE_OTHER_AREA).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /events/{id}/criteria/confirm:
     post:
@@ -1327,6 +1377,9 @@ paths:
                     type: integer
                   skipped:
                     type: integer
+                  skippedClosedCycle:
+                    type: integer
+                    description: Eventos de ciclo FECHADO pulados (só consulta; já contados em skipped)
                   totalAdded:
                     type: integer
                   totalDeactivated:
@@ -1375,6 +1428,11 @@ paths:
                           type: integer
                         updated:
                           type: integer
+                  skippedClosedCycle:
+                    type: array
+                    description: Eventos de ciclo FECHADO (só consulta) cujas calibrações não foram remapeadas
+                    items:
+                      $ref: "#/components/schemas/ClosedCycleSkip"
 
   /integration/fix-orphaned-evaluations:
     post:
@@ -1390,6 +1448,9 @@ paths:
                 type: object
                 required: [fixed, eventsAffected, criteriaReactivated]
                 properties:
+                  skippedClosedCycle:
+                    type: integer
+                    description: Critérios de evento de ciclo FECHADO não reativados (só consulta)
                   fixed:
                     type: integer
                   eventsAffected:
@@ -1429,6 +1490,13 @@ paths:
                     type: integer
                   eventCriteriaFixed:
                     type: integer
+                  evaluationsRemapped:
+                    type: integer
+                  skippedClosedCycle:
+                    type: array
+                    description: Eventos de ciclo FECHADO (só consulta) — critérios e avaliações deles não foram migrados
+                    items:
+                      $ref: "#/components/schemas/ClosedCycleSkip"
 
   /events/{id}/comments:
     get:
@@ -1667,6 +1735,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/Criterion"
 
+  /evaluations/my-area:
+    get:
+      operationId: getMyAreaEvaluations
+      tags: [evaluations]
+      summary: Tela do avaliador numa chamada só — eventos e critérios da área do cadastro (e os designados)
+      description: |
+        Eventos com critérios confirmados em que o usuário tem critério da área
+        do cadastro (users.areaId — a primeira resposta enviada da área fecha o
+        critério), critério designado (fluxo antigo) ou a Matriz de
+        Conformidade. Sem from/to/eventId, só o ciclo atual. Admin/RH podem
+        consultar outra área com areaId.
+      parameters:
+        - name: search
+          in: query
+          description: Busca por nome do evento, cliente ou cidade.
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, done, all]
+        - name: from
+          in: query
+          description: Data inicial (YYYY-MM-DD).
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: Data final (YYYY-MM-DD).
+          schema:
+            type: string
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+        - name: areaId
+          in: query
+          description: Só admin/RH.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyAreaEvaluations"
+        "403":
+          description: Papel sem acesso (só admin, RH e avaliador)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /evaluations:
     get:
       operationId: getEvaluations
@@ -1707,6 +1830,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Evaluation"
+        "403":
+          description: |
+            Sem acesso ao critério. No evento de ciclo por área, admin/RH recebem
+            code AREA_MODE_EVALUATOR_ONLY ("No ciclo por área, só o avaliador da área
+            responde. Ajustes de nota são feitos na Calibração.").
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "409":
+          description: Critério já respondido pela área (code AREA_ALREADY_ANSWERED), ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /evaluations/{id}:
     patch:
@@ -1732,6 +1870,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Evaluation"
+        "403":
+          description: Sem permissão (só admin, RH e avaliador; no ciclo por área, admin/RH → code AREA_MODE_EVALUATOR_ONLY)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "409":
+          description: Critério já respondido pela área (code AREA_ALREADY_ANSWERED), ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+    delete:
+      operationId: deleteEvaluationDraft
+      tags: [evaluations]
+      summary: Apaga um RASCUNHO (só o dono do rascunho, ou admin/RH)
+      description: |
+        Para limpar o rascunho que ficou "órfão" quando outra pessoa da área enviou primeiro
+        (modo por área). Avaliação enviada não se apaga (409). Ciclo fechado → 409 code CLOSED_CYCLE.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rascunho apagado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "403":
+          description: Rascunho de outra pessoa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Avaliação já enviada, ou ciclo fechado (code CLOSED_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /evaluations/{id}/submit:
     post:
@@ -1751,6 +1939,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Evaluation"
+        "403":
+          description: Sem permissão (só admin, RH e avaliador; no ciclo por área, admin/RH → code AREA_MODE_EVALUATOR_ONLY)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "409":
+          description: Critério já respondido pela área (code AREA_ALREADY_ANSWERED), ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /evaluations/{id}/reopen:
     post:
@@ -1844,6 +2044,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Absence"
+        "409":
+          description: Ciclo fechado (code CLOSED_CYCLE) — evento ligado de ciclo fechado (mesmo com o ciclo atual aberto) ou ciclo atual fechado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /absences/{id}:
     patch:
@@ -2086,6 +2292,19 @@ paths:
       operationId: getDashboardSummary
       tags: [dashboard]
       summary: Get dashboard summary
+      description: |
+        Números do ciclo (padrão o atual). Com cycleId=all, eventos, média, bônus
+        e penalidades somam todos os ciclos; as pendências operacionais
+        (avaliações, eventos com pendência, zona de risco) continuam sendo do
+        ciclo atual (operationalCycleId).
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+          schema:
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -2093,6 +2312,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+        "400":
+          description: cycleId inválido
+        "404":
+          description: Ciclo não encontrado
 
   /analytics/events-report:
     get:
@@ -2103,8 +2326,10 @@ paths:
         - name: cycleId
           in: query
           required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
           schema:
-            type: integer
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -2121,7 +2346,21 @@ paths:
     get:
       operationId: getAnalyticsOverview
       tags: [analytics]
-      summary: Indicadores do ciclo atual para a tela de Análises (gestores)
+      summary: Indicadores de um ciclo (padrão o atual) ou do Total geral para a tela de Análises (gestores)
+      description: |
+        Com cycleId=all: todos os eventos e resultados de todos os ciclos. As
+        contagens de pessoas viram participações (uma pessoa conta uma vez por
+        ciclo; kpis.distinctCollaborators = pessoas diferentes), o funil usa o
+        mínimo de eventos de cada ciclo e nearNextFaixa vem vazio (projeção só
+        faz sentido num ciclo). cycle.id = 0 no Total geral.
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+          schema:
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -2129,14 +2368,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalyticsOverview"
+        "400":
+          description: cycleId inválido
         "404":
-          description: Nenhum ciclo ativo
+          description: Nenhum ciclo ativo ou ciclo não encontrado
 
   /dashboard/platoon-distribution:
     get:
       operationId: getDashboardPlatoonDistribution
       tags: [dashboard]
       summary: Get platoon distribution
+      description: Com cycleId=all, conta os resultados de todos os ciclos (uma pessoa conta uma vez por ciclo).
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+          schema:
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -2152,6 +2402,18 @@ paths:
       operationId: getDashboardTopEmployees
       tags: [dashboard]
       summary: Get top 10 employees
+      description: |
+        Com cycleId=all, uma linha por pessoa: finalResult = média das notas
+        finais dos ciclos com nota, eventsCount = soma, bonusValue = soma dos
+        ciclos elegíveis e platoon = faixa do ciclo mais recente.
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+          schema:
+            type: string
+            pattern: "^([1-9][0-9]*|all)$"
       responses:
         "200":
           description: OK
@@ -2191,6 +2453,13 @@ paths:
           in: query
           schema:
             type: string
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2294,6 +2563,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QuarterEligibility"
+        "409":
+          description: Ciclo atual FECHADO (code CLOSED_CYCLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /cycles/current:
     get:
@@ -2307,6 +2582,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Cycle"
+
+  /cycles/options:
+    get:
+      operationId: listCycleOptions
+      tags: [cycles]
+      summary: Opções do seletor de ciclo (atual primeiro, depois os anteriores do mais recente ao mais antigo), qualquer papel logado
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cycle"
 
   /cycles:
     get:
@@ -2373,7 +2663,13 @@ paths:
         "404":
           description: Ciclo não encontrado
         "409":
-          description: Ciclo fechado não muda de período
+          description: |
+            Ciclo fechado não muda de período nem de regra de nota; ou a avaliação por área não pode mais ser
+            ligada/desligada porque o ciclo já tem avaliação enviada (code CYCLE_HAS_EVALUATIONS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /cycles/{id}/set-current:
     post:
@@ -2429,6 +2725,13 @@ paths:
           in: query
           schema:
             type: string
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2438,6 +2741,27 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RankingEntry"
+
+  /ranking/total:
+    get:
+      operationId: getRankingTotal
+      tags: [ranking]
+      summary: Total geral de Resultados & Ranking (uma linha por pessoa, somando todos os ciclos)
+      description: |
+        Somente leitura. cyclesWithScore = ciclos com evento com nota;
+        avgFinalResult = média PONDERADA pelos eventos com nota
+        (Σ nota final × eventos ÷ Σ eventos); eventsCount = soma dos eventos com
+        nota; bonusOfficial = bônus dos ciclos fechados; bonusProjected = bônus
+        do ciclo aberto (projeção); bonusTotal = os dois somados; bonusPaid =
+        soma do bônus pago; latest = faixa do ciclo mais recente (não há faixa
+        do total). Mesmo recorte do Ranking em cada ciclo (no atual só ativos).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingTotal"
 
   /ranking-detail:
     get:
@@ -2450,6 +2774,13 @@ paths:
           required: true
           schema:
             type: integer
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2560,6 +2891,9 @@ paths:
       operationId: triggerSync
       tags: [integration]
       summary: Trigger external sync
+      description: |
+        Traz os eventos do ciclo atual pela DATA DE INÍCIO (mesmo critério de eventPeriodPosition). Evento já
+        existente de ciclo FECHADO não é tocado (vem em skippedClosedCycle).
       responses:
         "200":
           description: OK
@@ -2567,6 +2901,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SyncResult"
+        "409":
+          description: Ciclo atual FECHADO (code CLOSED_CYCLE) — nada é gravado; ou sincronização já em andamento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /integration/reset:
     post:
@@ -2662,6 +3002,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HistoricalImportResult"
+        "400":
+          description: Erros de validação (vêm em errors, com a prévia)
+        "409":
+          description: |
+            Algum grupo atualizaria evento de ciclo FECHADO, criaria evento num ciclo fechado ou seria vinculado a
+            evento de ciclo fechado (code CLOSED_CYCLE; na prévia o mesmo motivo vem em errors). Nada é gravado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /integration/import/survey:
     post:
@@ -2692,6 +3042,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SurveyImportResult"
+        "409":
+          description: Algum grupo da planilha está vinculado a evento de ciclo FECHADO (code CLOSED_CYCLE; o resto da prévia vem junto) — vincule a outro evento ou ignore o grupo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /integration/evaluations/dedupe:
     post:
@@ -2741,6 +3097,14 @@ paths:
       operationId: exportQuarterlyResults
       tags: [exports]
       summary: Export quarterly results CSV
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2754,6 +3118,14 @@ paths:
       operationId: exportRanking
       tags: [exports]
       summary: Export ranking CSV
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2767,6 +3139,14 @@ paths:
       operationId: exportCajuBonuses
       tags: [exports]
       summary: Export Caju bonus report CSV
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2780,6 +3160,14 @@ paths:
       operationId: exportAbsences
       tags: [exports]
       summary: Export absences CSV
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          description: Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           description: OK
@@ -2884,6 +3272,12 @@ paths:
               schema:
                 type: string
                 format: binary
+        "403":
+          description: Avaliador pedindo áudio de avaliação que não enxerga (nem gravado por ele)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "404":
           description: Object not found.
           content:
@@ -3539,7 +3933,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventCriterionAssignmentRow"
         "400":
-          description: Regra de redirecionamento/atribuição violada
+          description: Regra de redirecionamento/atribuição violada, id inválido ou critério não ativo no evento
           content:
             application/json:
               schema:
@@ -3550,12 +3944,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Evento, critério ou usuário destino não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Ciclo com avaliação por área: repassar só para alguém da área do critério (code AREA_MODE_OTHER_AREA); ou ciclo fechado (code CLOSED_CYCLE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /events/{id}/criterion-assignments/redirect-options/{criterionId}:
     get:
       operationId: getCriterionRedirectOptions
       tags: [events]
       summary: Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
+      description: |
+        Ciclo com avaliação por área: só usuários da área do critério. Avaliador: só de critério que é dele
+        (designado, da área do cadastro, da área designada no evento ou da área em que é principal); outro → 403.
       parameters:
         - name: id
           in: path
@@ -3628,6 +4037,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE) — nenhum link é gerado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /events/{id}/admin-public-token:
     post:
@@ -3659,6 +4074,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE) — nenhum link é gerado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /events/{id}/public-tokens:
     get:
@@ -3724,7 +4145,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: Formulário já respondido
+          description: Formulário já respondido; ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
           content:
             application/json:
               schema:
@@ -3773,7 +4194,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: Formulário já respondido
+          description: Formulário já respondido; ciclo fechado (code CLOSED_CYCLE) ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE)
           content:
             application/json:
               schema:
@@ -3886,11 +4307,14 @@ paths:
               $ref: "#/components/schemas/PublicEvalSubmitInput"
       responses:
         "200":
-          description: OK
+          description: |
+            OK — `rejected` lista o que não foi gravado, com o motivo: critérios que a área já tinha
+            respondido e critérios DESATIVADOS no evento depois que o link foi gerado (B3: ignorados com
+            aviso, o resto do envio é gravado; o GET do link já não os pede).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OkResponse"
+                $ref: "#/components/schemas/PublicEvalSubmitResult"
         "400":
           description: Dados inválidos ou evento fechado
           content:
@@ -3904,11 +4328,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: Link já utilizado
+          description: |
+            Link já utilizado; todos os critérios já respondidos pela área (code AREA_ALREADY_ANSWERED, nada gravado; `rejected` traz o motivo de cada um);
+            ou ciclo do evento fechado (code CLOSED_CYCLE, cycleClosed true — nada gravado e o link continua sem uso),
+            ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE, nextCycle true — nada gravado e o link continua sem uso),
+            ou todos os critérios do link desativados no evento (code CRITERIA_INACTIVE — nada gravado e o link continua sem uso).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                $ref: "#/components/schemas/ConflictError"
 
   /public-eval/{token}/submit-conformity:
     post:
@@ -3947,11 +4375,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: Link já utilizado
+          description: |
+            Link já utilizado; a matriz deste link já foi respondida (code CONFORMITY_ALREADY_ANSWERED, `rejected` com quem respondeu —
+            nada gravado e o link continua sem uso); ou ciclo do evento fechado (code CLOSED_CYCLE, cycleClosed true);
+            ou evento do PRÓXIMO ciclo (code EVENT_NEXT_CYCLE, nextCycle true).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                $ref: "#/components/schemas/ConflictError"
 
   /public-eval-tokens/{tokenId}:
     delete:
@@ -4071,6 +4502,66 @@ components:
       properties:
         error:
           type: string
+    ForbiddenError:
+      type: object
+      required: [error]
+      description: |
+        403 com o motivo (mensagem pronta para a tela em `error`). `code`, quando presente:
+        - EVALUATOR_SCOPE: o papel AVALIADOR só acessa as rotas da tela de avaliação (lista fechada em
+          lib/evaluator-scope.ts); qualquer outra rota — inclusive um caminho com maiúsculas ou
+          codificado (%33) — é recusada. Mensagem: "Acesso negado: o perfil avaliador só acessa a
+          tela de avaliação."
+        - AREA_MODE_EVALUATOR_ONLY: evento de ciclo com avaliação por área — admin e RH não lançam
+          nem enviam avaliação de critério. Mensagem: "No ciclo por área, só o avaliador da área
+          responde. Ajustes de nota são feitos na Calibração."
+        Sem `code`: outras recusas (papel sem acesso, critério que não é da pessoa…).
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: EVALUATOR_SCOPE | AREA_MODE_EVALUATOR_ONLY
+    ConflictError:
+      type: object
+      required: [error]
+      description: |
+        409 com o motivo (mensagem pronta para a tela em `error`). `code` diz o porquê:
+        - CLOSED_CYCLE: ciclo fechado só consulta (`cycleClosed: true`). Nada foi
+          gravado; no link público o link continua sem uso.
+        - AREA_ALREADY_ANSWERED: critério(s) já respondido(s) — `rejected` traz o motivo de cada parte.
+        - CONFORMITY_ALREADY_ANSWERED: a Matriz de Conformidade já foi respondida
+          (por quem, em `rejected[].reason`); o link continua sem uso.
+        - EVENT_NEXT_CYCLE: o evento é do PRÓXIMO ciclo (data de início depois do fim do ciclo em
+          que está): não aceita avaliação, matriz nem link público até ser movido para o ciclo novo
+          (`nextCycle: true`). Mensagem: "Este evento é do próximo ciclo: abre para avaliação quando o
+          ciclo novo for criado." Preparação (equipe, critérios, dados) continua liberada.
+        - AREA_MODE_OTHER_AREA: ciclo com avaliação por área — o critério só pode ser repassado (e o
+          avaliador só pode ser designado no evento) para alguém da área dele.
+        - CYCLE_HAS_EVALUATIONS: o ciclo já tem avaliação enviada — a avaliação por área não pode mais
+          ser ligada/desligada.
+        - CRITERIA_INACTIVE: link público cujos critérios foram todos desativados no evento — nada
+          gravado, o link continua sem uso.
+        Sem `code`: outros conflitos (ex.: link já utilizado).
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: CLOSED_CYCLE | EVENT_NEXT_CYCLE | AREA_ALREADY_ANSWERED | CONFORMITY_ALREADY_ANSWERED | AREA_MODE_OTHER_AREA | CYCLE_HAS_EVALUATIONS | CRITERIA_INACTIVE
+        cycleClosed:
+          type: boolean
+          description: true quando a recusa é de ciclo fechado (code = CLOSED_CYCLE)
+        nextCycle:
+          type: boolean
+          description: true quando a recusa é de evento do próximo ciclo (code = EVENT_NEXT_CYCLE)
+        rejected:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicEvalSubmitRejected"
+        closedCycleData:
+          type: array
+          description: Junção de colaboradores — os dados de ciclo fechado que impediram a junção (por exemplo, 3 participações em eventos)
+          items: { type: string }
     HealthStatus:
       type: object
       properties:
@@ -4598,6 +5089,23 @@ components:
           type: ["integer", "null"]
         conformityEvaluatorFerramentasName:
           type: ["string", "null"]
+        periodPosition:
+          type: string
+          enum: [before, inside, after]
+          description: |
+            Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,
+            eventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em
+            stats.eventsAfterEnd, não em eventsTotal). Só em GET /events.
+        nextCycle:
+          type: boolean
+          description: |
+            Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público
+            (409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.
+        openForEvaluation:
+          type: boolean
+          description: |
+            ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,
+            ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
         createdAt:
           type: string
 
@@ -4657,6 +5165,21 @@ components:
           type: array
           items:
             type: string
+
+    ConformityRedirectResult:
+      type: object
+      description: |
+        Resposta do repasse da Matriz de Conformidade. Para o avaliador, SÓ estes campos (A1: nada do
+        detalhe do evento). Admin/RH recebem também o detalhe completo do evento (campos de EventDetail).
+      required: [ok]
+      additionalProperties: true
+      properties:
+        ok:
+          type: boolean
+        conformityEvaluatorUserId:
+          type: ["integer", "null"]
+        conformityEvaluatorFerramentasUserId:
+          type: ["integer", "null"]
 
     EventDetail:
       type: object
@@ -4736,6 +5259,9 @@ components:
           type: ["integer", "null"]
         conformityEvaluatorFerramentasName:
           type: ["string", "null"]
+        conformityWithoutConduta:
+          type: boolean
+          description: O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)
         conformity:
           oneOf:
             - $ref: "#/components/schemas/EventConformity"
@@ -5680,6 +6206,11 @@ components:
       properties:
         id:
           type: integer
+        cycleId:
+          type: integer
+          description: Ciclo do evento (útil no Total geral)
+        cycleName:
+          type: string
         name:
           type: string
         clientName:
@@ -5776,6 +6307,7 @@ components:
         cycle:
           type: object
           required: [id, name]
+          description: Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo
           properties:
             id:
               type: integer
@@ -5785,6 +6317,21 @@ components:
               type: ["string", "null"]
             endDate:
               type: ["string", "null"]
+        scope:
+          type: object
+          required: [kind, cyclesCount, isCurrent]
+          properties:
+            kind:
+              type: string
+              enum: [cycle, all]
+            cyclesCount:
+              type: integer
+            isCurrent:
+              type: boolean
+              description: O ciclo consultado é o atual (false no Total geral)
+            status:
+              type: ["string", "null"]
+              description: Situação do ciclo consultado (open/closed); null no Total geral
         kpis:
           type: object
           required: [eventsTotal, eventsConfirmed, eventsScored, collaborators, reachedMinEvents, eligible, withBonus, bonusTotal, evaluationsSubmitted, evaluationsDraft, calibratedCriteria, penaltiesCount, meritsCount, minEvents]
@@ -5799,21 +6346,38 @@ components:
               type: ["number", "null"]
             avgFinalResult:
               type: ["number", "null"]
-              description: Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
+              description: |
+                Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados). No Total geral:
+                o KPI único (TotalGeralSummary.avgFinalResult de GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
             collaborators:
               type: integer
+              description: Linhas de resultado; no Total geral, participações (uma pessoa conta uma vez por ciclo)
+            distinctCollaborators:
+              type: integer
+              description: Pessoas diferentes (num ciclo, igual a collaborators)
             reachedMinEvents:
               type: integer
+              description: |
+                Atingiram o mínimo de eventos. Elegível sempre conta (funil decrescente: mínimo ≥ elegíveis ≥ com bônus).
+                Ciclo FECHADO: vale o resultado GRAVADO na apuração (quem foi recusado pelo mínimo não atingiu), não a regra de hoje.
             eligible:
               type: integer
             withBonus:
               type: integer
             bonusTotal:
               type: number
+              description: bonusOfficial + bonusProjected
+            bonusOfficial:
+              type: number
+              description: Bônus de ciclos FECHADOS (oficial)
+            bonusProjected:
+              type: number
+              description: Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento)
             evaluationsSubmitted:
               type: integer
             evaluationsDraft:
               type: integer
+              description: Rascunhos (sem os "órfãos" do modo por área — critério já fechado por outra pessoa)
             calibratedCriteria:
               type: integer
             avgCalibrationShift:
@@ -5827,16 +6391,34 @@ components:
         ruleSet:
           type: object
           description: Parâmetros das regras de negócio em vigor
-          required: [minEvents, conformityItemPoints, conformityPenaltyFactor, conformityPenaltyPerNo]
+          required: [minEvents, conformityItemPoints, conformityPenaltyFactor, conformityPenaltyPerNo, conformityItemsAsked, condutaInMatrix, minEventsByCycle]
           properties:
             minEvents:
               type: integer
+              description: Mínimo do ciclo (no Total geral, o do ciclo mais recente — use minEventsByCycle)
             conformityItemPoints:
               type: number
             conformityPenaltyFactor:
               type: number
             conformityPenaltyPerNo:
               type: number
+            conformityItemsAsked:
+              type: integer
+              description: Itens que o avaliador responde na matriz (4; 3 quando a Conduta saiu da matriz)
+            condutaInMatrix:
+              type: string
+              enum: [all, some, none]
+              description: A Conduta está na matriz dos eventos do recorte (all), em nenhum (none, ciclo sem Conduta) ou em parte (some, Total geral misturando ciclos)
+            minEventsByCycle:
+              type: array
+              description: Mínimo de eventos de cada ciclo do recorte
+              items:
+                type: object
+                required: [cycleId, cycleName, minEvents]
+                properties:
+                  cycleId: { type: integer }
+                  cycleName: { type: string }
+                  minEvents: { type: integer }
         scoreTrend:
           type: array
           items:
@@ -6013,24 +6595,50 @@ components:
       properties:
         cycleId:
           type: integer
+          description: Ciclo dos números (0 = Total geral)
         cycleName:
           type: string
+        scope:
+          type: string
+          enum: [cycle, all]
+          description: cycle = um ciclo; all = Total geral (todos os ciclos)
+        operationalCycleId:
+          type: ["integer", "null"]
+          description: Ciclo das pendências operacionais (progresso de avaliações, eventos com pendência, zona de risco) — o escolhido ou, no Total geral, o atual
+        operationalCycleName:
+          type: ["string", "null"]
         totalEvents:
           type: integer
         totalEmployeesEvaluated:
           type: integer
         pendingEvaluations:
           type: integer
+          description: |
+            Progresso de avaliações, em EVENTOS do ciclo operacional abertos para avaliação (não históricos,
+            já no dia seguinte ao fim, com critério ativo): pendente = sem nota completa — inclusive evento sem
+            nenhuma nota. Rascunho não conta (nem o "órfão" do modo por área).
         submittedEvaluations:
           type: integer
+          description: Eventos abertos para avaliação já avaliados (resultado confirmado ou todos os critérios ativos com nota). Progresso = submitted ÷ (submitted + pending).
         eventsInCalibration:
           type: integer
         eventsInCycle:
           type: integer
         quarterAverage:
           type: ["number", "null"]
+          description: |
+            Um ciclo: média das notas finais de quem tem evento com nota, no MESMO recorte de Análises e do Ranking
+            (rankingScope), 1 casa. No Total geral (scope all): o KPI único (TotalGeralSummary.avgFinalResult de
+            GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
         totalBonusPreview:
           type: number
+          description: bonusOfficial + bonusProjected (compatibilidade). Prefira mostrar os dois separados.
+        bonusOfficial:
+          type: number
+          description: Bônus de ciclos FECHADOS (oficial). Um ciclo aberto → 0. Só gestores (senão 0).
+        bonusProjected:
+          type: number
+          description: Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento). Só gestores (senão 0).
         totalAbsences:
           type: integer
         eventsWithPendencies:
@@ -6419,6 +7027,42 @@ components:
           type: ["string", "null"]
         createdAt:
           type: ["string", "null"]
+        minEvents:
+          type: ["integer", "null"]
+          description: Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+        paymentDate:
+          type: ["string", "null"]
+          description: Data prevista do pagamento do bônus (AAAA-MM-DD)
+        conformityWithoutConduta:
+          type: boolean
+          description: Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)
+        areaEvaluation:
+          type: boolean
+          description: Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)
+        effectiveMinEvents:
+          type: integer
+          description: Mínimo que vale de fato (o do ciclo ou, se vazio, o global)
+        movedEvents:
+          type: array
+          description: |
+            Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo
+            (com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              outsidePeriod:
+                type: boolean
+                description: O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)
+        movedAbsences:
+          type: integer
+          description: Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)
+        warnings:
+          type: array
+          description: Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)
+          items: { type: string }
 
     CycleStats:
       type: object
@@ -6426,10 +7070,23 @@ components:
       properties:
         eventsTotal:
           type: integer
+          description: Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo)
+        eventsAfterEnd:
+          type: integer
+          description: Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)
+        eventsStored:
+          type: integer
+          description: |
+            TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista
+            (e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);
+            "fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.
         eventsConfirmed:
           type: integer
         eventsOpen:
           type: integer
+          description: |
+            Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,
+            status "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.
         firstEventDate:
           type: ["string", "null"]
         lastEventDate:
@@ -6465,6 +7122,18 @@ components:
           type: string
         endDate:
           type: string
+        minEvents:
+          type: ["integer", "null"]
+          description: Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+        paymentDate:
+          type: ["string", "null"]
+          description: Data prevista do pagamento do bônus (AAAA-MM-DD)
+        conformityWithoutConduta:
+          type: boolean
+          description: Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)
+        areaEvaluation:
+          type: boolean
+          description: Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)
 
     CycleHistoryEntry:
       type: object
@@ -6553,6 +7222,145 @@ components:
           type: string
         endDate:
           type: string
+        minEvents:
+          type: ["integer", "null"]
+          description: Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+        paymentDate:
+          type: ["string", "null"]
+          description: Data prevista do pagamento do bônus (AAAA-MM-DD)
+        conformityWithoutConduta:
+          type: boolean
+          description: Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)
+        areaEvaluation:
+          type: boolean
+          description: Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)
+
+    RankingTotal:
+      type: object
+      required: [cycles, rows]
+      properties:
+        cycles:
+          type: array
+          description: Ciclos somados (atual primeiro, depois do mais recente ao mais antigo)
+          items:
+            type: object
+            required: [id, name, status, isCurrent, minEvents]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              status: { type: string }
+              isCurrent: { type: boolean }
+              minEvents:
+                type: ["integer", "null"]
+                description: Mínimo de eventos que vale neste ciclo (o do ciclo ou a regra geral)
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingTotalRow"
+        summary:
+          $ref: "#/components/schemas/TotalGeralSummary"
+
+    TotalGeralSummary:
+      type: object
+      description: |
+        KPI do Total geral — o MESMO número em /ranking/total, Dashboard (cycleId=all) e Análises (cycleId=all),
+        calculado pela mesma função (lib/total-geral.ts).
+      required: [avgFinalResult, eventsWithScore, people, bonusOfficial, bonusProjected, bonusTotal]
+      properties:
+        avgFinalResult:
+          type: ["number", "null"]
+          description: Σ(nota final do ciclo × eventos com nota) ÷ Σ(eventos com nota), em todas as linhas pessoa × ciclo (1 casa).
+        eventsWithScore:
+          type: integer
+          description: Σ eventos com nota (o peso da média).
+        people:
+          type: integer
+        bonusOfficial:
+          type: number
+        bonusProjected:
+          type: number
+        bonusTotal:
+          type: number
+
+    RankingTotalRow:
+      type: object
+      required: [position, employeeId, employeeName, employeeActive, cyclesCount, cyclesWithScore, avgFinalResult, eventsCount, participatedEventsCount, totalAbsences, eligibleCycles, bonusOfficial, bonusProjected, bonusTotal, bonusPaid, latest, cycles]
+      properties:
+        position:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeeActive:
+          type: boolean
+        cyclesCount:
+          type: integer
+          description: Ciclos com resultado apurado
+        cyclesWithScore:
+          type: integer
+          description: Ciclos em que teve evento com nota
+        avgFinalResult:
+          type: ["number", "null"]
+          description: Média ponderada pelos eventos com nota (Σ nota final × eventos ÷ Σ eventos), 1 casa
+        eventsCount:
+          type: integer
+          description: Soma dos eventos com nota
+        participatedEventsCount:
+          type: integer
+        totalAbsences:
+          type: integer
+        eligibleCycles:
+          type: integer
+        bonusOfficial:
+          type: number
+          description: Bônus OFICIAL — ciclos fechados em que foi elegível
+        bonusProjected:
+          type: number
+          description: Bônus PROJETADO — ciclo ainda aberto (muda até o fechamento)
+        bonusTotal:
+          type: number
+          description: bonusOfficial + bonusProjected
+        bonusPaid:
+          type: number
+          description: Soma do bônus marcado como pago
+        latest:
+          type: object
+          description: Resultado do ciclo mais recente da pessoa (a faixa exibida no total)
+          required: [cycleId, cycleName, finalResult, platoon, platoonColor]
+          properties:
+            cycleId: { type: integer }
+            cycleName: { type: string }
+            finalResult: { type: number }
+            platoon: { type: ["string", "null"] }
+            platoonColor: { type: ["string", "null"] }
+        cycles:
+          type: array
+          description: Um item por ciclo, do mais recente ao mais antigo
+          items:
+            $ref: "#/components/schemas/RankingTotalCycle"
+
+    RankingTotalCycle:
+      type: object
+      required: [cycleId, cycleName, cycleStatus, isCurrent, finalResult, platoon, platoonColor, eventsCount, participatedEventsCount, eligible, bonusValue, bonusStatus, official]
+      properties:
+        cycleId: { type: integer }
+        cycleName: { type: string }
+        cycleStatus: { type: string }
+        isCurrent: { type: boolean }
+        finalResult: { type: number }
+        platoon: { type: ["string", "null"] }
+        platoonColor: { type: ["string", "null"] }
+        eventsCount: { type: integer }
+        participatedEventsCount: { type: integer }
+        eligible: { type: boolean }
+        bonusValue:
+          type: number
+          description: Bônus do ciclo (0 quando não elegível)
+        bonusStatus: { type: ["string", "null"] }
+        official:
+          type: boolean
+          description: Ciclo fechado (bônus oficial); false = ciclo aberto (projeção)
 
     RankingEntry:
       type: object
@@ -6969,6 +7777,15 @@ components:
           type: integer
         participantsSync:
           type: integer
+        skippedClosedCycle:
+          type: array
+          description: Eventos já existentes de ciclo FECHADO que a sincronização deixou como estão (só consulta)
+          items:
+            type: object
+            properties:
+              eventId: { type: integer }
+              eventName: { type: string }
+              reason: { type: string }
 
     ResetDataInput:
       type: object
@@ -7327,6 +8144,9 @@ components:
           type: integer
         duplicatesRemoved:
           type: integer
+        skippedClosedCycle:
+          type: integer
+          description: Duplicatas em evento de ciclo FECHADO deixadas como estão (só consulta)
         warnings:
           type: array
           items:
@@ -7534,6 +8354,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventCriterionAssignment"
+        areaModeEventIds:
+          type: array
+          description: Eventos de ciclo com avaliação por área — um critério conta "avaliado" com uma resposta enviada e qualquer avaliador da área responde (sem designação).
+          items:
+            type: integer
 
     EventCriterionAssignment:
       type: object
@@ -7733,11 +8558,247 @@ components:
           type: string
         criterionDescription:
           type: ["string", "null"]
+        closed:
+          type: boolean
+          description: Já respondido pela área (por outra pessoa ou outro link) — não é cobrado e, se enviado, é recusado.
+        closedByName:
+          type: ["string", "null"]
+        closedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    PublicEvalSubmitRejected:
+      type: object
+      required: [criterionId, criterionName, reason]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        reason:
+          type: string
+        kind:
+          type: string
+          enum: [criterion, conformity]
+          description: "conformity = a parte da Matriz de Conformidade do link combinado (criterionId 0): a matriz já tinha resposta e foi mantida."
+
+    PublicEvalSubmitResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        saved:
+          type: array
+          items:
+            type: integer
+        rejected:
+          type: array
+          description: O que já estava respondido e não foi gravado (critérios e, no link combinado, a parte da matriz).
+          items:
+            $ref: "#/components/schemas/PublicEvalSubmitRejected"
+        conformitySaved:
+          type: boolean
+          description: Link combinado — a Matriz de Conformidade foi gravada neste envio.
+
+    MyAreaCriterion:
+      type: object
+      required: [criterionId, name, description, weight, multiArea, areaId, areaName, eventScoped, sourceCriterionId, access, state, answeredByName, answeredByMe, answeredViaLink, answeredAt, hasDraft]
+      properties:
+        criterionId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        weight:
+          type: number
+          description: Peso do critério no evento (congelado na liberação).
+        multiArea:
+          type: boolean
+          description: O critério também é respondido por outra área neste evento (original + cópias por área).
+        areaId:
+          type: ["integer", "null"]
+        areaName:
+          type: ["string", "null"]
+        eventScoped:
+          type: boolean
+        sourceCriterionId:
+          type: ["integer", "null"]
+        access:
+          type: string
+          enum: [area, assigned]
+          description: "area = pela área do cadastro (só no ciclo com avaliação por área); assigned = designado no evento."
+        state:
+          type: string
+          enum: [open, answered, closed]
+          description: "open = posso responder; answered = eu (ou link meu) respondi; closed = ciclo com avaliação por área e outra pessoa já respondeu (a primeira resposta fecha para todos, designados inclusive)."
+        answeredByName:
+          type: ["string", "null"]
+        answeredByMe:
+          type: boolean
+        answeredViaLink:
+          type: boolean
+        answeredAt:
+          type: ["string", "null"]
+          format: date-time
+        hasDraft:
+          type: boolean
+
+    MyAreaEvent:
+      type: object
+      required: [id, name, clientName, city, state, location, startDate, endDate, status, cycleName, participantCount, published, totalCriteria, answeredCount, openCount, draftCount, conformityCenografia, conformityFerramentas, conformityPending, conformityWithoutConduta, areaMode, pending, criteria]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+        cycleName:
+          type: ["string", "null"]
+        participantCount:
+          type: ["integer", "null"]
+          description: Só quando a consulta é de um evento (eventId).
+        published:
+          type: ["string", "null"]
+          enum: [partial, final, null]
+        totalCriteria:
+          type: integer
+        answeredCount:
+          type: integer
+        openCount:
+          type: integer
+        draftCount:
+          type: integer
+        conformityCenografia:
+          type: boolean
+        conformityFerramentas:
+          type: boolean
+        conformityPending:
+          type: boolean
+        conformityWithoutConduta:
+          type: boolean
+          description: Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e conta só os outros itens.
+        areaMode:
+          type: boolean
+          description: Ciclo com avaliação por área (qualquer avaliador da área responde; a primeira resposta enviada fecha o critério).
+        pending:
+          type: boolean
+          description: |
+            Algo a responder E o evento ABERTO pela regra única (não histórico, status open, dentro do
+            período, ciclo não fechado, já no dia seguinte ao fim). Ciclo fechado ou evento encerrado → false.
+        criteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyAreaCriterion"
+
+    MyAreaUpcomingEvent:
+      type: object
+      required: [eventId, eventName, startDate, endDate, opensOn]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        opensOn:
+          type: ["string", "null"]
+          description: Dia em que a avaliação abre (YYYY-MM-DD) — o dia seguinte ao fim do evento, em Brasília.
+
+    MyAreaEvaluations:
+      type: object
+      required: [areaId, areaName, totals, events, upcoming]
+      properties:
+        upcoming:
+          type: array
+          description: |
+            Só para o papel AVALIADOR (admin/RH recebem []): eventos do ciclo ATUAL (aberto), dentro do
+            período dele, com algo do avaliador (mesma regra de relevância da lista: critério da área do
+            cadastro no ciclo por área, designado no fluxo antigo, ou a matriz) que AINDA NÃO ABRIRAM
+            (hoje em Brasília < dia seguinte ao fim). Ordenados por opensOn, no máximo 30. Não depende
+            dos filtros (search/status/from/to/eventId).
+          items:
+            $ref: "#/components/schemas/MyAreaUpcomingEvent"
+        areaId:
+          type: ["integer", "null"]
+        areaName:
+          type: ["string", "null"]
+        totals:
+          type: object
+          required: [pending, done]
+          properties:
+            pending:
+              type: integer
+            done:
+              type: integer
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyAreaEvent"
+        unavailable:
+          description: |
+            Só com ?eventId=: o evento pedido é do usuário (critério da área,
+            designado ou matriz), mas ainda não abriu para avaliação — a tela diz
+            "Abre em DD/MM" (dia seguinte ao fim) ou "próximo ciclo". Ausente para
+            evento de outra área.
+          type: object
+          required: [eventId, eventName, startDate, endDate, nextCycle]
+          properties:
+            eventId:
+              type: integer
+            eventName:
+              type: string
+            startDate:
+              type: ["string", "null"]
+            endDate:
+              type: ["string", "null"]
+            nextCycle:
+              type: boolean
 
     PublicEvalInfo:
       type: object
       required: [tokenId, tokenType, isUsed, usedAt, recipientName, submitterName, eventName, eventStatus, criteria]
       properties:
+        nextCycle:
+          type: boolean
+          description: |
+            Evento do PRÓXIMO ciclo (começa depois do fim do ciclo em que está): o link ainda não aceita envio
+            (o POST responde 409 code EVENT_NEXT_CYCLE, nada gravado e o link continua sem uso). A tela deve avisar
+            "abre para avaliação quando o ciclo novo for criado" em vez de mostrar o formulário.
+        cycleClosed:
+          type: boolean
+          description: O ciclo do evento está FECHADO (só consulta) — o link não aceita envio (o POST responde 409 code CLOSED_CYCLE). A tela deve avisar "ciclo fechado" em vez de mostrar o formulário.
+        conformityWithoutConduta:
+          type: boolean
+          description: Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e o servidor não a cobra.
+        allClosed:
+          type: boolean
+          description: Todos os critérios do link já foram respondidos (no link combinado, ainda pode faltar a matriz — ver conformityAnswered).
+        conformityAnswered:
+          type: boolean
+          description: |
+            A Matriz de Conformidade (a parte que o link responde) já tem resposta; o link não a pede nem a sobrescreve.
+            Link combinado: a parte de Cenografia. Links só de matriz: conformity_cenografia = Cenografia;
+            conformity_ferramentas = Guarda de Equipamentos — nesses, o envio responde 409 code CONFORMITY_ALREADY_ANSWERED.
+        conformityAnsweredByName:
+          type: ["string", "null"]
+          description: Quem respondeu a matriz (nome gravado no envio), quando se sabe.
         tokenId:
           type: string
         tokenType:
@@ -8091,6 +9152,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventDateChange"
+        skippedClosedCycle:
+          type: array
+          description: Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda
+          items:
+            $ref: "#/components/schemas/ClosedCycleSkip"
+
+    ClosedCycleSkip:
+      type: object
+      required: [eventId, eventName, reason]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        reason:
+          type: string
 
     NormalizeDatesInput:
       type: object
@@ -8118,6 +9195,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventDateChange"
+        skippedClosedCycle:
+          type: array
+          description: Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda
+          items:
+            $ref: "#/components/schemas/ClosedCycleSkip"
 
     ConfirmResultsBulkInput:
       type: object

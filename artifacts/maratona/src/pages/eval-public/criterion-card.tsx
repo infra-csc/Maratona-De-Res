@@ -2,6 +2,7 @@ import type { PublicEvalCriterion } from "@workspace/api-client-react";
 import { CONDENSED, WARNING, DANGER_TEXT } from "@/lib/premium-theme";
 import { Card } from "./ui";
 import { scoreLabels } from "./helpers";
+import { displayCriterionName } from "../evaluations/helpers";
 import type { CriterionAnswer } from "./types";
 
 /** Um critério: escala 0–10 (rótulo só nas pontas) + comentário obrigatório. */
@@ -18,7 +19,7 @@ export function CriterionCard({ c, ans, setScore, setComments }: {
     <Card className="overflow-hidden">
       <div className="px-5 py-4" style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
         <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-0.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Critério</p>
-        <p className="font-black uppercase text-lg" style={{ fontFamily: CONDENSED }}>{c.criterionName}</p>
+        <p className="font-black uppercase text-lg" style={{ fontFamily: CONDENSED }}>{displayCriterionName(c.criterionName)}</p>
         {c.criterionDescription && (
           <p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{c.criterionDescription}</p>
         )}
@@ -32,15 +33,17 @@ export function CriterionCard({ c, ans, setScore, setComments }: {
               <span className="ml-2 normal-case font-semibold" style={{ color: "var(--accent-text)" }}>— {scoreLabels[selectedScore]}</span>
             )}
           </p>
-          <div className="flex gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${c.criterionName}`}>
-            {[0,1,2,3,4,5,6,7,8,9,10].map((s) => (
+          {/* No celular a escala quebra em duas linhas (0–5 / 6–10): cada botão
+              fica com pelo menos 32 px de toque (11 numa linha davam ~25 px em 390 px). */}
+          <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 sm:gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${c.criterionName}`}>
+            {[0,1,2,3,4,5,6,7,8,9,10].map(s => (
               <button
                 key={s}
                 type="button"
                 aria-label={`Nota ${s}`}
                 aria-pressed={selectedScore === s}
                 onClick={() => setScore(c.criterionId, s)}
-                className="flex-1 rounded-lg min-h-10 py-2.5 text-sm font-black transition-all"
+                className="rounded-lg min-h-11 min-w-8 py-2.5 text-base sm:text-sm font-black transition-all"
                 style={{
                   fontFamily: CONDENSED,
                   backgroundColor: selectedScore === s ? "var(--primary)" : "transparent",
@@ -60,7 +63,7 @@ export function CriterionCard({ c, ans, setScore, setComments }: {
 
         {/* Comentário SEMPRE obrigatório */}
         <div>
-          <label className="block text-[11px] font-bold tracking-[0.15em] uppercase mb-1.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+          <label htmlFor={`crit-${c.criterionId}-comment`} className="block text-[11px] font-bold tracking-[0.15em] uppercase mb-1.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
             Comentário <span style={{ color: DANGER_TEXT }}>*</span>
             <span className="ml-1 text-[11px] font-medium normal-case" style={{ color: "var(--muted-foreground)" }}>(obrigatório)</span>
           </label>

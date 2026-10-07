@@ -25,3 +25,22 @@ export const CENOGRAFIA_ITEMS: { key: CenografiaKey; commentKey: CenografiaComme
   { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
   { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
 ];
+
+/**
+ * Perguntas Sim/Não da matriz de Cenografia NESTE evento: no ciclo sem
+ * "Conduta" (cycles.conformity_without_conduta) a pergunta some — ela passou a
+ * ser avaliada no critério Proatividade/Conduta.
+ */
+export function cenografiaItemsFor(withoutConduta: boolean | undefined) {
+  return withoutConduta ? CENOGRAFIA_ITEMS.filter(i => i.key !== "conduta") : CENOGRAFIA_ITEMS;
+}
+
+/** Quantos itens a matriz de Cenografia tem no evento: as perguntas Sim/Não + Faltas/Atrasos + Destaque. */
+export function cenografiaItemCount(withoutConduta: boolean | undefined): number {
+  return cenografiaItemsFor(withoutConduta).length + 2;
+}
+
+/** Texto curto dos itens da matriz de Cenografia, ex.: "EPI · Estaiamentos · Faltas/Atrasos · Destaque". */
+export function cenografiaItemsLabel(withoutConduta: boolean | undefined): string {
+  return ["EPI", "Estaiamentos", ...(withoutConduta ? [] : ["Conduta"]), "Faltas/Atrasos", "Destaque"].join(" · ");
+}

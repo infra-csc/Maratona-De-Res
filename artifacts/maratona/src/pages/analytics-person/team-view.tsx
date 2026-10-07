@@ -17,11 +17,13 @@ interface Row { q: QuarterlyResult; pos: number; impact: Impact; lostFaixa: bool
  * Sem colaborador escolhido: a equipe inteira, uma linha por pessoa, com o que
  * as penalidades e os méritos fizeram com cada nota. Clicar abre a análise.
  */
-export function TeamView({ rows, faixas, minEvents, onPick }: {
+export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: {
   rows: QuarterlyResult[]; faixas: Faixa[];
   /** Mínimo de eventos PARTICIPADOS para o bônus; null = regras do ciclo não carregaram. */
   minEvents: number | null;
   onPick: (id: number) => void;
+  /** Ciclo anterior (seletor de ciclo): o bônus é o apurado, não projeção. */
+  readOnly?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
@@ -98,12 +100,12 @@ export function TeamView({ rows, faixas, minEvents, onPick }: {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="person-team-kpis">
-        <StatTile hero label="Nota final média" value={n1(teamAvg)} detail={`${all.length} colaboradores no ranking`} />
+        <StatTile hero label="Nota final média" value={n1(teamAvg)} detail={`${plural(all.length, "colaborador", "colaboradores")} no ranking`} />
         <StatTile label="Com penalidade" value={withPenalty.length} detail={withPenalty.length ? `${pts(penaltyPts)} pontos lançados no total` : "Nenhuma penalidade no ciclo"} />
         <StatTile label="Faixa perdida por penalidade" value={lostFaixa.length} detail={lostFaixa.length ? "Sem as penalidades, estariam numa faixa acima" : "Ninguém mudou de faixa por penalidade"} />
         <StatTile label="Com mérito" value={counts.merito} detail="Ganharam pontos por mérito" />
         <StatTile label="Elegíveis ao bônus" value={`${eligible.length}/${all.length}`} detail={minEvents != null ? `Mínimo de ${minEvents} eventos participados` : "Mínimo de eventos indisponível"} />
-        <StatTile label="Bônus projetado" value={brl(bonusTotal)} detail={bonusLost > 0 ? `${brl(bonusLost)} a menos por penalidades` : "Nenhum real perdido por penalidades"} />
+        <StatTile label={readOnly ? "Bônus do ciclo" : "Bônus projetado"} value={brl(bonusTotal)} detail={bonusLost > 0 ? `${brl(bonusLost)} a menos por penalidades` : "Nenhum real perdido por penalidades"} />
       </div>
 
       <Card title="A equipe numa linha" subtitle="Cada ponto é uma pessoa, pela nota final do ciclo; o fundo mostra as faixas e a linha tracejada, a média da equipe. Clique num ponto para abrir a análise.">

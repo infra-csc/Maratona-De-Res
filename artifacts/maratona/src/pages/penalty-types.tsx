@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useState } from "react";
 import {
   useGetPenaltyTypes, useCreatePenaltyType, useUpdatePenaltyType, useDeletePenaltyType,
@@ -83,7 +84,7 @@ export default function PenaltyTypesPage() {
         toast({
           title: "Tipo atualizado",
           description: retro > 0
-            ? `${retro} lançamento(s) já registrados neste ciclo foram atualizados com o novo valor. Os resultados foram recalculados.`
+            ? `${retro === 1 ? "1 lançamento já registrado neste ciclo foi atualizado" : `${retro} lançamentos já registrados neste ciclo foram atualizados`} com o novo valor. Os resultados foram recalculados.`
             : undefined,
         });
         setOpen(false);
@@ -107,7 +108,7 @@ export default function PenaltyTypesPage() {
         if (data.inserted === 0) {
           toast({ title: "Tipos padrão já existem", description: "Nenhum tipo novo foi inserido." });
         } else {
-          toast({ title: `${data.inserted} tipo(s) padrão restaurado(s) com sucesso` });
+          toast({ title: `${plural(data.inserted ?? 0, "tipo padrão restaurado", "tipos padrão restaurados")} com sucesso` });
         }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao restaurar padrões", description: e.message, variant: "destructive" }),

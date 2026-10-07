@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventPeriodPosition } from './eventPeriodPosition';
 
 export interface Event {
   id: number;
@@ -86,5 +87,21 @@ export interface Event {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  /**
+     * Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,
+     * eventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em
+     * stats.eventsAfterEnd, não em eventsTotal). Só em GET /events.
+     */
+  periodPosition?: EventPeriodPosition;
+  /**
+     * Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público
+     * (409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.
+     */
+  nextCycle?: boolean;
+  /**
+     * ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,
+     * ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
+     */
+  openForEvaluation?: boolean;
   createdAt?: string;
 }

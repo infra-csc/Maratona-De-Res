@@ -109,6 +109,9 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
 }, (t) => ({
   eventIdx: index("public_eval_tokens_event_idx").on(t.eventId),
   createdByIdx: index("public_eval_tokens_created_by_idx").on(t.createdByUserId),
+  // "Quem respondeu pelo link" e os links de cada avaliador no evento
+  // consultam por (evento, quem gerou) — migração 0011.
+  eventCreatorIdx: index("public_eval_tokens_event_creator_idx").on(t.eventId, t.createdByUserId),
 }));
 
 /**

@@ -1,13 +1,15 @@
-import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
-import { Building2, Flag, Target, Lock, CornerDownRight, Link2 } from "lucide-react";
-import { CONDENSED, AMBER, AMBER_TEXT } from "@/lib/premium-theme";
+import type { Evaluation, EventCriterion, MyAreaCriterion } from "@workspace/api-client-react";
+import { Building2, Flag, Target, CornerDownRight, Link2, Users } from "lucide-react";
+import { CONDENSED } from "@/lib/premium-theme";
 import { CriterionCard, type CriterionCardHandlers } from "./criterion-card";
 import type { AreaGroup, CriterionAssignmentRow, PublicLinkEligibleCriterion } from "./types";
 
 interface CriteriaColumnProps extends CriterionCardHandlers {
-  criteriaLocked: boolean;
   myCriteria: EventCriterion[];
   myAreaGroups: AreaGroup[];
+  // Ciclo com avaliação por área: qualquer avaliador da área responde e a
+  // primeira resposta enviada fecha o critério para todos.
+  areaMode: boolean;
   publicLinkEligibleCriteria: PublicLinkEligibleCriterion[] | undefined;
   criterionAssignments: CriterionAssignmentRow[] | undefined;
   // Critérios respondidos por mais de uma área neste evento.
@@ -18,6 +20,10 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
   currentAudio: (criterionId: number) => string | null;
   isSaving: boolean;
   progressPct: number;
+  // Estado do critério para mim (GET /evaluations/my-area): aberto, respondido, fechado pela área.
+  criterionInfo: (criterionId: number) => MyAreaCriterion | undefined;
+  // Avaliação que fechou o critério (nota e comentário de quem respondeu).
+  closingEval: (criterionId: number) => Evaluation | undefined;
   onRedirectArea: (group: AreaGroup) => void;
   onOpenPublicLink: (group: AreaGroup, areaEligible: number[]) => void;
 }
@@ -25,40 +31,35 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
 // Coluna "Critérios de Avaliação": formulários por área com os cartões de
 // critério e a meta de progresso no rodapé.
 export function CriteriaColumn({
-  criteriaLocked, myCriteria, myAreaGroups, publicLinkEligibleCriteria, criterionAssignments, sharedCriterionIds, comments,
-  getEval, currentScore, currentAudio, isSaving, progressPct, onRedirectArea, onOpenPublicLink,
-  onScoreClick, onCommentChange, onAudioChange, onSaveDraft,
+  myCriteria, myAreaGroups, areaMode, publicLinkEligibleCriteria, criterionAssignments, sharedCriterionIds, comments,
+  getEval, currentScore, currentAudio, isSaving, progressPct, criterionInfo, closingEval, onRedirectArea, onOpenPublicLink,
+  onScoreClick, onCommentChange, onAudioChange, onSaveDraft, onDiscardDraft, isDiscarding,
 }: CriteriaColumnProps) {
   return (
-    <div className="space-y-4 order-2 lg:order-none">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 px-1">
         <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
           <Target size={20} /> Critérios de Avaliação
         </h3>
       </div>
 
-      {criteriaLocked ? (
-        <div data-testid="notice-criteria-locked" className="text-center py-14 rounded-xl px-6" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: `1px solid ${AMBER}` }}>
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: AMBER, color: "var(--accent-foreground)" }}>
-            <Lock size={26} />
-          </div>
-          <h2 className="text-2xl uppercase font-black tracking-tight mb-1" style={{ fontFamily: CONDENSED, color: AMBER_TEXT }}>Avaliação bloqueada</h2>
-          <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para iniciar a avaliação da equipe.</p>
-        </div>
-      ) : myCriteria.length === 0 ? (
+      {myCriteria.length === 0 ? (
         <div data-testid="notice-no-area-criteria" className="text-center py-12 bg-card border border-border rounded-lg px-6">
           <div className="w-14 h-14 border border-border rounded-lg bg-secondary text-muted-foreground flex items-center justify-center mx-auto mb-4">
             <Building2 size={24} />
           </div>
-          <p className="uppercase font-bold text-muted-foreground max-w-md mx-auto">Nenhum critério atribuído à sua área neste evento.</p>
+          <p className="uppercase font-bold text-muted-foreground max-w-md mx-auto">Nenhum critério para você neste evento.</p>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl p-6 md:p-8">
+        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 md:p-8">
           <div className="space-y-12">
             {myAreaGroups.map(g => {
               const eligibleIds = new Set((publicLinkEligibleCriteria ?? []).map(ec => ec.criterionId));
               const areaEligible = g.criteria.filter(c => eligibleIds.has(c.criterionId)).map(c => c.criterionId);
-              const allGroupDone = g.criteria.every(c => getEval(c.criterionId)?.status === "submitted");
+              const allGroupDone = g.criteria.every(c => getEval(c.criterionId)?.status === "submitted" || criterionInfo(c.criterionId)?.state === "closed");
+              // Redirecionar é do fluxo antigo (designação); pela área não há o que redirecionar.
+              const canRedirect = g.criteria.some(c => criterionInfo(c.criterionId)?.access === "assigned" && criterionInfo(c.criterionId)?.state === "open");
+              const byArea = areaMode;
               return (
                 <div key={g.areaId} className="space-y-10">
                   {/* Header do formulário com botões de redirecionar e link público por grupo/área */}
@@ -66,23 +67,30 @@ export function CriteriaColumn({
                     <div>
                       <p className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Formulário</p>
                       <h3 className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{g.areaName}</h3>
+                      {byArea && (
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-start gap-1.5 max-w-md leading-snug">
+                          <Users size={12} className="shrink-0 mt-0.5" aria-hidden />
+                          Qualquer avaliador da área pode responder. A primeira resposta enviada fecha o critério para todos.
+                        </p>
+                      )}
                     </div>
                     {!allGroupDone && (
                       <div className="flex items-center gap-2 flex-wrap">
-                        <button
+                        {canRedirect && <button
                           type="button"
                           onClick={() => onRedirectArea(g)}
                           className="border border-border rounded-lg bg-card px-3 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-secondary transition-all"
                         >
                           <CornerDownRight size={13} /> Redirecionar Formulário
-                        </button>
+                        </button>}
                         {areaEligible.length > 0 && (
                           <button
                             type="button"
                             onClick={() => onOpenPublicLink(g, areaEligible)}
-                            className="border border-border rounded-lg bg-card px-3 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-secondary transition-all"
+                            data-testid={`button-freela-link-${g.areaId}`}
+                            className="border border-border rounded-lg bg-card px-3 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 whitespace-nowrap hover:bg-secondary transition-all"
                           >
-                            <Link2 size={13} /> Link Freelancer
+                            <Link2 size={13} /> Link para freela
                           </button>
                         )}
                       </div>
@@ -90,6 +98,7 @@ export function CriteriaColumn({
                   </div>
                   {g.criteria.map((c, index) => {
                     const ev = getEval(c.criterionId);
+                    const info = criterionInfo(c.criterionId);
                     return (
                       <CriterionCard
                         key={c.criterionId}
@@ -103,10 +112,14 @@ export function CriteriaColumn({
                         assignment={criterionAssignments?.find(x => x.criterionId === c.criterionId)}
                         isSaving={isSaving}
                         sharedWithOtherAreas={sharedCriterionIds?.has(c.criterionId) ?? false}
+                        closedBy={info?.state === "closed" ? { name: info.answeredByName, at: info.answeredAt, viaLink: info.answeredViaLink, score: closingEval(c.criterionId)?.score ?? null, comment: closingEval(c.criterionId)?.comments ?? null } : null}
+                        answeredByLinkName={info?.state === "answered" && info.answeredViaLink ? info.answeredByName : null}
                         onScoreClick={onScoreClick}
                         onCommentChange={onCommentChange}
                         onAudioChange={onAudioChange}
                         onSaveDraft={onSaveDraft}
+                        onDiscardDraft={onDiscardDraft}
+                        isDiscarding={isDiscarding}
                       />
                     );
                   })}

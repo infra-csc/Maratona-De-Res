@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Target } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
-import { getCycleWeekends } from "@/lib/utils";
+import { getCycleWeekends, weekendsEnd } from "@/lib/utils";
 import { CONDENSED, BODY, usePremiumTheme } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 import { calibrationEventChip, filterCalibratableEvents, getPickerPalette, SAVED_REASON_FEEDBACK_MS } from "./calibrations/helpers";
@@ -93,7 +93,8 @@ export default function CalibrationsPage() {
   // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
   // momento, inclusive antes de todas as avaliações serem enviadas.
   const calibratableEvents = events ?? [];
-  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
+  // Até o último evento: evento "fora do período" também ganha o chip do fim de semana.
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, weekendsEnd(cycle?.endDate, events));
   const filteredCalibratableEvents = filterCalibratableEvents(calibratableEvents, eventStatusFilter, filterDateFrom, filterDateTo, eventSearchText);
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 

@@ -34,7 +34,9 @@ export function PageHeader({
     <header
       data-testid={rest["data-testid"]}
       className={cn(
-        "flex flex-col gap-4 md:flex-row md:items-end md:justify-between",
+        // lg (não md): a 768 o menu lateral fica aberto e sobram 512 px — em linha, a
+        // descrição virava uma palavra por linha e as ações saíam da tela.
+        "flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between",
         className,
       )}
     >
@@ -64,7 +66,7 @@ export function PageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">{actions}</div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">{actions}</div>
       ) : null}
     </header>
   );

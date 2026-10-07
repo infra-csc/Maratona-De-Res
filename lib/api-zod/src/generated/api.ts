@@ -183,6 +183,9 @@ export const CreateUserResponse = zod.object({
 
 
 /**
+ * Avaliador: só as áreas que ele usa na avaliação (a do cadastro, as em que é principal, Cenografia/
+ * Ferramentas quando responde a matriz de algum evento e a área de redirecionamento dos critérios dele);
+ * outra área → 403.
  * @summary List active users in a given area (for redirect dropdowns)
  */
 export const GetUsersByAreaParams = zod.object({
@@ -671,10 +674,15 @@ export const GetEmployeeHistoryResponse = zod.array(GetEmployeeHistoryResponseIt
 
 
 /**
+ * Eventos de um ciclo (padrão o atual) ou de todos (cycleId=all; cada evento traz o seu cycleId).
  * @summary List events
  */
+export const getEventsQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
 export const GetEventsQueryParams = zod.object({
-  "status": zod.coerce.string().optional()
+  "status": zod.coerce.string().optional(),
+  "cycleId": zod.coerce.string().regex(getEventsQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
 })
 
 export const GetEventsResponseItem = zod.object({
@@ -727,6 +735,9 @@ export const GetEventsResponseItem = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -795,6 +806,9 @@ export const CreateEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -910,6 +924,7 @@ export const GetEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -1003,6 +1018,9 @@ export const UpdateEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1122,6 +1140,9 @@ export const MergeEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 }),
   "warnings": zod.array(zod.string())
@@ -1190,6 +1211,9 @@ export const CloseEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1251,6 +1275,9 @@ export const ReopenEventResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
+  "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1733,6 +1760,7 @@ export const SetConformityEvaluatorResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -1770,132 +1798,10 @@ export const RedirectConformityEvaluatorBody = zod.object({
 })
 
 export const RedirectConformityEvaluatorResponse = zod.object({
-  "id": zod.int(),
-  "name": zod.string(),
-  "clientName": zod.string().nullish(),
-  "location": zod.string().nullish(),
-  "city": zod.string().nullish(),
-  "state": zod.string().nullish(),
-  "startDate": zod.string(),
-  "endDate": zod.string(),
-  "cycleId": zod.int(),
-  "cycleName": zod.string().optional(),
-  "status": zod.string(),
-  "forcedClosed": zod.boolean().optional(),
-  "forcedCloseReason": zod.string().nullish(),
-  "criteriaConfirmed": zod.boolean().optional(),
-  "hasEvaluations": zod.boolean().optional(),
-  "feedbackReleased": zod.boolean().optional(),
-  "isHistorical": zod.boolean().optional(),
-  "importedScore": zod.number().nullish(),
-  "importedNotes": zod.string().nullish(),
-  "resultsConfirmed": zod.boolean().optional(),
-  "resultsConfirmedAt": zod.string().nullish(),
-  "resultsConfirmedBy": zod.int().nullish(),
-  "participants": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
-  "functionName": zod.string(),
-  "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional(),
-  "scheduledDiariaCount": zod.int().nullish(),
-  "scheduledDiariaStart": zod.string().nullish(),
-  "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaDates": zod.array(zod.string()).nullish().describe('LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.'),
-  "actualDiariaCount": zod.int().nullish().describe('LEGADO — ver actualDiariaDates. Não é mais escrito.'),
-  "diariaQuickConfirmed": zod.boolean().nullish().describe('LEGADO — o modo rápido de confirmação não existe mais.'),
-  "diariaQuickConfirmedAt": zod.string().nullish().describe('LEGADO — timestamp histórico da confirmação rápida.'),
-  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).'),
-  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.')
-})).optional(),
-  "criteria": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "criterionDescription": zod.string().nullish(),
-  "responsibleAreaId": zod.int().nullish(),
-  "responsibleAreaName": zod.string().nullish(),
-  "active": zod.boolean(),
-  "originalWeight": zod.number().optional(),
-  "weightOverride": zod.number().nullish(),
-  "normalizedWeight": zod.number(),
-  "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional(),
-  "sourceCriterionId": zod.int().nullish(),
-  "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish(),
-  "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish(),
-  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
-})).optional(),
-  "areaAssignments": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "areaId": zod.int(),
-  "areaName": zod.string().nullish(),
-  "evaluatorUserId": zod.int(),
-  "evaluatorName": zod.string().nullish()
-})).optional(),
-  "evaluationMatrix": zod.array(zod.object({
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "criteria": zod.array(zod.object({
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "status": zod.string(),
-  "averageScore": zod.number().nullish(),
-  "calibratedScore": zod.number().nullish()
-}))
-})).optional(),
-  "results": zod.array(zod.object({
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "eventId": zod.int(),
-  "eventScore": zod.number(),
-  "projectedPlatoon": zod.string().nullish(),
-  "criteriaDetails": zod.array(zod.object({
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "averageScore": zod.number().nullish(),
-  "calibratedScore": zod.number().nullish(),
-  "scoreUsed": zod.number().nullish(),
-  "scorePercentual": zod.number().nullish(),
-  "normalizedWeight": zod.number(),
-  "weightedContribution": zod.number().nullish()
-})).optional()
-})).optional(),
-  "evaluationProgress": zod.number().optional(),
+  "ok": zod.boolean(),
   "conformityEvaluatorUserId": zod.int().nullish(),
-  "conformityEvaluatorName": zod.string().nullish(),
-  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish(),
-  "conformity": zod.union([zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "epi": zod.boolean().nullish(),
-  "estaiamentos": zod.boolean().nullish(),
-  "guardaEquipamentos": zod.boolean().nullish(),
-  "conduta": zod.boolean().nullish(),
-  "epiComment": zod.string().nullish(),
-  "estaiamentosComment": zod.string().nullish(),
-  "guardaEquipamentosComment": zod.string().nullish(),
-  "condutaComment": zod.string().nullish(),
-  "absencesResponse": zod.boolean().nullish(),
-  "absencesReport": zod.string().nullish(),
-  "standoutResponse": zod.boolean().nullish(),
-  "standoutJustification": zod.string().nullish(),
-  "createdByUserId": zod.int(),
-  "createdByUserName": zod.string().nullish(),
-  "cenografiaSubmittedByName": zod.string().nullish(),
-  "ferramentasSubmittedByName": zod.string().nullish(),
-  "createdAt": zod.coerce.date().optional(),
-  "updatedAt": zod.coerce.date().optional()
-}),zod.null()]).optional()
-})
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish()
+}).describe('Resposta do repasse da Matriz de Conformidade. Para o avaliador, SÓ estes campos (A1: nada do\ndetalhe do evento). Admin/RH recebem também o detalhe completo do evento (campos de EventDetail).\n')
 
 
 /**
@@ -2013,6 +1919,7 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -2050,132 +1957,10 @@ export const RedirectConformityEvaluatorFerramentasBody = zod.object({
 })
 
 export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
-  "id": zod.int(),
-  "name": zod.string(),
-  "clientName": zod.string().nullish(),
-  "location": zod.string().nullish(),
-  "city": zod.string().nullish(),
-  "state": zod.string().nullish(),
-  "startDate": zod.string(),
-  "endDate": zod.string(),
-  "cycleId": zod.int(),
-  "cycleName": zod.string().optional(),
-  "status": zod.string(),
-  "forcedClosed": zod.boolean().optional(),
-  "forcedCloseReason": zod.string().nullish(),
-  "criteriaConfirmed": zod.boolean().optional(),
-  "hasEvaluations": zod.boolean().optional(),
-  "feedbackReleased": zod.boolean().optional(),
-  "isHistorical": zod.boolean().optional(),
-  "importedScore": zod.number().nullish(),
-  "importedNotes": zod.string().nullish(),
-  "resultsConfirmed": zod.boolean().optional(),
-  "resultsConfirmedAt": zod.string().nullish(),
-  "resultsConfirmedBy": zod.int().nullish(),
-  "participants": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
-  "functionName": zod.string(),
-  "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional(),
-  "scheduledDiariaCount": zod.int().nullish(),
-  "scheduledDiariaStart": zod.string().nullish(),
-  "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaDates": zod.array(zod.string()).nullish().describe('LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.'),
-  "actualDiariaCount": zod.int().nullish().describe('LEGADO — ver actualDiariaDates. Não é mais escrito.'),
-  "diariaQuickConfirmed": zod.boolean().nullish().describe('LEGADO — o modo rápido de confirmação não existe mais.'),
-  "diariaQuickConfirmedAt": zod.string().nullish().describe('LEGADO — timestamp histórico da confirmação rápida.'),
-  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).'),
-  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.')
-})).optional(),
-  "criteria": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "criterionDescription": zod.string().nullish(),
-  "responsibleAreaId": zod.int().nullish(),
-  "responsibleAreaName": zod.string().nullish(),
-  "active": zod.boolean(),
-  "originalWeight": zod.number().optional(),
-  "weightOverride": zod.number().nullish(),
-  "normalizedWeight": zod.number(),
-  "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional(),
-  "sourceCriterionId": zod.int().nullish(),
-  "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish(),
-  "partialPublishedByUserName": zod.string().nullish(),
-  "finalPublishedByUserName": zod.string().nullish(),
-  "publishedScore": zod.number().nullish().describe('Nota calibrada da última publicação (a que vale hoje); null = nunca publicada com calibração')
-})).optional(),
-  "areaAssignments": zod.array(zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "areaId": zod.int(),
-  "areaName": zod.string().nullish(),
-  "evaluatorUserId": zod.int(),
-  "evaluatorName": zod.string().nullish()
-})).optional(),
-  "evaluationMatrix": zod.array(zod.object({
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "criteria": zod.array(zod.object({
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "status": zod.string(),
-  "averageScore": zod.number().nullish(),
-  "calibratedScore": zod.number().nullish()
-}))
-})).optional(),
-  "results": zod.array(zod.object({
-  "employeeId": zod.int(),
-  "employeeName": zod.string(),
-  "eventId": zod.int(),
-  "eventScore": zod.number(),
-  "projectedPlatoon": zod.string().nullish(),
-  "criteriaDetails": zod.array(zod.object({
-  "criterionId": zod.int(),
-  "criterionName": zod.string(),
-  "averageScore": zod.number().nullish(),
-  "calibratedScore": zod.number().nullish(),
-  "scoreUsed": zod.number().nullish(),
-  "scorePercentual": zod.number().nullish(),
-  "normalizedWeight": zod.number(),
-  "weightedContribution": zod.number().nullish()
-})).optional()
-})).optional(),
-  "evaluationProgress": zod.number().optional(),
+  "ok": zod.boolean(),
   "conformityEvaluatorUserId": zod.int().nullish(),
-  "conformityEvaluatorName": zod.string().nullish(),
-  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish(),
-  "conformity": zod.union([zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "epi": zod.boolean().nullish(),
-  "estaiamentos": zod.boolean().nullish(),
-  "guardaEquipamentos": zod.boolean().nullish(),
-  "conduta": zod.boolean().nullish(),
-  "epiComment": zod.string().nullish(),
-  "estaiamentosComment": zod.string().nullish(),
-  "guardaEquipamentosComment": zod.string().nullish(),
-  "condutaComment": zod.string().nullish(),
-  "absencesResponse": zod.boolean().nullish(),
-  "absencesReport": zod.string().nullish(),
-  "standoutResponse": zod.boolean().nullish(),
-  "standoutJustification": zod.string().nullish(),
-  "createdByUserId": zod.int(),
-  "createdByUserName": zod.string().nullish(),
-  "cenografiaSubmittedByName": zod.string().nullish(),
-  "ferramentasSubmittedByName": zod.string().nullish(),
-  "createdAt": zod.coerce.date().optional(),
-  "updatedAt": zod.coerce.date().optional()
-}),zod.null()]).optional()
-})
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish()
+}).describe('Resposta do repasse da Matriz de Conformidade. Para o avaliador, SÓ estes campos (A1: nada do\ndetalhe do evento). Admin/RH recebem também o detalhe completo do evento (campos de EventDetail).\n')
 
 
 /**
@@ -2445,6 +2230,7 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -2585,6 +2371,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -2721,6 +2508,7 @@ export const ResyncEventCriteriaResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -2755,6 +2543,7 @@ export const ResyncEventCriteriaResponse = zod.object({
 export const ResyncAllEventsCriteriaResponse = zod.object({
   "processed": zod.int().optional(),
   "skipped": zod.int().optional(),
+  "skippedClosedCycle": zod.int().optional().describe('Eventos de ciclo FECHADO pulados (só consulta; já contados em skipped)'),
   "totalAdded": zod.int().optional(),
   "totalDeactivated": zod.int().optional(),
   "events": zod.array(zod.object({
@@ -2777,7 +2566,12 @@ export const FixCalibrationCriteriaResponse = zod.object({
   "fromId": zod.int().optional(),
   "toId": zod.int().optional(),
   "updated": zod.int().optional()
-})).optional()
+})).optional(),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "reason": zod.string()
+})).optional().describe('Eventos de ciclo FECHADO (só consulta) cujas calibrações não foram remapeadas')
 })
 
 
@@ -2785,6 +2579,7 @@ export const FixCalibrationCriteriaResponse = zod.object({
  * @summary Admin — reactivates event_criteria rows that are inactive but have submitted evaluations (orphaned after a catalog migration). Idempotent and safe.
  */
 export const FixOrphanedEvaluationsResponse = zod.object({
+  "skippedClosedCycle": zod.int().optional().describe('Critérios de evento de ciclo FECHADO não reativados (só consulta)'),
   "fixed": zod.int(),
   "eventsAffected": zod.int(),
   "criteriaReactivated": zod.array(zod.object({
@@ -2802,7 +2597,13 @@ export const MigrateCriteriaCatalogResponse = zod.object({
   "catalogDeactivated": zod.int(),
   "catalogActivated": zod.int(),
   "catalogCreated": zod.int(),
-  "eventCriteriaFixed": zod.int()
+  "eventCriteriaFixed": zod.int(),
+  "evaluationsRemapped": zod.int().optional(),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "reason": zod.string()
+})).optional().describe('Eventos de ciclo FECHADO (só consulta) — critérios e avaliações deles não foram migrados')
 })
 
 
@@ -2976,6 +2777,7 @@ export const DuplicateEventCriterionResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -3117,6 +2919,7 @@ export const SetEventCriterionAreasResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -3253,6 +3056,7 @@ export const ApplyEventCriteriaAreaDefaultsResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -3390,6 +3194,7 @@ export const DeleteEventCriterionResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -3493,6 +3298,89 @@ export const UpdateCriterionResponse = zod.object({
 
 
 /**
+ * Eventos com critérios confirmados em que o usuário tem critério da área
+ * do cadastro (users.areaId — a primeira resposta enviada da área fecha o
+ * critério), critério designado (fluxo antigo) ou a Matriz de
+ * Conformidade. Sem from/to/eventId, só o ciclo atual. Admin/RH podem
+ * consultar outra área com areaId.
+ * @summary Tela do avaliador numa chamada só — eventos e critérios da área do cadastro (e os designados)
+ */
+export const GetMyAreaEvaluationsQueryParams = zod.object({
+  "search": zod.coerce.string().optional().describe('Busca por nome do evento, cliente ou cidade.'),
+  "status": zod.enum(['pending', 'done', 'all']).optional(),
+  "from": zod.coerce.string().optional().describe('Data inicial (YYYY-MM-DD).'),
+  "to": zod.coerce.string().optional().describe('Data final (YYYY-MM-DD).'),
+  "eventId": zod.coerce.number().int().optional(),
+  "areaId": zod.coerce.number().int().optional().describe('Só admin/RH.')
+})
+
+export const GetMyAreaEvaluationsResponse = zod.object({
+  "upcoming": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "startDate": zod.string().nullable(),
+  "endDate": zod.string().nullable(),
+  "opensOn": zod.string().nullable().describe('Dia em que a avaliação abre (YYYY-MM-DD) — o dia seguinte ao fim do evento, em Brasília.')
+})).describe('Só para o papel AVALIADOR (admin/RH recebem []): eventos do ciclo ATUAL (aberto), dentro do\nperíodo dele, com algo do avaliador (mesma regra de relevância da lista: critério da área do\ncadastro no ciclo por área, designado no fluxo antigo, ou a matriz) que AINDA NÃO ABRIRAM\n(hoje em Brasília < dia seguinte ao fim). Ordenados por opensOn, no máximo 30. Não depende\ndos filtros (search/status/from/to/eventId).\n'),
+  "areaId": zod.int().nullable(),
+  "areaName": zod.string().nullable(),
+  "totals": zod.object({
+  "pending": zod.int(),
+  "done": zod.int()
+}),
+  "events": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "clientName": zod.string().nullable(),
+  "city": zod.string().nullable(),
+  "state": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "status": zod.string(),
+  "cycleName": zod.string().nullable(),
+  "participantCount": zod.int().nullable().describe('Só quando a consulta é de um evento (eventId).'),
+  "published": zod.union([zod.literal('partial'),zod.literal('final'),zod.literal(null)]).nullable(),
+  "totalCriteria": zod.int(),
+  "answeredCount": zod.int(),
+  "openCount": zod.int(),
+  "draftCount": zod.int(),
+  "conformityCenografia": zod.boolean(),
+  "conformityFerramentas": zod.boolean(),
+  "conformityPending": zod.boolean(),
+  "conformityWithoutConduta": zod.boolean().describe('Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e conta só os outros itens.'),
+  "areaMode": zod.boolean().describe('Ciclo com avaliação por área (qualquer avaliador da área responde; a primeira resposta enviada fecha o critério).'),
+  "pending": zod.boolean().describe('Algo a responder E o evento ABERTO pela regra única (não histórico, status open, dentro do\nperíodo, ciclo não fechado, já no dia seguinte ao fim). Ciclo fechado ou evento encerrado → false.\n'),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "weight": zod.number().describe('Peso do critério no evento (congelado na liberação).'),
+  "multiArea": zod.boolean().describe('O critério também é respondido por outra área neste evento (original + cópias por área).'),
+  "areaId": zod.int().nullable(),
+  "areaName": zod.string().nullable(),
+  "eventScoped": zod.boolean(),
+  "sourceCriterionId": zod.int().nullable(),
+  "access": zod.enum(['area', 'assigned']).describe('area = pela área do cadastro (só no ciclo com avaliação por área); assigned = designado no evento.'),
+  "state": zod.enum(['open', 'answered', 'closed']).describe('open = posso responder; answered = eu (ou link meu) respondi; closed = ciclo com avaliação por área e outra pessoa já respondeu (a primeira resposta fecha para todos, designados inclusive).'),
+  "answeredByName": zod.string().nullable(),
+  "answeredByMe": zod.boolean(),
+  "answeredViaLink": zod.boolean(),
+  "answeredAt": zod.coerce.date().nullable(),
+  "hasDraft": zod.boolean()
+}))
+})),
+  "unavailable": zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "startDate": zod.string().nullable(),
+  "endDate": zod.string().nullable(),
+  "nextCycle": zod.boolean()
+}).optional().describe('Só com ?eventId=: o evento pedido é do usuário (critério da área,\ndesignado ou matriz), mas ainda não abriu para avaliação — a tela diz\n"Abre em DD/MM" (dia seguinte ao fim) ou "próximo ciclo". Ausente para\nevento de outra área.\n')
+})
+
+
+/**
  * @summary List evaluations
  */
 export const GetEvaluationsQueryParams = zod.object({
@@ -3575,6 +3463,20 @@ export const UpdateEvaluationResponse = zod.object({
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
   "createdAt": zod.string().optional()
+})
+
+
+/**
+ * Para limpar o rascunho que ficou "órfão" quando outra pessoa da área enviou primeiro
+ * (modo por área). Avaliação enviada não se apaga (409). Ciclo fechado → 409 code CLOSED_CYCLE.
+ * @summary Apaga um RASCUNHO (só o dono do rascunho, ou admin/RH)
+ */
+export const DeleteEvaluationDraftParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteEvaluationDraftResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 
@@ -4022,19 +3924,35 @@ export const DeletePlatoonRuleResponse = zod.void()
 
 
 /**
+ * Números do ciclo (padrão o atual). Com cycleId=all, eventos, média, bônus
+ * e penalidades somam todos os ciclos; as pendências operacionais
+ * (avaliações, eventos com pendência, zona de risco) continuam sendo do
+ * ciclo atual (operationalCycleId).
  * @summary Get dashboard summary
  */
+export const getDashboardSummaryQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
+export const GetDashboardSummaryQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(getDashboardSummaryQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
+})
+
 export const GetDashboardSummaryResponse = zod.object({
-  "cycleId": zod.int().optional(),
+  "cycleId": zod.int().optional().describe('Ciclo dos números (0 = Total geral)'),
   "cycleName": zod.string().optional(),
+  "scope": zod.enum(['cycle', 'all']).optional().describe('cycle = um ciclo; all = Total geral (todos os ciclos)'),
+  "operationalCycleId": zod.int().nullish().describe('Ciclo das pendências operacionais (progresso de avaliações, eventos com pendência, zona de risco) — o escolhido ou, no Total geral, o atual'),
+  "operationalCycleName": zod.string().nullish(),
   "totalEvents": zod.int(),
   "totalEmployeesEvaluated": zod.int(),
-  "pendingEvaluations": zod.int(),
-  "submittedEvaluations": zod.int(),
+  "pendingEvaluations": zod.int().describe('Progresso de avaliações, em EVENTOS do ciclo operacional abertos para avaliação (não históricos,\njá no dia seguinte ao fim, com critério ativo): pendente = sem nota completa — inclusive evento sem\nnenhuma nota. Rascunho não conta (nem o "órfão" do modo por área).\n'),
+  "submittedEvaluations": zod.int().describe('Eventos abertos para avaliação já avaliados (resultado confirmado ou todos os critérios ativos com nota). Progresso = submitted ÷ (submitted + pending).'),
   "eventsInCalibration": zod.int(),
   "eventsInCycle": zod.int(),
-  "quarterAverage": zod.number().nullable(),
-  "totalBonusPreview": zod.number(),
+  "quarterAverage": zod.number().nullable().describe('Um ciclo: média das notas finais de quem tem evento com nota, no MESMO recorte de Análises e do Ranking\n(rankingScope), 1 casa. No Total geral (scope all): o KPI único (TotalGeralSummary.avgFinalResult de\nGET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).\n'),
+  "totalBonusPreview": zod.number().describe('bonusOfficial + bonusProjected (compatibilidade). Prefira mostrar os dois separados.'),
+  "bonusOfficial": zod.number().optional().describe('Bônus de ciclos FECHADOS (oficial). Um ciclo aberto → 0. Só gestores (senão 0).'),
+  "bonusProjected": zod.number().optional().describe('Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento). Só gestores (senão 0).'),
   "totalAbsences": zod.int(),
   "eventsWithPendencies": zod.array(zod.object({
   "eventId": zod.int(),
@@ -4052,8 +3970,11 @@ export const GetDashboardSummaryResponse = zod.object({
 /**
  * @summary Relatório por evento (nota final calibrada, critérios, calibração e equipe)
  */
+export const getAnalyticsEventsReportQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
 export const GetAnalyticsEventsReportQueryParams = zod.object({
-  "cycleId": zod.coerce.number().int().optional()
+  "cycleId": zod.coerce.string().regex(getAnalyticsEventsReportQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
 })
 
 export const GetAnalyticsEventsReportResponse = zod.object({
@@ -4065,6 +3986,8 @@ export const GetAnalyticsEventsReportResponse = zod.object({
 }),
   "events": zod.array(zod.object({
   "id": zod.int(),
+  "cycleId": zod.int().optional().describe('Ciclo do evento (útil no Total geral)'),
+  "cycleName": zod.string().optional(),
   "name": zod.string(),
   "clientName": zod.string().nullish(),
   "city": zod.string().nullish(),
@@ -4103,28 +4026,49 @@ export const GetAnalyticsEventsReportResponse = zod.object({
 
 
 /**
- * @summary Indicadores do ciclo atual para a tela de Análises (gestores)
+ * Com cycleId=all: todos os eventos e resultados de todos os ciclos. As
+ * contagens de pessoas viram participações (uma pessoa conta uma vez por
+ * ciclo; kpis.distinctCollaborators = pessoas diferentes), o funil usa o
+ * mínimo de eventos de cada ciclo e nearNextFaixa vem vazio (projeção só
+ * faz sentido num ciclo). cycle.id = 0 no Total geral.
+ * @summary Indicadores de um ciclo (padrão o atual) ou do Total geral para a tela de Análises (gestores)
  */
+export const getAnalyticsOverviewQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
+export const GetAnalyticsOverviewQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(getAnalyticsOverviewQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
+})
+
 export const GetAnalyticsOverviewResponse = zod.object({
   "cycle": zod.object({
   "id": zod.int(),
   "name": zod.string(),
   "startDate": zod.string().nullish(),
   "endDate": zod.string().nullish()
-}),
+}).describe('Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo'),
+  "scope": zod.object({
+  "kind": zod.enum(['cycle', 'all']),
+  "cyclesCount": zod.int(),
+  "isCurrent": zod.boolean().describe('O ciclo consultado é o atual (false no Total geral)'),
+  "status": zod.string().nullish().describe('Situação do ciclo consultado (open/closed); null no Total geral')
+}).optional(),
   "kpis": zod.object({
   "eventsTotal": zod.int(),
   "eventsConfirmed": zod.int(),
   "eventsScored": zod.int(),
   "avgEventScore": zod.number().nullish(),
-  "avgFinalResult": zod.number().nullish().describe('Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)'),
-  "collaborators": zod.int(),
-  "reachedMinEvents": zod.int(),
+  "avgFinalResult": zod.number().nullish().describe('Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados). No Total geral:\no KPI único (TotalGeralSummary.avgFinalResult de GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).\n'),
+  "collaborators": zod.int().describe('Linhas de resultado; no Total geral, participações (uma pessoa conta uma vez por ciclo)'),
+  "distinctCollaborators": zod.int().optional().describe('Pessoas diferentes (num ciclo, igual a collaborators)'),
+  "reachedMinEvents": zod.int().describe('Atingiram o mínimo de eventos. Elegível sempre conta (funil decrescente: mínimo ≥ elegíveis ≥ com bônus).\nCiclo FECHADO: vale o resultado GRAVADO na apuração (quem foi recusado pelo mínimo não atingiu), não a regra de hoje.\n'),
   "eligible": zod.int(),
   "withBonus": zod.int(),
-  "bonusTotal": zod.number(),
+  "bonusTotal": zod.number().describe('bonusOfficial + bonusProjected'),
+  "bonusOfficial": zod.number().optional().describe('Bônus de ciclos FECHADOS (oficial)'),
+  "bonusProjected": zod.number().optional().describe('Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento)'),
   "evaluationsSubmitted": zod.int(),
-  "evaluationsDraft": zod.int(),
+  "evaluationsDraft": zod.int().describe('Rascunhos (sem os "órfãos" do modo por área — critério já fechado por outra pessoa)'),
   "calibratedCriteria": zod.int(),
   "avgCalibrationShift": zod.number().nullish(),
   "penaltiesCount": zod.int(),
@@ -4132,10 +4076,17 @@ export const GetAnalyticsOverviewResponse = zod.object({
   "minEvents": zod.int()
 }),
   "ruleSet": zod.object({
-  "minEvents": zod.int(),
+  "minEvents": zod.int().describe('Mínimo do ciclo (no Total geral, o do ciclo mais recente — use minEventsByCycle)'),
   "conformityItemPoints": zod.number(),
   "conformityPenaltyFactor": zod.number(),
-  "conformityPenaltyPerNo": zod.number()
+  "conformityPenaltyPerNo": zod.number(),
+  "conformityItemsAsked": zod.int().describe('Itens que o avaliador responde na matriz (4; 3 quando a Conduta saiu da matriz)'),
+  "condutaInMatrix": zod.enum(['all', 'some', 'none']).describe('A Conduta está na matriz dos eventos do recorte (all), em nenhum (none, ciclo sem Conduta) ou em parte (some, Total geral misturando ciclos)'),
+  "minEventsByCycle": zod.array(zod.object({
+  "cycleId": zod.int(),
+  "cycleName": zod.string(),
+  "minEvents": zod.int()
+})).describe('Mínimo de eventos de cada ciclo do recorte')
 }).describe('Parâmetros das regras de negócio em vigor'),
   "scoreTrend": zod.array(zod.object({
   "weekStart": zod.string(),
@@ -4225,8 +4176,16 @@ export const GetAnalyticsOverviewResponse = zod.object({
 
 
 /**
+ * Com cycleId=all, conta os resultados de todos os ciclos (uma pessoa conta uma vez por ciclo).
  * @summary Get platoon distribution
  */
+export const getDashboardPlatoonDistributionQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
+export const GetDashboardPlatoonDistributionQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(getDashboardPlatoonDistributionQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
+})
+
 export const GetDashboardPlatoonDistributionResponseItem = zod.object({
   "platoonName": zod.string(),
   "color": zod.string(),
@@ -4237,8 +4196,18 @@ export const GetDashboardPlatoonDistributionResponse = zod.array(GetDashboardPla
 
 
 /**
+ * Com cycleId=all, uma linha por pessoa: finalResult = média das notas
+ * finais dos ciclos com nota, eventsCount = soma, bonusValue = soma dos
+ * ciclos elegíveis e platoon = faixa do ciclo mais recente.
  * @summary Get top 10 employees
  */
+export const getDashboardTopEmployeesQueryCycleIdRegExp = new RegExp('^([1-9][0-9]*|all)$');
+
+
+export const GetDashboardTopEmployeesQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(getDashboardTopEmployeesQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)')
+})
+
 export const GetDashboardTopEmployeesResponseItem = zod.object({
   "id": zod.int().optional(),
   "employeeId": zod.int(),
@@ -4288,9 +4257,13 @@ export const GetDashboardQuarterlyEvolutionResponse = zod.array(GetDashboardQuar
 /**
  * @summary Get quarterly results
  */
+export const getQuarterlyResultsQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
 export const GetQuarterlyResultsQueryParams = zod.object({
   "employeeId": zod.coerce.number().int().optional(),
-  "platoon": zod.coerce.string().optional()
+  "platoon": zod.coerce.string().optional(),
+  "cycleId": zod.coerce.string().regex(getQuarterlyResultsQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
 })
 
 export const GetQuarterlyResultsResponseItem = zod.object({
@@ -4464,8 +4437,48 @@ export const GetCurrentCycleResponse = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 })
+
+
+/**
+ * @summary Opções do seletor de ciclo (atual primeiro, depois os anteriores do mais recente ao mais antigo), qualquer papel logado
+ */
+export const ListCycleOptionsResponseItem = zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
+})
+export const ListCycleOptionsResponse = zod.array(ListCycleOptionsResponseItem)
 
 
 /**
@@ -4479,12 +4492,26 @@ export const ListCyclesResponseItem = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 }).and(zod.object({
   "stats": zod.object({
-  "eventsTotal": zod.int(),
+  "eventsTotal": zod.int().describe('Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo)'),
+  "eventsAfterEnd": zod.int().optional().describe('Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)'),
+  "eventsStored": zod.int().optional().describe('TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista\n(e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);\n"fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.\n'),
   "eventsConfirmed": zod.int(),
-  "eventsOpen": zod.int(),
+  "eventsOpen": zod.int().describe('Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,\nstatus "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.\n'),
   "firstEventDate": zod.string().nullish(),
   "lastEventDate": zod.string().nullish(),
   "collaborators": zod.int(),
@@ -4504,7 +4531,11 @@ export const ListCyclesResponse = zod.array(ListCyclesResponseItem)
 export const CreateCycleBody = zod.object({
   "name": zod.string(),
   "startDate": zod.string(),
-  "endDate": zod.string()
+  "endDate": zod.string(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)')
 })
 
 export const CreateCycleResponse = zod.object({
@@ -4515,7 +4546,19 @@ export const CreateCycleResponse = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 })
 
 
@@ -4529,7 +4572,11 @@ export const UpdateCycleParams = zod.object({
 export const UpdateCycleBody = zod.object({
   "name": zod.string().optional(),
   "startDate": zod.string().optional(),
-  "endDate": zod.string().optional()
+  "endDate": zod.string().optional(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)')
 })
 
 export const UpdateCycleResponse = zod.object({
@@ -4540,7 +4587,19 @@ export const UpdateCycleResponse = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 })
 
 
@@ -4559,7 +4618,19 @@ export const SetCurrentCycleResponse = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 })
 
 
@@ -4579,12 +4650,26 @@ export const GetCycleHistoryResponse = zod.object({
   "status": zod.string(),
   "isCurrent": zod.boolean(),
   "closedAt": zod.string().nullish(),
-  "createdAt": zod.string().nullish()
+  "createdAt": zod.string().nullish(),
+  "minEvents": zod.int().nullish().describe('Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)'),
+  "paymentDate": zod.string().nullish().describe('Data prevista do pagamento do bônus (AAAA-MM-DD)'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta)'),
+  "areaEvaluation": zod.boolean().optional().describe('Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação)'),
+  "effectiveMinEvents": zod.int().optional().describe('Mínimo que vale de fato (o do ciclo ou, se vazio, o global)'),
+  "movedEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "outsidePeriod": zod.boolean().optional().describe('O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período)')
+})).optional().describe('Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo\n(com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.\n'),
+  "movedAbsences": zod.int().optional().describe('Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo)'),
+  "warnings": zod.array(zod.string()).optional().describe('Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado)')
 }).and(zod.object({
   "stats": zod.object({
-  "eventsTotal": zod.int(),
+  "eventsTotal": zod.int().describe('Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo)'),
+  "eventsAfterEnd": zod.int().optional().describe('Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)'),
+  "eventsStored": zod.int().optional().describe('TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista\n(e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);\n"fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.\n'),
   "eventsConfirmed": zod.int(),
-  "eventsOpen": zod.int(),
+  "eventsOpen": zod.int().describe('Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,\nstatus "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.\n'),
   "firstEventDate": zod.string().nullish(),
   "lastEventDate": zod.string().nullish(),
   "collaborators": zod.int(),
@@ -4631,8 +4716,12 @@ export const GetCycleHistoryResponse = zod.object({
 /**
  * @summary Get ranking (Maratona de Resultados)
  */
+export const getRankingQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
 export const GetRankingQueryParams = zod.object({
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "cycleId": zod.coerce.string().regex(getRankingQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
 })
 
 export const GetRankingResponseItem = zod.object({
@@ -4654,10 +4743,82 @@ export const GetRankingResponse = zod.array(GetRankingResponseItem)
 
 
 /**
+ * Somente leitura. cyclesWithScore = ciclos com evento com nota;
+ * avgFinalResult = média PONDERADA pelos eventos com nota
+ * (Σ nota final × eventos ÷ Σ eventos); eventsCount = soma dos eventos com
+ * nota; bonusOfficial = bônus dos ciclos fechados; bonusProjected = bônus
+ * do ciclo aberto (projeção); bonusTotal = os dois somados; bonusPaid =
+ * soma do bônus pago; latest = faixa do ciclo mais recente (não há faixa
+ * do total). Mesmo recorte do Ranking em cada ciclo (no atual só ativos).
+ * @summary Total geral de Resultados & Ranking (uma linha por pessoa, somando todos os ciclos)
+ */
+export const GetRankingTotalResponse = zod.object({
+  "cycles": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "minEvents": zod.int().nullable().describe('Mínimo de eventos que vale neste ciclo (o do ciclo ou a regra geral)')
+})).describe('Ciclos somados (atual primeiro, depois do mais recente ao mais antigo)'),
+  "rows": zod.array(zod.object({
+  "position": zod.int(),
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "employeeActive": zod.boolean(),
+  "cyclesCount": zod.int().describe('Ciclos com resultado apurado'),
+  "cyclesWithScore": zod.int().describe('Ciclos em que teve evento com nota'),
+  "avgFinalResult": zod.number().nullable().describe('Média ponderada pelos eventos com nota (Σ nota final × eventos ÷ Σ eventos), 1 casa'),
+  "eventsCount": zod.int().describe('Soma dos eventos com nota'),
+  "participatedEventsCount": zod.int(),
+  "totalAbsences": zod.int(),
+  "eligibleCycles": zod.int(),
+  "bonusOfficial": zod.number().describe('Bônus OFICIAL — ciclos fechados em que foi elegível'),
+  "bonusProjected": zod.number().describe('Bônus PROJETADO — ciclo ainda aberto (muda até o fechamento)'),
+  "bonusTotal": zod.number().describe('bonusOfficial + bonusProjected'),
+  "bonusPaid": zod.number().describe('Soma do bônus marcado como pago'),
+  "latest": zod.object({
+  "cycleId": zod.int(),
+  "cycleName": zod.string(),
+  "finalResult": zod.number(),
+  "platoon": zod.string().nullable(),
+  "platoonColor": zod.string().nullable()
+}).describe('Resultado do ciclo mais recente da pessoa (a faixa exibida no total)'),
+  "cycles": zod.array(zod.object({
+  "cycleId": zod.int(),
+  "cycleName": zod.string(),
+  "cycleStatus": zod.string(),
+  "isCurrent": zod.boolean(),
+  "finalResult": zod.number(),
+  "platoon": zod.string().nullable(),
+  "platoonColor": zod.string().nullable(),
+  "eventsCount": zod.int(),
+  "participatedEventsCount": zod.int(),
+  "eligible": zod.boolean(),
+  "bonusValue": zod.number().describe('Bônus do ciclo (0 quando não elegível)'),
+  "bonusStatus": zod.string().nullable(),
+  "official": zod.boolean().describe('Ciclo fechado (bônus oficial); false = ciclo aberto (projeção)')
+})).describe('Um item por ciclo, do mais recente ao mais antigo')
+})),
+  "summary": zod.object({
+  "avgFinalResult": zod.number().nullable().describe('Σ(nota final do ciclo × eventos com nota) ÷ Σ(eventos com nota), em todas as linhas pessoa × ciclo (1 casa).'),
+  "eventsWithScore": zod.int().describe('Σ eventos com nota (o peso da média).'),
+  "people": zod.int(),
+  "bonusOfficial": zod.number(),
+  "bonusProjected": zod.number(),
+  "bonusTotal": zod.number()
+}).optional().describe('KPI do Total geral — o MESMO número em /ranking/total, Dashboard (cycleId=all) e Análises (cycleId=all),\ncalculado pela mesma função (lib/total-geral.ts).\n')
+})
+
+
+/**
  * @summary Ranking detail for an employee (drill-down)
  */
+export const getRankingDetailQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
 export const GetRankingDetailQueryParams = zod.object({
-  "employeeId": zod.coerce.number().int()
+  "employeeId": zod.coerce.number().int(),
+  "cycleId": zod.coerce.string().regex(getRankingDetailQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
 })
 
 export const GetRankingDetailResponse = zod.object({
@@ -4892,6 +5053,8 @@ export const GetIntegrationStatusResponse = zod.object({
 
 
 /**
+ * Traz os eventos do ciclo atual pela DATA DE INÍCIO (mesmo critério de eventPeriodPosition). Evento já
+ * existente de ciclo FECHADO não é tocado (vem em skippedClosedCycle).
  * @summary Trigger external sync
  */
 export const TriggerSyncResponse = zod.object({
@@ -4899,7 +5062,12 @@ export const TriggerSyncResponse = zod.object({
   "message": zod.string(),
   "eventsSync": zod.int().optional(),
   "employeesSync": zod.int().optional(),
-  "participantsSync": zod.int().optional()
+  "participantsSync": zod.int().optional(),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int().optional(),
+  "eventName": zod.string().optional(),
+  "reason": zod.string().optional()
+})).optional().describe('Eventos já existentes de ciclo FECHADO que a sincronização deixou como estão (só consulta)')
 })
 
 
@@ -4915,7 +5083,12 @@ export const ResetAllDataResponse = zod.object({
   "message": zod.string(),
   "eventsSync": zod.int().optional(),
   "employeesSync": zod.int().optional(),
-  "participantsSync": zod.int().optional()
+  "participantsSync": zod.int().optional(),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int().optional(),
+  "eventName": zod.string().optional(),
+  "reason": zod.string().optional()
+})).optional().describe('Eventos já existentes de ciclo FECHADO que a sincronização deixou como estão (só consulta)')
 })
 
 
@@ -5083,6 +5256,7 @@ export const DedupeEvaluationsResponse = zod.object({
   "groupsAffected": zod.int().describe('Combinações (evento, quesito, avaliador, conteúdo) com duplicatas.'),
   "eventsAffected": zod.int(),
   "duplicatesRemoved": zod.int(),
+  "skippedClosedCycle": zod.int().optional().describe('Duplicatas em evento de ciclo FECHADO deixadas como estão (só consulta)'),
   "warnings": zod.array(zod.string())
 })
 
@@ -5103,6 +5277,13 @@ export const ExportEventResultsResponse = zod.object({
 /**
  * @summary Export quarterly results CSV
  */
+export const exportQuarterlyResultsQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
+export const ExportQuarterlyResultsQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(exportQuarterlyResultsQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
+})
+
 export const ExportQuarterlyResultsResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -5112,6 +5293,13 @@ export const ExportQuarterlyResultsResponse = zod.object({
 /**
  * @summary Export ranking CSV
  */
+export const exportRankingQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
+export const ExportRankingQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(exportRankingQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
+})
+
 export const ExportRankingResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -5121,6 +5309,13 @@ export const ExportRankingResponse = zod.object({
 /**
  * @summary Export Caju bonus report CSV
  */
+export const exportCajuBonusesQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
+export const ExportCajuBonusesQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(exportCajuBonusesQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
+})
+
 export const ExportCajuBonusesResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -5130,6 +5325,13 @@ export const ExportCajuBonusesResponse = zod.object({
 /**
  * @summary Export absences CSV
  */
+export const exportAbsencesQueryCycleIdRegExp = new RegExp('^[1-9][0-9]*$');
+
+
+export const ExportAbsencesQueryParams = zod.object({
+  "cycleId": zod.coerce.string().regex(exportAbsencesQueryCycleIdRegExp).optional().describe('Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)')
+})
+
 export const ExportAbsencesResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -5527,7 +5729,12 @@ export const BulkSyncEventDatesResponse = zod.object({
   "startDateAfter": zod.string(),
   "endDateAfter": zod.string(),
   "reason": zod.string().nullable().describe('normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).')
-}))
+})),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "reason": zod.string()
+})).optional().describe('Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda')
 })
 
 
@@ -5573,7 +5780,12 @@ export const NormalizeEventDatesResponse = zod.object({
   "startDateAfter": zod.string(),
   "endDateAfter": zod.string(),
   "reason": zod.string().nullable().describe('normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).')
-}))
+})),
+  "skippedClosedCycle": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "reason": zod.string()
+})).optional().describe('Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda')
 })
 
 
@@ -5693,6 +5905,7 @@ export const SwapEventCriterionSourceResponse = zod.object({
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
   "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformityWithoutConduta": zod.boolean().optional().describe('O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta)'),
   "conformity": zod.union([zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
@@ -5795,7 +6008,8 @@ export const GetEvaluationConsoleResponse = zod.object({
   "confirmedAt": zod.coerce.date().nullable(),
   "updatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date().nullable()
-}))
+})),
+  "areaModeEventIds": zod.array(zod.int()).optional().describe('Eventos de ciclo com avaliação por área — um critério conta "avaliado" com uma resposta enviada e qualquer avaliador da área responde (sem designação).')
 })
 
 
@@ -5867,6 +6081,8 @@ export const UpdateCriterionAssignmentResponse = zod.object({
 
 
 /**
+ * Ciclo com avaliação por área: só usuários da área do critério. Avaliador: só de critério que é dele
+ * (designado, da área do cadastro, da área designada no evento ou da área em que é principal); outro → 403.
  * @summary Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
  */
 export const GetCriterionRedirectOptionsParams = zod.object({
@@ -6051,6 +6267,12 @@ export const GetPublicEvalParams = zod.object({
 })
 
 export const GetPublicEvalResponse = zod.object({
+  "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (começa depois do fim do ciclo em que está): o link ainda não aceita envio\n(o POST responde 409 code EVENT_NEXT_CYCLE, nada gravado e o link continua sem uso). A tela deve avisar\n"abre para avaliação quando o ciclo novo for criado" em vez de mostrar o formulário.\n'),
+  "cycleClosed": zod.boolean().optional().describe('O ciclo do evento está FECHADO (só consulta) — o link não aceita envio (o POST responde 409 code CLOSED_CYCLE). A tela deve avisar "ciclo fechado" em vez de mostrar o formulário.'),
+  "conformityWithoutConduta": zod.boolean().optional().describe('Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e o servidor não a cobra.'),
+  "allClosed": zod.boolean().optional().describe('Todos os critérios do link já foram respondidos (no link combinado, ainda pode faltar a matriz — ver conformityAnswered).'),
+  "conformityAnswered": zod.boolean().optional().describe('A Matriz de Conformidade (a parte que o link responde) já tem resposta; o link não a pede nem a sobrescreve.\nLink combinado: a parte de Cenografia. Links só de matriz: conformity_cenografia = Cenografia;\nconformity_ferramentas = Guarda de Equipamentos — nesses, o envio responde 409 code CONFORMITY_ALREADY_ANSWERED.\n'),
+  "conformityAnsweredByName": zod.string().nullish().describe('Quem respondeu a matriz (nome gravado no envio), quando se sabe.'),
   "tokenId": zod.string(),
   "tokenType": zod.enum(['criteria', 'criteria_with_conformity', 'conformity_cenografia', 'conformity_ferramentas']),
   "isUsed": zod.boolean(),
@@ -6062,7 +6284,10 @@ export const GetPublicEvalResponse = zod.object({
   "criteria": zod.array(zod.object({
   "criterionId": zod.int(),
   "criterionName": zod.string(),
-  "criterionDescription": zod.string().nullable()
+  "criterionDescription": zod.string().nullable(),
+  "closed": zod.boolean().optional().describe('Já respondido pela área (por outra pessoa ou outro link) — não é cobrado e, se enviado, é recusado.'),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.coerce.date().nullish()
 })).describe('Vazio nos links de conformidade.')
 })
 
@@ -6099,7 +6324,15 @@ export const SubmitPublicEvalBody = zod.object({
 }).describe('Nos links `criteria_with_conformity` também exige os campos da\nconformidade Cenografia (epi, estaiamentos, conduta, absencesReport,\nstandoutResponse e comentários quando a resposta é Não).\n')
 
 export const SubmitPublicEvalResponse = zod.object({
-  "ok": zod.boolean()
+  "ok": zod.boolean(),
+  "saved": zod.array(zod.int()).optional(),
+  "rejected": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "reason": zod.string(),
+  "kind": zod.enum(['criterion', 'conformity']).optional().describe('conformity = a parte da Matriz de Conformidade do link combinado (criterionId 0): a matriz já tinha resposta e foi mantida.')
+})).optional().describe('O que já estava respondido e não foi gravado (critérios e, no link combinado, a parte da matriz).'),
+  "conformitySaved": zod.boolean().optional().describe('Link combinado — a Matriz de Conformidade foi gravada neste envio.')
 })
 
 

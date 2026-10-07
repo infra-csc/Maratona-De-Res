@@ -1,7 +1,8 @@
 import {
   db, eventsTable, employeeEventResultsTable, eventParticipantsTable, employeesTable, cyclesTable, type EventConformity,
 } from "@workspace/db";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import { eventWithinItsCycleSql } from "./cycle.js";
 import { loadEventTeamData } from "./cycle-data.js";
 import { computeEventTeamResultFromData, emptyEventTeamData } from "./cycle-compute.js";
 import { participantCountsForScore } from "./participation.js";
@@ -30,6 +31,9 @@ export interface EventReportRow {
   status: string;
   resultsConfirmed: boolean;
   isHistorical: boolean;
+  /** Ciclo do evento (útil no Total geral, que mistura ciclos). */
+  cycleId: number;
+  cycleName: string;
   /** Nota final oficial (0–100) do recálculo; só para eventos confirmados. */
   finalScore: number | null;
   /** Nota que o evento teria hoje pelo cálculo oficial (0–100), confirmado ou não. */
@@ -51,12 +55,23 @@ export interface EventReportRow {
 
 const r2 = (n: number | null | undefined) => (n == null || Number.isNaN(n) ? null : Math.round(n * 100) / 100);
 
-export async function buildEventsReport(cycleId: number): Promise<EventsReport | null> {
-  const [cycle] = await db.select().from(cyclesTable).where(eq(cyclesTable.id, cycleId)).limit(1);
-  if (!cycle) return null;
+/** `cycleId = "all"`: eventos de todos os ciclos (Total geral; cycle.id = 0). */
+export async function buildEventsReport(cycleId: number | "all"): Promise<EventsReport | null> {
+  const cycles = cycleId === "all"
+    ? await db.select().from(cyclesTable)
+    : await db.select().from(cyclesTable).where(eq(cyclesTable.id, cycleId)).limit(1);
+  if (cycles.length === 0) return null;
+  const cycleNameById = new Map(cycles.map(c => [c.id, c.name]));
+  const starts = cycles.map(c => c.startDate).filter((d): d is string => !!d).sort();
+  const ends = cycles.map(c => c.endDate).filter((d): d is string => !!d).sort();
+  const cycle = cycleId === "all"
+    ? { id: 0, name: "Total geral", startDate: starts[0] ?? null, endDate: ends[ends.length - 1] ?? null }
+    : { id: cycles[0].id, name: cycles[0].name, startDate: cycles[0].startDate, endDate: cycles[0].endDate };
 
+  // Eventos "fora do período" (começam depois do fim do ciclo) não são deste
+  // ciclo — mesmo critério do recálculo (eventPeriodPosition).
   const events = await db.select().from(eventsTable)
-    .where(eq(eventsTable.cycleId, cycleId))
+    .where(and(inArray(eventsTable.cycleId, cycles.map(c => c.id)), eventWithinItsCycleSql()))
     .orderBy(asc(eventsTable.startDate), asc(eventsTable.name));
   const ids = events.map(e => e.id);
 
@@ -95,7 +110,7 @@ export async function buildEventsReport(cycleId: number): Promise<EventsReport |
       // Evento importado sem avaliação por critério: a nota vem pronta.
       const imported = ev.importedScore != null ? pgNum(ev.importedScore) : null;
       return {
-        id: ev.id, name: ev.name, clientName: ev.clientName, city: ev.city, state: ev.state,
+        id: ev.id, name: ev.name, clientName: ev.clientName, city: ev.city, state: ev.state, cycleId: ev.cycleId, cycleName: cycleNameById.get(ev.cycleId) ?? "",
         startDate: ev.startDate, endDate: ev.endDate, status: ev.status, resultsConfirmed: ev.resultsConfirmed, isHistorical: true,
         finalScore: ev.resultsConfirmed ? r2(officialByEvent.get(ev.id) ?? imported) : null,
         projectedScore: r2(imported), performanceScore: r2(imported), conformityPenalty: 0,
@@ -104,12 +119,16 @@ export async function buildEventsReport(cycleId: number): Promise<EventsReport |
     }
 
     const result = computeEventTeamResultFromData(teamData.get(ev.id) ?? emptyEventTeamData<EventConformity>());
+    // Sem NENHUMA nota de critério (ex.: resultado do ciclo gravado/importado
+    // sem as avaliações por evento) o evento não tem nota — o recálculo também
+    // o deixa fora da média. Mostrar 0,0 aqui seria inventar uma nota.
+    const hasAnyScore = result.criteriaDetails.some(c => c.scoreUsed != null);
     return {
-      id: ev.id, name: ev.name, clientName: ev.clientName, city: ev.city, state: ev.state,
+      id: ev.id, name: ev.name, clientName: ev.clientName, city: ev.city, state: ev.state, cycleId: ev.cycleId, cycleName: cycleNameById.get(ev.cycleId) ?? "",
       startDate: ev.startDate, endDate: ev.endDate, status: ev.status, resultsConfirmed: ev.resultsConfirmed, isHistorical: false,
-      finalScore: ev.resultsConfirmed ? r2(officialByEvent.get(ev.id) ?? result.conformityScore) : null,
-      projectedScore: result.totalCriteria > 0 ? r2(result.conformityScore) : null,
-      performanceScore: result.totalCriteria > 0 ? r2(result.eventScore) : null,
+      finalScore: ev.resultsConfirmed && hasAnyScore ? r2(officialByEvent.get(ev.id) ?? result.conformityScore) : null,
+      projectedScore: hasAnyScore ? r2(result.conformityScore) : null,
+      performanceScore: hasAnyScore ? r2(result.eventScore) : null,
       conformityPenalty: r2(result.conformityPenalty) ?? 0,
       calibratedCriteria: result.criteriaDetails.filter(c => c.calibratedScore !== null).length,
       evaluatedCriteria: result.evaluatedCriteria,
@@ -123,5 +142,5 @@ export async function buildEventsReport(cycleId: number): Promise<EventsReport |
     };
   });
 
-  return { cycle: { id: cycle.id, name: cycle.name, startDate: cycle.startDate, endDate: cycle.endDate }, events: rows };
+  return { cycle, events: rows };
 }

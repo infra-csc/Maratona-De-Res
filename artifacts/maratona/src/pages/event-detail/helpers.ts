@@ -142,3 +142,8 @@ export const CONFORMITY_ITEMS: ConformityItem[] = [
   { key: "guardaEquipamentos", label: "Guarda de Equipamentos", commentKey: "guardaEquipamentosComment", group: "ferramentas" },
   { key: "conduta", label: "Conduta", commentKey: "condutaComment", group: "cenografia" },
 ];
+
+/** Itens da matriz NESTE evento: o ciclo novo tira a "Conduta" (avaliada no critério Proatividade/Conduta). */
+export function conformityItemsFor(event: { conformityWithoutConduta?: boolean } | null | undefined): ConformityItem[] {
+  return event?.conformityWithoutConduta ? CONFORMITY_ITEMS.filter(i => i.key !== "conduta") : CONFORMITY_ITEMS;
+}

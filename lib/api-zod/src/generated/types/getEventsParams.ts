@@ -8,4 +8,9 @@
 
 export type GetEventsParams = {
 status?: string;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
 };

@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useImportSurvey, useGetEvents, getGetEventsQueryKey, type SurveyImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -51,7 +52,7 @@ export function SurveyImportSection() {
       onSuccess: (data) => {
         toast({
           title: "Pesquisa de avaliadores importada",
-          description: `${data.usersCreated ?? 0} avaliador(es) criado(s), ${data.evaluationsCreated ?? 0} avaliação(ões) gravada(s), ${data.conformitiesUpserted ?? 0} conformidade(s) atualizada(s), ${data.eventsUpdated ?? 0} evento(s) atualizado(s).`,
+          description: `${plural(data.usersCreated ?? 0, "avaliador criado", "avaliadores criados")}, ${plural(data.evaluationsCreated ?? 0, "avaliação gravada", "avaliações gravadas")}, ${plural(data.conformitiesUpserted ?? 0, "conformidade atualizada", "conformidades atualizadas")}, ${plural(data.eventsUpdated ?? 0, "evento atualizado", "eventos atualizados")}.`,
         });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
