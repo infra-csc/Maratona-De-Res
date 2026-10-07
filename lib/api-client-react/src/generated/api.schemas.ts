@@ -415,6 +415,17 @@ export const EventPeriodPosition = {
   after: 'after',
 } as const;
 
+/**
+ * Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios
+ * multiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.
+ * null fora do ciclo por área. Só em GET /events.
+ * @nullable
+ */
+export type EventAreaResponses = {
+  done: number;
+  total: number;
+} | null;
+
 export interface Event {
   id: number;
   /** @nullable */
@@ -511,6 +522,13 @@ export interface Event {
      * ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
      */
   openForEvaluation?: boolean;
+  /**
+     * Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios
+     * multiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.
+     * null fora do ciclo por área. Só em GET /events.
+     * @nullable
+     */
+  areaResponses?: EventAreaResponses;
   createdAt?: string;
 }
 

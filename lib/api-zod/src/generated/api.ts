@@ -742,6 +742,10 @@ export const GetEventsResponseItem = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -813,6 +817,10 @@ export const CreateEventResponse = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1025,6 +1033,10 @@ export const UpdateEventResponse = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1147,6 +1159,10 @@ export const MergeEventResponse = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 }),
   "warnings": zod.array(zod.string())
@@ -1218,6 +1234,10 @@ export const CloseEventResponse = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
@@ -1282,6 +1302,10 @@ export const ReopenEventResponse = zod.object({
   "periodPosition": zod.enum(['before', 'inside', 'after']).optional().describe('Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,\neventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em\nstats.eventsAfterEnd, não em eventsTotal). Só em GET /events.\n'),
   "nextCycle": zod.boolean().optional().describe('Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público\n(409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.\n'),
   "openForEvaluation": zod.boolean().optional().describe('ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,\nciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.\n'),
+  "areaResponses": zod.object({
+  "done": zod.int(),
+  "total": zod.int()
+}).nullish().describe('Ciclo por ÁREA: respostas por área (cada critério ativo do evento, as cópias por área dos critérios\nmultiárea incluídas; feito = avaliação enviada ou critério publicado) — a mesma conta da Central.\nnull fora do ciclo por área. Só em GET /events.\n'),
   "createdAt": zod.string().optional()
 })
 
