@@ -2,6 +2,7 @@ import { Award, TrendingUp, TrendingDown } from "lucide-react";
 import { fmtNum } from "@/lib/utils";
 import { scoreColor, scoreBarColor } from "./helpers";
 import type { EventSummary } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /** Item 6 — Destaques do Ciclo (critério mais forte / mais fraco + ranking). */
 export function CycleHighlights({ events }: { events: EventSummary[] }) {
@@ -11,7 +12,7 @@ export function CycleHighlights({ events }: { events: EventSummary[] }) {
   for (const ev of scoredEvents) {
     for (const c of ev.criteriaDetails) {
       if (c.scoreUsed === null || !c.finalPublishedAt || Number(c.weight) <= 0) continue;
-      const name = c.criterionName;
+      const name = displayCriterionName(c.criterionName);
       if (!map.has(name)) map.set(name, []);
       map.get(name)!.push(c.scoreUsed);
     }

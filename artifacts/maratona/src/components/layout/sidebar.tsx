@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Calendar, Users, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck, CalendarRange,
-  Database, LogOut, Target, Menu, X, TrendingUp,
+  Database, LogOut, Target, X, TrendingUp, PanelLeftClose, PanelLeftOpen,
   FolderLock, BookOpen, Settings2, Sun, Moon, BarChart3, History } from "lucide-react";
 import { useState } from "react";
 import { useAuth, hasRole } from "@/lib/auth-context";
@@ -116,13 +116,14 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
             className={cn("p-1.5 rounded-lg transition-colors shrink-0 hover:opacity-70", collapsed && "mx-auto")}
             style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
           >
-            {collapsed ? <Menu size={18} aria-hidden="true" /> : <X size={18} aria-hidden="true" />}
+            {collapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
           </button>
         )}
       </div>
 
-      <ScrollArea className="flex-1 py-4">
-        <nav className="px-3 space-y-6" aria-label="Navegação principal">
+      {/* 1366×768: itens compactos e barra de rolagem visível quando o menu não cabe. */}
+      <ScrollArea type="auto" className="flex-1 min-h-0 py-3">
+        <nav className="px-3 space-y-4" aria-label="Navegação principal">
           {navGroups.map(group => {
             const visibleItems = group.items.filter(item => {
               if (user?.role === "avaliador") return item.path === "/evaluations";
@@ -141,11 +142,11 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
             if (visibleItems.length === 0) return null;
 
             return (
-              <div key={group.name} className="space-y-1.5">
+              <div key={group.name} className="space-y-1">
                 {/* Avaliador tem um item só (Avaliações): sem título de seção —
                     "Gestão" em cima dele não descrevia nada do que ele faz. */}
                 {(!collapsed || isMobile) && user?.role !== "avaliador" && (
-                  <p className="px-2 text-[11px] font-bold uppercase tracking-[0.15em] mb-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                  <p className="px-2 text-[11px] font-bold uppercase tracking-[0.15em] mb-1.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
                     {group.name}
                   </p>
                 )}
@@ -162,7 +163,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
                       aria-current={isActive ? "page" : undefined}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold uppercase tracking-tight transition-all hover:opacity-80",
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-semibold uppercase tracking-tight transition-all hover:opacity-80",
                         collapsed && !isMobile && "justify-center",
                       )}
                       style={{
@@ -182,52 +183,51 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
         </nav>
       </ScrollArea>
 
-      <div className="p-4 space-y-3" style={{ borderTop: "1px solid var(--border)" }}>
-        <button
-          type="button"
-          onClick={toggle}
-          className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all w-full hover:opacity-70", collapsed && !isMobile && "justify-center")}
-          style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
-          title={collapsed && !isMobile ? (isDark ? "Modo claro" : "Modo escuro") : undefined}
-          aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
-          aria-pressed={isDark}
-        >
-          {isDark ? <Sun size={16} className="shrink-0" aria-hidden="true" /> : <Moon size={16} className="shrink-0" aria-hidden="true" />}
-          {(!collapsed || isMobile) && <span>{isDark ? "Modo Claro" : "Modo Escuro"}</span>}
-        </button>
-
+      <div className="p-3 space-y-2.5 shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
         {user && (
-          <>
-            <div className={cn("flex items-center gap-3", collapsed && !isMobile && "justify-center")}>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-                <span className="text-sm font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>
-                  {user.name.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}
-                </span>
-              </div>
-              {(!collapsed || isMobile) && (
-                <div className="min-w-0">
-                  <p className="text-sm font-bold truncate">{user.name}</p>
-                  <p className="text-[11px] font-bold uppercase tracking-widest mt-0.5 truncate" style={{ color: "var(--muted-foreground)" }}>{user.role}</p>
-                </div>
-              )}
+          <div className={cn("flex items-center gap-3", collapsed && !isMobile && "justify-center")}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
+              <span className="text-sm font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>
+                {user.name.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}
+              </span>
             </div>
+            {(!collapsed || isMobile) && (
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">{user.name}</p>
+                <p className="text-[11px] font-bold uppercase tracking-widest mt-0.5 truncate" style={{ color: "var(--muted-foreground)" }}>{user.role}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Tema e sair lado a lado (recolhido: um embaixo do outro) — o menu ganha altura a 1366×768. */}
+        <div className={cn("flex gap-2", collapsed && !isMobile && "flex-col")}>
+          <button
+            type="button"
+            onClick={toggle}
+            className={cn("flex flex-1 items-center justify-center gap-2 px-2 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:opacity-70 min-w-0")}
+            style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+            title={collapsed && !isMobile ? (isDark ? "Modo claro" : "Modo escuro") : undefined}
+            aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+            aria-pressed={isDark}
+          >
+            {isDark ? <Sun size={15} className="shrink-0" aria-hidden="true" /> : <Moon size={15} className="shrink-0" aria-hidden="true" />}
+            {(!collapsed || isMobile) && <span className="whitespace-nowrap">{isDark ? "Modo claro" : "Modo escuro"}</span>}
+          </button>
+          {user && (
             <button
               type="button"
               data-testid="button-logout"
               onClick={logout}
               title={collapsed && !isMobile ? "Sair" : undefined}
               aria-label="Encerrar sessão"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold uppercase text-[13px] tracking-tight transition-all hover:opacity-70",
-                collapsed && !isMobile ? "justify-center w-full" : "w-full"
-              )}
+              className="flex flex-1 items-center justify-center gap-2 px-2 py-2 rounded-lg font-bold uppercase text-[11px] tracking-wider transition-all hover:opacity-70 min-w-0"
               style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: DANGER_TEXT }}
             >
-              <LogOut size={18} className="shrink-0" aria-hidden="true" />
-              {(!collapsed || isMobile) && <span>Encerrar Sessão</span>}
+              <LogOut size={15} className="shrink-0" aria-hidden="true" />
+              {(!collapsed || isMobile) && <span className="whitespace-nowrap">Sair</span>}
             </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </aside>
   );

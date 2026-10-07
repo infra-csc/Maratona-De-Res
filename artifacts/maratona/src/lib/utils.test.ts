@@ -2,7 +2,7 @@
 //   node --import ./scripts/test/register.mjs --test artifacts/maratona/src/lib/utils.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fmtOpensOn, isLightColor, faixaEdge, apiErrorCode, EVENT_NEXT_CYCLE, plural, evaluationOpensOn } from "./utils";
+import { fmtOpensOn, isLightColor, faixaEdge, apiErrorCode, EVENT_NEXT_CYCLE, plural, evaluationOpensOn, evaluationErrorTitle } from "./utils";
 
 test("fmtOpensOn: sem ano a menos de 12 meses; com ano (AA) depois", () => {
   assert.equal(fmtOpensOn("2026-10-26", "2026-10-06"), "26/10");
@@ -34,4 +34,13 @@ test("apiErrorCode: lê o code do corpo (ApiError) ou do erro (ApiRequestError)"
 test("plural", () => {
   assert.equal(plural(1, "penalidade", "penalidades"), "1 penalidade");
   assert.equal(plural(2, "penalidade", "penalidades"), "2 penalidades");
+});
+
+test("evaluationErrorTitle: título pelo code do 409", () => {
+  assert.equal(evaluationErrorTitle({ data: { code: "EVENT_NEXT_CYCLE" } }), "Evento do próximo ciclo");
+  assert.equal(evaluationErrorTitle({ data: { code: "CLOSED_CYCLE" } }), "Ciclo fechado");
+  assert.equal(evaluationErrorTitle({ data: { code: "AREA_ALREADY_ANSWERED" } }), "Critério já respondido pela área");
+  assert.equal(evaluationErrorTitle({ code: "AREA_MODE_OTHER_AREA" }), "Critério de outra área");
+  assert.equal(evaluationErrorTitle(new Error("x")), "Não foi possível salvar");
+  assert.equal(evaluationErrorTitle({ data: { code: "OUTRO" } }, "Erro ao lançar"), "Erro ao lançar");
 });

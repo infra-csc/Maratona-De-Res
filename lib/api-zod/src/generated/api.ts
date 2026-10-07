@@ -457,6 +457,7 @@ export const GetEmployeesResponseItem = zod.object({
   "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
   "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
   "cycleExcludedReason": zod.string().nullish(),
+  "inPreviousCycle": zod.boolean().optional().describe('Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo.'),
   "linkedUserId": zod.int().nullish(),
   "hasAccess": zod.boolean().optional()
 })
@@ -497,6 +498,7 @@ export const CreateEmployeeResponse = zod.object({
   "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
   "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
   "cycleExcludedReason": zod.string().nullish(),
+  "inPreviousCycle": zod.boolean().optional().describe('Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo.'),
   "linkedUserId": zod.int().nullish(),
   "hasAccess": zod.boolean().optional()
 }).and(zod.object({
@@ -535,6 +537,7 @@ export const GetEmployeeResponse = zod.object({
   "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
   "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
   "cycleExcludedReason": zod.string().nullish(),
+  "inPreviousCycle": zod.boolean().optional().describe('Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo.'),
   "linkedUserId": zod.int().nullish(),
   "hasAccess": zod.boolean().optional()
 })
@@ -582,6 +585,7 @@ export const UpdateEmployeeResponse = zod.object({
   "cycleEventsCount": zod.int().nullish().describe('Eventos COM NOTA no ciclo atual (null = sem resultado no ciclo)'),
   "cycleExcluded": zod.boolean().optional().describe('O admin tirou o colaborador do ciclo atual'),
   "cycleExcludedReason": zod.string().nullish(),
+  "inPreviousCycle": zod.boolean().optional().describe('Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo.'),
   "linkedUserId": zod.int().nullish(),
   "hasAccess": zod.boolean().optional()
 })
@@ -6287,7 +6291,8 @@ export const GetPublicEvalResponse = zod.object({
   "criterionDescription": zod.string().nullable(),
   "closed": zod.boolean().optional().describe('Já respondido pela área (por outra pessoa ou outro link) — não é cobrado e, se enviado, é recusado.'),
   "closedByName": zod.string().nullish(),
-  "closedAt": zod.coerce.date().nullish()
+  "closedAt": zod.coerce.date().nullish(),
+  "closedReason": zod.string().nullish().describe('Fechado por outro motivo que não uma resposta (ciclo por área, link em nome de alguém de outra área) — a tela mostra este texto.')
 })).describe('Vazio nos links de conformidade.')
 })
 

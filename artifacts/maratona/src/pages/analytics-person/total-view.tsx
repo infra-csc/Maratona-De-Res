@@ -56,8 +56,8 @@ export function TotalTeamView({ rows, onPick }: { rows: RankingTotalRow[]; onPic
   return (
     <div className="space-y-5" data-testid="person-total-team">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatTile hero label="Média final" value={n1(avg)} detail="Ponderada pelos eventos com nota" />
-        <StatTile label="Pessoas" value={rows.length} detail="Com resultado em algum ciclo" />
+        <StatTile hero label="Nota média geral" value={n1(avg)} detail="Ponderada pelos eventos com nota" />
+        <StatTile label="Colaboradores" value={rows.length} detail="Com resultado em algum ciclo" />
         <StatTile label="Bônus oficial" value={brl(official)} detail="Ciclos fechados" />
         <StatTile label="Bônus projetado" value={brl(projected)} detail="Ciclo aberto: muda até o fechamento" />
         <StatTile className="col-span-2 md:col-span-1" label="Bônus pago" value={brl(rows.reduce((s, r) => s + r.bonusPaid, 0))} detail="Marcado como pago" />
@@ -73,7 +73,7 @@ export function TotalTeamView({ rows, onPick }: { rows: RankingTotalRow[]; onPic
               <tr>
                 {th("Colaborador", "name", true)}
                 {th("Ciclos c/ nota", "cycles")}
-                {th("Média final", "avg")}
+                {th("Nota média geral", "avg")}
                 {th("Eventos c/ nota", "events")}
                 {/* Oficial (ciclos fechados) e projetado (ciclo aberto) nunca somados
                     numa coluna só — como em Resultados → Total geral. */}
@@ -119,7 +119,7 @@ export function TotalPersonView({ row, onOpenCycle, onBack }: {
   return (
     <div className="space-y-5" data-testid="person-total-detail">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <StatTile hero label="Média final" value={n1(row.avgFinalResult)} detail={`Ponderada pelos eventos · ${plural(row.cyclesWithScore, "ciclo com nota", "ciclos com nota")}`} />
+        <StatTile hero label="Nota média geral" value={n1(row.avgFinalResult)} detail={`Ponderada pelos eventos · ${plural(row.cyclesWithScore, "ciclo com nota", "ciclos com nota")}`} />
         <StatTile label="Eventos com nota" value={row.eventsCount} detail={plural(row.participatedEventsCount, "participado", "participados")} />
         <StatTile label="Ciclos elegíveis" value={`${row.eligibleCycles}/${row.cyclesCount}`} detail="Ao bônus" />
         <StatTile label="Bônus oficial" value={brl(row.bonusOfficial)} detail="Ciclos fechados" />

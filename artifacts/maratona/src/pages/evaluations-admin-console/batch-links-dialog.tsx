@@ -1,14 +1,19 @@
 import { plural } from "@/lib/utils";
 import type { Dispatch, SetStateAction } from "react";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { Copy, X, RotateCcw } from "lucide-react";
+import { Copy, X, RotateCcw, Link2 } from "lucide-react";
 import { CONDENSED, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import type { ToastFn } from "./use-event-mutations";
-import type { BatchLink, EnrichedEvent } from "./types";
+import type { AreaBatchPlanRow, BatchLink, EnrichedEvent } from "./types";
+import { AreaEvaluatorSelect } from "./pickers";
 
 /** Todos os links (batch) — resultado de "Gerar Todos os Links". */
-export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllCopied, setBatchAllCopied, setBatchOpen, batchEventHeader, toast }: {
+export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllCopied, setBatchAllCopied, setBatchOpen, batchEventHeader, toast, batchPlan, setBatchPlan, runAreaBatch }: {
   selected: EnrichedEvent | null;
+  /** Ciclo por área: áreas à espera da escolha do avaliador (antes de gerar). */
+  batchPlan: AreaBatchPlanRow[] | null;
+  setBatchPlan: Dispatch<SetStateAction<AreaBatchPlanRow[] | null>>;
+  runAreaBatch: () => void;
   batchRunning: boolean;
   batchLinks: BatchLink[];
   batchAllCopied: boolean;
@@ -17,9 +22,68 @@ export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllC
   batchEventHeader: string;
   toast: ToastFn;
 }) {
+  const planning = !!batchPlan && !batchRunning && batchLinks.length === 0;
+  const close = () => { setBatchOpen(false); setBatchPlan(null); };
+  if (planning) {
+    const chosen = batchPlan.filter(r => r.evaluatorId != null).length;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="Gerar todos os links" className="rounded-xl w-full max-w-lg overflow-hidden flex flex-col" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", maxHeight: "85vh" }}>
+          <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+            <div className="min-w-0">
+              <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }} title={selected?.name}>{selected?.name}</h3>
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Gerar todos os links · {plural(batchPlan.length, "área", "áreas")} com critério aberto</p>
+            </div>
+            <button type="button" onClick={close} aria-label="Fechar" title="Fechar" className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+              <X size={14} />
+            </button>
+          </div>
+          <div className="px-5 py-4 space-y-2.5 overflow-y-auto">
+            <p className="text-[12px] leading-snug" style={{ color: "var(--muted-foreground)" }}>
+              No ciclo por área, cada link sai em nome de um avaliador da área — a resposta conta como a dele. Escolha o avaliador de cada área; área sem escolha fica de fora.
+            </p>
+            {batchPlan.map(r => (
+              <div key={r.areaId} className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase" style={{ fontFamily: CONDENSED }}>{r.areaName}</span>
+                  {r.includeConformity && (
+                    <span className="text-[11px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>+ Matriz</span>
+                  )}
+                  <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{plural(r.criterionIds.length, "critério aberto", "critérios abertos")}</span>
+                </div>
+                <p className="text-[11px] leading-snug" style={{ color: "var(--muted-foreground)" }}>{r.criterionNames.join(" · ")}</p>
+                <AreaEvaluatorSelect
+                  compact
+                  areaId={r.areaId}
+                  areaName={r.areaName}
+                  value={r.evaluatorId}
+                  onChange={(userId, name) => setBatchPlan(plan => (plan ?? []).map(x => x.areaId === r.areaId ? { ...x, evaluatorId: userId, evaluatorName: name } : x))}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-end gap-2 px-5 py-3 shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
+            <button type="button" onClick={close} className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase transition-opacity hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              data-testid="button-run-area-batch"
+              disabled={chosen === 0}
+              onClick={runAreaBatch}
+              className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+            >
+              <Link2 size={12} /> {chosen === 0 ? "Gerar links" : `Gerar ${plural(chosen, "link", "links")}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="rounded-xl w-full max-w-lg overflow-hidden flex flex-col" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", maxHeight: "85vh" }}>
+      <div role="dialog" aria-modal="true" aria-label="Links do evento" className="rounded-xl w-full max-w-lg overflow-hidden flex flex-col" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", maxHeight: "85vh" }}>
         <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
             <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }} title={selected?.name}>{selected?.name}</h3>
@@ -44,7 +108,7 @@ export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllC
                 <Copy size={12} /> {batchAllCopied ? "Copiado!" : "Copiar Todos"}
               </button>
             )}
-            <button type="button" onClick={() => setBatchOpen(false)} aria-label="Fechar lista de links" title="Fechar" className="rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+            <button type="button" onClick={close} aria-label="Fechar lista de links" title="Fechar" className="rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
               <X size={14} />
             </button>
           </div>
@@ -65,7 +129,7 @@ export function BatchLinksDialog({ selected, batchRunning, batchLinks, batchAllC
                   <span
                     className="inline-flex items-center gap-1 text-[11px] font-bold uppercase px-1.5 py-0.5 rounded"
                     style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}
-                    title="Já existia um link pendente com estes mesmos critérios para este avaliador — nenhum token novo foi criado."
+                    title="Já existia um link pendente com estes mesmos critérios em nome deste avaliador — nenhum link novo foi criado."
                   >
                     <RotateCcw size={9} /> Link já existente (reaproveitado)
                   </span>

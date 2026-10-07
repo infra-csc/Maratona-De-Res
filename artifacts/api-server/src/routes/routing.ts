@@ -751,8 +751,10 @@ router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
 async function publicLinkEligible(eventId: number, user: { userId: number; role: string }) {
   // D2: no modo por área a designação não dá acesso — o avaliador manda link
   // só dos critérios ABERTOS da área do cadastro (areaLinkEligibleCriteria).
-  // Admin/RH (link em nome próprio) seguem pela designação, como antes.
-  if (isRole(user.role, "avaliador") && await eventAreaMode(eventId)) return areaLinkEligibleCriteria(eventId, user);
+  // Admin/RH e demais papéis não respondem critério no ciclo por área (só o
+  // avaliador da área) — link em nome próprio, nenhum critério. Fora dele,
+  // seguem pela designação, como antes.
+  if (await eventAreaMode(eventId)) return isRole(user.role, "avaliador") ? areaLinkEligibleCriteria(eventId, user) : [];
   const assignments = await db.select({
     criterionId: eventCriterionAssignmentsTable.criterionId,
     criterionName: criteriaTable.name,
@@ -841,6 +843,10 @@ router.post("/events/:id/public-token", async (req, res) => {
     eligibleCriterionIds = eligibleCriterionIds.filter(id => requested.has(id));
   }
 
+  if (eligibleCriterionIds.length === 0 && !isRole(user.role, "avaliador") && await eventAreaMode(eventId)) {
+    res.status(409).json({ error: "No ciclo por área, o link de critério sai em nome de um avaliador da área (use \"Link para freela\" escolhendo o avaliador).", code: "AREA_MODE_OTHER_AREA" });
+    return;
+  }
   if (eligibleCriterionIds.length === 0) {
     res.status(400).json({ error: "Nenhum critério deste formulário permite link público, ou já foram todos submetidos" });
     return;
@@ -947,7 +953,7 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
   // Reaproveita link PENDENTE equivalente (mesmo avaliador, mesmo tipo, mesmos
   // critérios): cada clique criava um token novo e, quando duas pessoas
   // respondiam por links diferentes, a segunda resposta era descartada.
-  const pendingSameKind = await db.select({ id: publicEvalTokensTable.id })
+  const pendingSameKind = await db.select({ id: publicEvalTokensTable.id, recipientName: publicEvalTokensTable.recipientName })
     .from(publicEvalTokensTable)
     .where(and(
       eq(publicEvalTokensTable.eventId, eventId),
@@ -963,7 +969,15 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
     const byToken = new Map<string, number[]>();
     for (const r of rows) { if (!byToken.has(r.tokenId)) byToken.set(r.tokenId, []); byToken.get(r.tokenId)!.push(r.criterionId); }
     const reusable = pendingSameKind.find(t => (byToken.get(t.id) ?? []).sort((a, b) => a - b).join(",") === wanted);
-    if (reusable) { res.json({ tokenId: reusable.id, reused: true }); return; }
+    if (reusable) {
+      // Reaproveita o link ainda sem uso, mas com o NOME pedido agora — o link
+      // aberto mostra "Preparado para" quem vai responder de fato.
+      if (finalRecipientName && finalRecipientName !== reusable.recipientName) {
+        await db.update(publicEvalTokensTable).set({ recipientName: finalRecipientName }).where(eq(publicEvalTokensTable.id, reusable.id));
+      }
+      res.json({ tokenId: reusable.id, reused: true });
+      return;
+    }
   }
 
   const tokenId = randomUUID();

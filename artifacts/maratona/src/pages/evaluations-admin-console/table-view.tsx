@@ -1,4 +1,6 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import type { AdminPublicToken } from "@/lib/routing-api";
+import { AreaBoard, boardGroups, type AreaBoardMode } from "./area-board";
 import { cn, plural } from "@/lib/utils";
 import { Clock, Link2, Lock, UserCheck } from "lucide-react";
 import { CONDENSED, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
@@ -7,6 +9,7 @@ import { EventCombobox, InlinePicker } from "./pickers";
 import { AreaModeOldDesignation, AreaModeResponder } from "./area-mode-bits";
 import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import type { ConformityKey, ConformityLinkDialogState, ConformityRow, CritRow, EnrichedEvent } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
 
@@ -23,24 +26,55 @@ export function TableView(props: {
   openLinkDialog: (c: CritRow) => void;
   setConformityLinkDialog: SetState<ConformityLinkDialogState | null>;
   setOpenConformityPicker: SetState<ConformityKey | null>;
+  allTokens: AdminPublicToken[] | undefined;
+  canViewSubmissions: boolean;
+  setViewEvalCrit: SetState<CritRow | null>;
 }) {
   const {
     selected, enrichedEvents, setSelectedEventId, conformityRows, canManage, openPickerCriterionId, setOpenPickerCriterionId,
-    handleAssign, openLinkDialog, setConformityLinkDialog, setOpenConformityPicker,
+    handleAssign, openLinkDialog, setConformityLinkDialog, setOpenConformityPicker, allTokens, canViewSubmissions, setViewEvalCrit,
   } = props;
+  // Ciclo por área: o mesmo quadro por área/critério da Atribuição (a tabela
+  // de um critério por linha virava 20 linhas com as cópias multiárea).
+  const [boardMode, setBoardMode] = useState<AreaBoardMode>("area");
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3">
         <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>Acompanhamento —</span>
         <EventCombobox events={enrichedEvents} value={selected.id} onChange={setSelectedEventId} />
         <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>
-          · {selected.done} de {plural(selected.total, "critério completo", "critérios completos")}
+          · {selected.done} de {selected.areaMode ? plural(selected.total, "resposta das áreas", "respostas das áreas") : plural(selected.total, "critério completo", "critérios completos")}
         </span>
       </div>
       {selected.areaMode && (
-        <p className="mb-3 text-[12px] rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }} data-testid="table-area-mode-note">
-          <strong style={{ color: "var(--foreground)" }}>No ciclo por área, só o avaliador da área responde</strong> — ninguém precisa ser designado. Ajustes na Calibração.
-        </p>
+        <>
+          <div className="mb-3 flex items-center gap-2.5 flex-wrap">
+            <div role="group" aria-label="Agrupar" className="inline-flex rounded-lg p-0.5" style={{ backgroundColor: "var(--secondary)" }}>
+              {([["area", "Por área"], ["criterion", "Por critério"]] as const).map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={boardMode === k} onClick={() => setBoardMode(k)}
+                  className="rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide transition-colors"
+                  style={{ fontFamily: CONDENSED, backgroundColor: boardMode === k ? "var(--card)" : "transparent", color: boardMode === k ? "var(--foreground)" : "var(--muted-foreground)" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }} data-testid="table-area-mode-note">
+              <strong style={{ color: "var(--foreground)" }}>No ciclo por área, só o avaliador da área responde</strong> — ninguém precisa ser designado. Ajustes na Calibração.
+            </p>
+          </div>
+          <div className="mb-4">
+            <AreaBoard
+              selected={selected}
+              groups={boardGroups(selected, boardMode)}
+              mode={boardMode}
+              canManage={canManage}
+              canViewSubmissions={canViewSubmissions}
+              tokens={allTokens}
+              openLinkDialog={openLinkDialog}
+              setViewEvalCrit={c => setViewEvalCrit(c)}
+            />
+          </div>
+        </>
       )}
       <div className="rounded-xl overflow-hidden overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] min-w-[820px]" style={{ backgroundColor: "var(--secondary)" }}>
@@ -48,7 +82,7 @@ export function TableView(props: {
             <div key={h} className={cn("px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wide", i === 5 && "text-right")} style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{h}</div>
           ))}
         </div>
-        {selected.criteria.length === 0 ? (
+        {selected.areaMode ? null : selected.criteria.length === 0 ? (
           <div className="p-6 text-center text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério ativo neste evento.</div>
         ) : selected.criteria.map(c => {
           const cfg = STATE_CFG[c.state];
@@ -57,7 +91,7 @@ export function TableView(props: {
           const missing = c.assignedToId == null && !c.areaMode;
           return (
             <div key={c.criterionId} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: missing ? "rgba(229,72,77,0.05)" : "transparent" }}>
-              <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{c.criterionName}</div>
+              <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{displayCriterionName(c.criterionName)}</div>
               <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>{c.areaName}</div>
               <div className="px-3.5 py-3">
                 {c.areaMode ? (
@@ -87,7 +121,7 @@ export function TableView(props: {
                 <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
               </div>
               <div className="px-3.5 py-3 text-right relative flex items-center justify-end gap-2">
-                {canManage && c.assignedToId != null && !selected.nextCycle && (
+                {canManage && !selected.nextCycle && (c.areaMode ? c.state !== "done" && c.areaId != null : c.assignedToId != null) && (
                   <button
                     type="button"
                     onClick={() => openLinkDialog(c)}

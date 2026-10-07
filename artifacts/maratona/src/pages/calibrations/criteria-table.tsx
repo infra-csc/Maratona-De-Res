@@ -17,17 +17,17 @@ export function CriteriaTable({ filteredActiveCriteria, displayActiveCount, rowP
                 </div>
               ) : (
                 <div className="rounded-xl overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <table className="w-full text-sm border-collapse min-w-[520px]">
-                    <thead>
+                  <table className="w-full text-sm border-collapse sm:min-w-[520px] max-sm:block">
+                    <thead className="max-sm:hidden">
                       <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
                         <th className="text-left px-3 py-2.5 text-[11px] font-black uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Critério</th>
                         <th className="text-center px-2 py-2.5 text-[11px] font-black uppercase tracking-wider w-16" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Peso</th>
-                        <th className="text-center px-2 py-2.5 text-[11px] font-black uppercase tracking-wider w-20" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} title="Média das notas enviadas pelos avaliadores da área">Avaliador</th>
+                        <th className="text-center px-2 py-2.5 text-[11px] font-black uppercase tracking-wider w-20" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} title="Nota enviada pela área; no critério de várias áreas, a média das áreas que responderam">Avaliador</th>
                         <th className="text-center px-2 py-2.5 text-[11px] font-black uppercase tracking-wider w-28" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Calibrada</th>
                         <th className="text-center px-2 py-2.5 text-[11px] font-black uppercase tracking-wider w-32 hidden sm:table-cell" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="max-sm:block">
                       {filteredActiveCriteria.map(c => (
                         <CriterionRow key={c.criterionId} c={c} {...rowProps} />
                       ))}

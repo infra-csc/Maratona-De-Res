@@ -4880,6 +4880,9 @@ components:
           description: O admin tirou o colaborador do ciclo atual
         cycleExcludedReason:
           type: ["string", "null"]
+        inPreviousCycle:
+          type: boolean
+          description: Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo.
         linkedUserId:
           type: ["integer", "null"]
         hasAccess:
@@ -8566,6 +8569,9 @@ components:
         closedAt:
           type: ["string", "null"]
           format: date-time
+        closedReason:
+          type: ["string", "null"]
+          description: Fechado por outro motivo que não uma resposta (ciclo por área, link em nome de alguém de outra área) — a tela mostra este texto.
 
     PublicEvalSubmitRejected:
       type: object

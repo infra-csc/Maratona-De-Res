@@ -6,6 +6,8 @@ import { requireAuth, requireRole, isRole, bumpTokenVersion, invalidateSessionCa
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 import { affectedRows } from "../lib/pg-num.js";
+import { closedCycleBody } from "../lib/closed-cycle-guard.js";
+import { plural } from "../lib/plural.js";
 
 const router = Router();
 
@@ -253,6 +255,21 @@ router.delete("/users/:id", requireRole("admin"), async (req, res) => {
   res.status(204).end();
 });
 
+/** Dados dos usuários duplicados ligados a evento de ciclo FECHADO (fora o "próximo ciclo"). */
+async function closedCycleUserDataToMove(dupIds: number[]): Promise<string[]> {
+  const ids = sql.join(dupIds.map(id => sql`${id}`), sql`, `);
+  const locked = (alias: string) => sql.raw(`EXISTS (SELECT 1 FROM events le JOIN cycles lc ON lc.id = le.cycle_id
+    WHERE le.id = ${alias} AND lc.status = 'closed' AND NOT (lc.end_date IS NOT NULL AND le.start_date > lc.end_date))`);
+  const rows = await db.execute<{ kind: string; n: number }>(sql`
+    SELECT 'avaliações' AS kind, count(*)::int AS n FROM evaluations x WHERE x.evaluator_user_id IN (${ids}) AND ${locked("x.event_id")}
+    UNION ALL SELECT 'calibrações', count(*)::int FROM calibrations x WHERE x.calibrated_by_user_id IN (${ids}) AND ${locked("x.event_id")}
+    UNION ALL SELECT 'matrizes de conformidade', count(*)::int FROM event_conformities x WHERE x.created_by_user_id IN (${ids}) AND ${locked("x.event_id")}
+    UNION ALL SELECT 'responsável pela matriz', count(*)::int FROM events x WHERE (x.conformity_evaluator_user_id IN (${ids}) OR x.conformity_evaluator_ferramentas_user_id IN (${ids})) AND ${locked("x.id")}
+    UNION ALL SELECT 'designações por área', count(*)::int FROM event_area_assignments x WHERE x.evaluator_user_id IN (${ids}) AND ${locked("x.event_id")}`);
+  const singular: Record<string, string> = { "avaliações": "avaliação", "calibrações": "calibração", "matrizes de conformidade": "matriz de conformidade", "responsável pela matriz": "responsável pela matriz", "designações por área": "designação por área" };
+  return rows.rows.filter(r => Number(r.n) > 0).map(r => r.kind === "responsável pela matriz" ? `${plural(Number(r.n), "evento")} como responsável pela matriz` : plural(Number(r.n), singular[r.kind] ?? r.kind, r.kind));
+}
+
 // POST /users/:id/merge — mescla avaliadores duplicados no canônico
 router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => {
   const canonicalId = parseInt(req.params.id as string);
@@ -265,6 +282,30 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
 
   const dupIds = duplicateIds.filter(id => id !== canonicalId);
   if (dupIds.length === 0) { res.status(400).json({ error: "Nenhum duplicado válido" }); return; }
+
+  // Ciclo fechado só consulta: o histórico dele não troca de avaliador (o
+  // "Respondido por" e a visibilidade da área mudariam). Mesma regra da
+  // junção de colaboradores (employees.ts).
+  const closedData = await closedCycleUserDataToMove(dupIds);
+  if (closedData.length > 0) {
+    res.status(409).json(closedCycleBody(
+      `Não dá para juntar: o usuário duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de avaliador.`,
+      { closedCycleData: closedData },
+    ));
+    return;
+  }
+  // Os dois avaliaram o mesmo critério do mesmo evento: juntar duplicaria a
+  // avaliação (índice único) — resolva antes (apague o rascunho sobrando).
+  const ids = sql.join(dupIds.map(id => sql`${id}`), sql`, `);
+  const clash = await db.execute<{ n: number }>(sql`
+    SELECT count(*)::int AS n FROM evaluations d
+     WHERE d.evaluator_user_id IN (${ids})
+       AND EXISTS (SELECT 1 FROM evaluations c WHERE c.evaluator_user_id = ${canonicalId} AND c.event_id = d.event_id AND c.criterion_id = d.criterion_id)`);
+  const clashes = Number(clash.rows[0]?.n ?? 0);
+  if (clashes > 0) {
+    res.status(409).json({ error: `Não dá para juntar: os dois usuários têm avaliação no mesmo critério do mesmo evento (${clashes === 1 ? "1 caso" : `${clashes} casos`}). Apague a avaliação que sobra (rascunho) e tente de novo.`, code: "MERGE_EVALUATION_CLASH" });
+    return;
+  }
 
   let movedEvaluations = 0, movedCalibrations = 0, movedConformities = 0, movedAssignments = 0;
 

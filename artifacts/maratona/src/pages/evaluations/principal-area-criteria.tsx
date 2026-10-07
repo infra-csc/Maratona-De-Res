@@ -63,7 +63,7 @@ export function PrincipalAreaCriteriaSection({
               const isSubmitted = a.status === "submitted";
               return (
                 <tr key={a.criterionId} className={isMine ? "bg-accent/10" : ""}>
-                  <td className="px-4 py-3 font-bold text-sm">{a.criterionName}</td>
+                  <td className="px-4 py-3 font-bold text-sm">{displayCriterionName(a.criterionName)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{areaNameById.get(a.criterionAreaId!)}</td>
                   <td className="px-4 py-3 text-sm">
                     {a.assignedToName ?? <span className="text-muted-foreground/50">Sem avaliador</span>}
@@ -118,7 +118,7 @@ export function AreaAssignDialog({ target, users, userId, onClose, onPickUser }:
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
         <DialogHeader>
-          <DialogTitle className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Atribuir "{target?.criterionName}"</DialogTitle>
+          <DialogTitle className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Atribuir "{displayCriterionName(target?.criterionName)}"</DialogTitle>
         </DialogHeader>
         <div className="space-y-2">
           <Label className="text-xs uppercase text-muted-foreground">Escolha o avaliador da área</Label>

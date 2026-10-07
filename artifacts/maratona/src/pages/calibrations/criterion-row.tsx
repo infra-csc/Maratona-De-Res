@@ -11,6 +11,7 @@ import { CalibrationAuditTrail } from "./calibration-audit-trail";
 import { CriterionComments } from "./criterion-comments";
 import { PendingPublishBadge, PublishStatusCell } from "./publish-status-cell";
 import { fmtNum } from "@/lib/utils";
+import type { AdminPublicToken } from "@/lib/routing-api";
 import type {
   AddCommentMutation,
   CalibrationAuditItem,
@@ -20,11 +21,15 @@ import type {
   PublishIntent,
   ToastFn,
 } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 // Props comuns a todas as linhas (estado e ações vêm do componente pai).
 export type CriterionRowSharedProps = {
   getAreaScores: DerivedCriteria["getAreaScores"];
+  getMembers: DerivedCriteria["getMembers"];
   getAvgScore: DerivedCriteria["getAvgScore"];
+  /** Links do evento (admin/RH) — para "via link: Freela". */
+  tokens: AdminPublicToken[] | undefined;
   getCalibration: DerivedCriteria["getCalibration"];
   childCriterionIdsMap: DerivedCriteria["childCriterionIdsMap"];
   activeCriteria: EventCriterion[];
@@ -61,11 +66,10 @@ export type CriterionRowProps = CriterionRowSharedProps & { c: EventCriterion };
 
 export function CriterionRow({
   c,
-  getAreaScores,
+  getMembers,
   getAvgScore,
+  tokens,
   getCalibration,
-  childCriterionIdsMap,
-  activeCriteria,
   calScores,
   setCalScores,
   calReasons,
@@ -75,8 +79,6 @@ export function CriterionRow({
   savingCritId,
   savingAll,
   saveCalibration,
-  expandedEvalComments,
-  setExpandedEvalComments,
   calAudit,
   calComments,
   newCommentTexts,
@@ -94,7 +96,10 @@ export function CriterionRow({
   publishIntents,
   setPublishIntents,
 }: CriterionRowProps) {
-                        const areaScores = getAreaScores(c.criterionId);
+                        const members = getMembers(c.criterionId);
+                        const multiArea = members.length > 1;
+                        const answeredAreas = members.filter(m => m.answers.length > 0).length;
+                        const answerCount = members.reduce((n, m) => n + m.answers.length, 0);
                         const avg = getAvgScore(c.criterionId);
                         const cal = getCalibration(c.criterionId);
                         // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
@@ -113,32 +118,30 @@ export function CriterionRow({
                         return (
                           <tr
                             data-testid={`row-cal-${c.criterionId}`}
-                            className="transition-colors group"
+                            // Celular: a linha vira um bloco (critério em cima; peso, avaliador e calibrada lado a lado).
+                            className="transition-colors group max-sm:flex max-sm:flex-wrap max-sm:items-start"
                             style={{ borderTop: "1px solid var(--border)" }}
                           >
                             {/* Critério */}
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 align-top max-sm:block max-sm:w-full">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{c.criterionName}</span>
+                                <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{displayCriterionName(c.criterionName)}</span>
                                 {/* No celular a coluna de status some: o selo vem para cá. */}
                                 {cal?.pendingPublish && <PendingPublishBadge className="sm:hidden" testId="badge-criterion-pending-publish-mobile" />}
-                                {c.responsibleAreaName && (
-                                  <span className="hidden lg:inline text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
+                                {/* Uma área só: o selo neutro da área. Multiárea: o detalhe por área vem logo abaixo. */}
+                                {multiArea ? (
+                                  <span className="text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{members.length} áreas · média das áreas</span>
+                                ) : c.responsibleAreaName && (
+                                  <span className="text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
                                 )}
-                                {(childCriterionIdsMap.get(c.criterionId) ?? []).map(childId => {
-                                  const childCrit = activeCriteria.find(ac => ac.criterionId === childId);
-                                  return childCrit?.responsibleAreaName ? (
-                                    <span key={childId} className="hidden lg:inline text-[11px] font-bold uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>+ {childCrit.responsibleAreaName}</span>
-                                  ) : null;
-                                })}
                               </div>
-                              {/* ── Avaliadores: nota individual + comentário ── */}
+                              {/* ── Detalhe por área: quem respondeu, nota, comentário, áudio ── */}
                               <EvaluatorScores
                                 criterionId={c.criterionId}
-                                areaScores={areaScores}
+                                members={members}
+                                avg={avg}
+                                tokens={tokens}
                                 setCalReasons={setCalReasons}
-                                expandedEvalComments={expandedEvalComments}
-                                setExpandedEvalComments={setExpandedEvalComments}
                               />
                               {/* ── Justificativa da calibração (editável) ── */}
                               <CalibrationReasonEditor
@@ -170,12 +173,13 @@ export function CriterionRow({
                               />
                             </td>
                             {/* Peso */}
-                            <td className="px-2 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                            <td className="px-2 py-2.5 text-center align-top max-sm:block max-sm:flex-1" onClick={e => e.stopPropagation()}>
+                              <span className="sm:hidden block text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Peso</span>
                               {canEditWeights ? (
                                 <div className="flex items-center justify-center gap-1">
                                   <input
                                     data-testid={`input-weight-${c.criterionId}`}
-                                    aria-label={`Peso de ${c.criterionName}`}
+                                    aria-label={`Peso de ${displayCriterionName(c.criterionName)}`}
                                     type="text"
                                     inputMode="decimal"
                                     value={weightEdits[c.criterionId] ?? String(peso)}
@@ -202,28 +206,23 @@ export function CriterionRow({
                               )}
                             </td>
                             {/* Nota Avaliador */}
-                            <td className="px-2 py-2.5 text-center">
-                              {/* Quando há múltiplos avaliadores, mostra breakdown por área */}
-                              {areaScores.length > 1 && (
-                                <div className="flex items-center justify-center gap-1 mb-0.5 flex-wrap">
-                                  {areaScores.map((s, si) => (
-                                    <span
-                                      key={si}
-                                      className="text-[11px] font-black px-1 py-px leading-none"
-                                      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", fontFamily: CONDENSED }}
-                                      title={`${s.name}${s.areaName ? ` · ${s.areaName}` : ""}: ${fmtNum(s.score, 1)}`}
-                                    >
-                                      {fmtNum(s.score, 1)}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                            <td className="px-2 py-2.5 text-center align-top max-sm:block max-sm:flex-1">
+                              <span className="sm:hidden block text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Avaliador</span>
+                              {/* Multiárea: quantas áreas responderam; a nota é a média das áreas (a mesma do servidor). */}
+                              {multiArea ? (
+                                <span className="block text-[11px] font-bold leading-tight mb-0.5" style={{ color: "var(--muted-foreground)" }} title={`${answeredAreas} de ${members.length} áreas responderam`}>
+                                  {answeredAreas}/{members.length} áreas
+                                </span>
+                              ) : answerCount > 1 ? (
+                                <span className="block text-[11px] font-bold leading-tight mb-0.5" style={{ color: "var(--muted-foreground)" }}>{answerCount} respostas</span>
+                              ) : null}
                               <span className="text-sm font-black" style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>
                                 {avg != null ? fmtNum(avg, 2) : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}
                               </span>
                             </td>
                             {/* Nota Calibrada inline */}
-                            <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
+                            <td className="px-2 py-2.5 align-top max-sm:block max-sm:flex-1" onClick={e => e.stopPropagation()}>
+                              <span className="sm:hidden block text-center text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Calibrada</span>
                               <div className="flex items-center justify-center gap-1">
                                 <input
                                   data-testid={`input-cal-score-${c.criterionId}`}

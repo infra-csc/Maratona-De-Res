@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { fieldStyle } from "./helpers";
 import type { CriteriaManagement } from "./use-criteria-management";
 import type { EnrichedEvent } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /** Aba Critérios — diálogos de duplicar, excluir cópia, remover critério e corrigir origem. */
 export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
@@ -101,7 +102,7 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
           <AlertDialogHeader>
             <AlertDialogTitle className="uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
             <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
-              O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmtW(targetWeightSum)}</strong> antes de salvar ou confirmar.
+              O critério <strong>{displayCriterionName(critMeta.get(pendingRemoval ?? -1)?.criterionName)}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmtW(targetWeightSum)}</strong> antes de salvar ou confirmar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -141,7 +142,7 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
                     .filter(c => !c.eventScoped && c.active)
                     .map(c => (
                       <SelectItem key={c.criterionId} value={c.criterionId.toString()} className="text-sm font-bold">
-                        {c.criterionName}
+                        {displayCriterionName(c.criterionName)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -201,7 +202,7 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
               {doomedCopies.length > 0 && (
                 <p role="note" className="flex items-start gap-2 text-xs font-bold" style={{ color: AMBER_TEXT }}>
                   <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
-                  Ao salvar, sai também a cópia feita à mão na mesma área: {doomedCopies.map(c => c.criterionName).join(", ")}.
+                  Ao salvar, sai também a cópia feita à mão na mesma área: {doomedCopies.map(c => displayCriterionName(c.criterionName)).join(", ")}.
                 </p>
               )}
             </div>

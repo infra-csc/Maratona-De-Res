@@ -50,15 +50,30 @@ export function initials(name: string) {
 }
 
 const LOWER_WORDS = new Set(["da","de","do","das","dos","dos","e","em","na","no","nas","nos","a","o","as","os"]);
+/** Sigla com dígito (E2E, B2B, 3D): fica como está — "E2e" parecia erro de digitação. */
+const KEEP_ACRONYM = /^(?=.*\d)[A-Z0-9]{2,4}$/;
 export function toTitleCase(str: string) {
-  return str.toLowerCase().split(/\s+/).map((w, i) => i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
+  return str.split(/\s+/).map((raw, i) => {
+    if (KEEP_ACRONYM.test(raw)) return raw;
+    const w = raw.toLowerCase();
+    return i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+  }).join(" ");
 }
 
-/** Com nota no ciclo = "in"; tirado do ciclo pelo admin = "out"; o resto = "none". */
+/**
+ * Com nota no ciclo OU vindo do ciclo anterior (ciclo novo, ainda sem nota) =
+ * "in"; tirado do ciclo pelo admin = "out"; o resto = "none".
+ */
 export function cycleStatus(e: EmployeeWithCycle): CycleStatus {
   if (e.cycleExcluded) return "out";
-  return (e.cycleEventsCount ?? 0) > 0 ? "in" : "none";
+  return (e.cycleEventsCount ?? 0) > 0 || !!e.inPreviousCycle ? "in" : "none";
 }
+
+/** Tem nota no ciclo atual (o KPI "Com nota no ciclo" conta só estes). */
+export const hasCycleScore = (e: EmployeeWithCycle) => !e.cycleExcluded && (e.cycleEventsCount ?? 0) > 0;
+
+/** Na lista "No ciclo" só por ter vindo do ciclo anterior — ainda sem nota no ciclo novo. */
+export const fromPreviousCycleOnly = (e: EmployeeWithCycle) => !e.cycleExcluded && !hasCycleScore(e) && !!e.inPreviousCycle;
 
 // cycleEligible = computed quarterly eligibility (8-event rule); null = no cycle data yet
 // Freelas never have quarterly_results entries, so cycleEligible is always null for them

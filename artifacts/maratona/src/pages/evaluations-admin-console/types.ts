@@ -94,9 +94,25 @@ export interface BatchLink {
 export interface LinkDialogState {
   criterionIds: number[];
   criterionNames: string[];
-  assignedToId: number;
-  assignedToName: string;
+  /** Em nome de quem o link responde. No ciclo por área começa vazio: o admin escolhe um avaliador da área. */
+  assignedToId: number | null;
+  assignedToName: string | null;
   includeConformity: boolean;
+  /** Ciclo por área: o link sai em nome de um avaliador ATIVO da área do critério (designação não vale). */
+  areaMode: boolean;
+  areaId: number | null;
+  areaName: string;
+}
+
+/** "Gerar todos os links" no ciclo por área: um link por área, em nome do avaliador escolhido. */
+export interface AreaBatchPlanRow {
+  areaId: number;
+  areaName: string;
+  criterionIds: number[];
+  criterionNames: string[];
+  includeConformity: boolean;
+  evaluatorId: number | null;
+  evaluatorName: string | null;
 }
 
 /** Link dialog para Matriz de Conformidade */

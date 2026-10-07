@@ -298,7 +298,7 @@ export function EvaluatorSidebar({
               {filtering
                 ? "Nenhum evento encontrado com esses filtros."
                 : status === "pending"
-                  ? "Nada a responder agora."
+                  ? "Tudo em dia"
                   : status === "done"
                     ? "Nenhum evento respondido ainda."
                     : data?.areaId == null

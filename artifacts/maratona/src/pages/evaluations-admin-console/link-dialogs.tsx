@@ -1,9 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AdminPublicToken } from "@/lib/routing-api";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { Link2, Copy, X, CheckCircle } from "lucide-react";
-import { CONDENSED, GOOD_TEXT } from "@/lib/premium-theme";
+import { Link2, Copy, X, CheckCircle, RotateCcw } from "lucide-react";
+import { CONDENSED, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
 import { fieldStyle, fmtDT } from "./helpers";
+import { AreaEvaluatorSelect } from "./pickers";
 import type { ToastFn } from "./use-event-mutations";
 import type { ConformityLinkDialogState, LinkDialogState } from "./types";
 
@@ -19,6 +20,9 @@ export function LinkDialog(props: {
   setGeneratedLinkUrl: SetState<string | null>;
   linkCopied: boolean;
   setLinkCopied: SetState<boolean>;
+  /** Link pendente reaproveitado pela API — nome de quem responde atualizado para este valor. */
+  linkReusedName: string | null;
+  setLinkReusedName: SetState<string | null>;
   handleGenerateLink: () => void;
   generating: boolean;
   allTokens: AdminPublicToken[] | undefined;
@@ -27,8 +31,9 @@ export function LinkDialog(props: {
 }) {
   const {
     linkDialog, setLinkDialog, linkRecipientName, setLinkRecipientName, generatedLinkUrl, setGeneratedLinkUrl,
-    linkCopied, setLinkCopied, handleGenerateLink, generating, allTokens, batchEventHeader, toast,
+    linkCopied, setLinkCopied, linkReusedName, setLinkReusedName, handleGenerateLink, generating, allTokens, batchEventHeader, toast,
   } = props;
+  const needsEvaluator = linkDialog.areaMode && linkDialog.assignedToId == null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div role="dialog" aria-modal="true" aria-label={`Link para freela: ${linkDialog.criterionNames.join(", ")}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
@@ -47,7 +52,11 @@ export function LinkDialog(props: {
                 ))}
               </ul>
             )}
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.assignedToName}</span></p>
+            {linkDialog.areaMode ? (
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Área: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.areaName}</span></p>
+            ) : (
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.assignedToName}</span></p>
+            )}
           </div>
           <button
             type="button"
@@ -69,6 +78,28 @@ export function LinkDialog(props: {
               <span>Este link incluirá o critério <strong>e</strong> a Matriz de Conformidade de Cenografia no mesmo questionário.</span>
             </div>
           )}
+          {/* Ciclo por área: em nome de qual avaliador da área o link responde. */}
+          {linkDialog.areaMode && linkDialog.areaId != null && (
+            <div>
+              <label htmlFor="link-area-evaluator" className="block text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                Em nome de qual avaliador da área?
+              </label>
+              <AreaEvaluatorSelect
+                id="link-area-evaluator"
+                areaId={linkDialog.areaId}
+                areaName={linkDialog.areaName}
+                value={linkDialog.assignedToId}
+                onChange={(userId, name) => {
+                  setLinkDialog(d => d ? { ...d, assignedToId: userId, assignedToName: name } : d);
+                  setGeneratedLinkUrl(null);
+                  setLinkReusedName(null);
+                }}
+              />
+              <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>
+                No ciclo por área, a resposta do link conta como a desse avaliador de {linkDialog.areaName}.
+              </p>
+            </div>
+          )}
           {/* recipient + generate */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
@@ -88,8 +119,9 @@ export function LinkDialog(props: {
               <button
                 type="button"
                 onClick={handleGenerateLink}
-                disabled={generating}
-                className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
+                disabled={generating || needsEvaluator}
+                title={needsEvaluator ? "Escolha antes o avaliador da área" : undefined}
+                className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
                 style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 <Link2 size={12} /> {generating ? "Gerando…" : "Gerar Link"}
@@ -100,7 +132,14 @@ export function LinkDialog(props: {
           {/* generated URL */}
           {generatedLinkUrl && (
             <div className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: GOOD_TEXT }}>Link gerado — copie e envie</p>
+              {linkReusedName ? (
+                <p className="text-[11px] font-bold leading-snug flex items-start gap-1.5" style={{ color: AMBER_TEXT }} data-testid="link-reused-notice">
+                  <RotateCcw size={11} className="shrink-0 mt-[2px]" aria-hidden />
+                  <span>Link já existente reaproveitado — o nome foi atualizado para {linkReusedName}.</span>
+                </p>
+              ) : (
+                <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: GOOD_TEXT }}>Link gerado — copie e envie</p>
+              )}
               <div className="flex gap-2 items-start">
                 <input
                   readOnly

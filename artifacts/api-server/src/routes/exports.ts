@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { computeEventTeamResult, computeEventTeamResultsBatch } from "./results.js";
 import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
 import { rankingScope } from "../lib/ranking-scope.js";
+import { eventOpenForEvaluationSql } from "../lib/next-cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -193,7 +194,10 @@ router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (
 });
 
 router.get("/exports/pending-evaluations", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
-  const openEvents = await db.select().from(eventsTable).where(eq(eventsTable.status, "open"));
+  // Regra única de "aberto para avaliação" (a mesma de Eventos, Dashboard e
+  // da tela do avaliador): evento futuro, do próximo ciclo ou de ciclo fechado
+  // não é pendência.
+  const openEvents = await db.select().from(eventsTable).where(eventOpenForEvaluationSql());
   const rows: Record<string, unknown>[] = [];
   // Um carregamento em lote para todos os eventos abertos (antes: N consultas por evento).
   const teams = await computeEventTeamResultsBatch(openEvents.map(ev => ev.id));

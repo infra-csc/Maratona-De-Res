@@ -8,13 +8,12 @@ import {
   getGetUsersQueryKey, getGetEventQueryKey, getGetEventResultQueryKey, getGetEventConformityQueryKey, getGetRankingQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ShieldAlert, AlertTriangle, UserCheck, Check, MessageSquare, Info } from "lucide-react";
+import { ShieldAlert, AlertTriangle, UserCheck, Check, MessageSquare } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { cn, apiErrorMessage } from "@/lib/utils";
-import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import { CONDENSED, WARNING, GOOD, AMBER, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { conformityItemsFor, fieldStyle } from "./helpers";
 import type { ConformityForm, EventConformity, EventDetail, ImportedConformityRatio, SetState } from "./types";
@@ -117,12 +116,7 @@ export function ConformitySection({
         <ShieldAlert size={16} style={{ color: "var(--accent-text)" }} />
         <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Matriz de Conformidade</span>
       </div>
-      {nextCycle && (
-        <p role="status" data-testid="conformity-next-cycle" className="mx-4 my-3 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
-          <Info size={13} aria-hidden className="mt-[2px] shrink-0" />
-          <span>{NEXT_CYCLE_NOTICE}</span>
-        </p>
-      )}
+      {/* Próximo ciclo: a frase única fica no topo da página; aqui só "Ainda não abre" em cada item. */}
       {canManage ? (
         <div className="flex flex-col min-[480px]:flex-row" style={{ borderBottom: "1px solid var(--border)" }}>
           {[

@@ -1,6 +1,6 @@
 import { CheckCircle2, XCircle, Filter, Pencil, Eye, Wifi, WifiOff, Hash, UserMinus, UserPlus } from "lucide-react";
 import { CONDENSED, GOOD, PremiumCard, GOOD_TEXT } from "@/lib/premium-theme";
-import { cycleStatus, employmentTypeLabel, getEligibilityStatus, initials, toTitleCase } from "./utils";
+import { cycleStatus, employmentTypeLabel, fromPreviousCycleOnly, getEligibilityStatus, initials, toTitleCase } from "./utils";
 import type { EmployeeWithCycle } from "./types";
 
 type EmployeesTableProps = {
@@ -162,7 +162,7 @@ export function EmployeesTable({
           <thead>
             <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
               {mergeMode && <th className="px-4 py-3 text-[11px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
-              <th className="px-5 py-3 text-[11px] font-bold uppercase min-w-[210px]" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
+              <th className="px-5 py-3 text-[11px] font-bold uppercase min-w-[210px]" style={{ color: "var(--muted-foreground)" }}>Colaborador</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
@@ -224,7 +224,17 @@ function CycleCell({ emp }: { emp: EmployeeWithCycle }) {
       </div>
     );
   }
-  // Na aba "No ciclo" todos têm nota: o selo "Com nota" repetido não dizia nada.
+  // Ciclo novo: quem estava no ciclo anterior aparece já, ainda sem nota.
+  if (fromPreviousCycleOnly(emp)) {
+    return (
+      <div className="flex flex-col items-center gap-1" data-testid={`cycle-previous-${emp.id}`}>
+        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>Do ciclo anterior</span>
+        <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>sem nota neste ciclo ainda</span>
+        {!emp.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cadastro inativo</span>}
+      </div>
+    );
+  }
+  // Na aba "No ciclo" os demais têm nota: o selo "Com nota" repetido não dizia nada.
   const n = emp.cycleEventsCount ?? 0;
   return (
     <div className="flex flex-col items-center gap-1">
@@ -244,6 +254,8 @@ function EligibilityCell({ emp }: { emp: EmployeeWithCycle }) {
   return (
     <div className="flex flex-col items-center justify-center gap-0.5 font-bold uppercase text-sm">
       {(() => {
+        // Ainda sem nota no ciclo novo: elegibilidade ainda não se aplica ("—", não "inelegível").
+        if (fromPreviousCycleOnly(emp)) return <span style={{ color: "var(--muted-foreground)" }} title="Sem nota neste ciclo ainda">—</span>;
         const status = getEligibilityStatus(emp);
         if (status === "freela") return (
           <span className="flex items-center gap-1.5 opacity-60" style={{ color: "var(--muted-foreground)" }}>— Não pontua</span>

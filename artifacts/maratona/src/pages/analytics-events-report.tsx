@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtNum, plural } from "@/lib/utils";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /*
  * Relatório por evento (Análises → Exportar → Relatório por evento em PDF):
@@ -21,6 +22,11 @@ const f1 = (v: number | null | undefined) => (v == null ? "—" : fmtNum(v, 1));
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 /** "Qualidade da Entrega (2)" e "(cópia)" voltam ao nome de origem. */
 const baseName = (n: string) => n.replace(/\s*\((?:\d+|c[óo]pia)\)\s*$/i, "").trim();
+/** Cópia por área de um critério multiárea ("Prazo (2)", peso 0): entra na nota pela média das áreas com o de origem. */
+const isAreaCopy = (c: { name: string; weight: number }, all: { name: string; weight: number }[]) =>
+  !(c.weight > 0) && baseName(c.name) !== c.name && all.some(o => o.weight > 0 && o.name === baseName(c.name));
+/** Nota de critério (0 a 10) mostrada de 0 a 100, a escala da nota final e de Análises. */
+const f100 = (v: number | null | undefined) => (v == null ? "—" : fmtNum(v * 10, 1));
 /** Nota ≥ 80 em verde, < 70 em vermelho (legenda no índice). */
 const scoreColor = (v: number | null | undefined) => (v == null ? undefined : v >= 80 ? "var(--status-ok-text)" : v < 70 ? "var(--status-danger-text)" : undefined);
 
@@ -89,19 +95,21 @@ function EventCard({ e }: { e: EventReportRow }) {
             </thead>
             <tbody>
               {e.criteria.map((c, i) => {
-                const counted = c.weight > 0;
+                const areaCopy = isAreaCopy(c, e.criteria);
+                const counted = c.weight > 0 || areaCopy;
                 return (
                   <tr key={i} style={{ color: counted && c.active ? undefined : "var(--muted-foreground)" }}>
                     <td className="py-1 px-2" style={tdStyle}>
-                      {c.name}
+                      {displayCriterionName(c.name)}
+                      {areaCopy && <span className="ml-1.5 text-[10.5px] uppercase rounded px-1" style={{ border: "1px solid var(--border)" }}>média das áreas</span>}
                       {!counted && <span className="ml-1.5 text-[10.5px] uppercase rounded px-1" style={{ border: "1px solid var(--border)" }}>peso 0 · não conta</span>}
                       {counted && !c.active && <span className="ml-1.5 text-[10.5px] uppercase rounded px-1" style={{ border: "1px solid var(--border)" }}>inativo, calibrado</span>}
                     </td>
                     <td className="py-1 px-2" style={tdStyle}>{c.area ?? "—"}</td>
-                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{c.weight}</td>
-                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{f1(c.evaluatorAvg)}</td>
-                    <td className="py-1 px-2 text-right tabular-nums font-bold" style={tdStyle}>{f1(c.calibrated)}</td>
-                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{f1(c.used)}</td>
+                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{areaCopy ? "—" : c.weight}</td>
+                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{f100(c.evaluatorAvg)}</td>
+                    <td className="py-1 px-2 text-right tabular-nums font-bold" style={tdStyle}>{f100(c.calibrated)}</td>
+                    <td className="py-1 px-2 text-right tabular-nums" style={tdStyle}>{f100(c.used)}</td>
                     <td className="py-1 px-2 text-[11.5px]" style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{c.calibrationReason ?? ""}</td>
                   </tr>
                 );
@@ -174,14 +182,15 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
   const totalCrit = events.reduce((s, e) => s + e.totalCriteria, 0);
 
   // Critérios no ciclo: nome de origem + área, um ponto por evento, sem peso 0.
+  // Escala 0 a 100 (nota do critério × 10), a mesma da nota final e de Análises.
   const criteriaSummary = useMemo(() => {
     const perEvent = new Map<string, { key: string; name: string; area: string | null; used: number[] }>();
     for (const e of events) for (const c of e.criteria) {
-      if (c.used == null || !(c.weight > 0)) continue;
+      if (c.used == null || !(c.weight > 0 || isAreaCopy(c, e.criteria))) continue;
       const key = `${baseName(c.name).toLowerCase()}|${(c.area ?? "").toLowerCase()}`;
       const k = `${e.id}|${key}`;
       if (!perEvent.has(k)) perEvent.set(k, { key, name: baseName(c.name), area: c.area ?? null, used: [] });
-      perEvent.get(k)!.used.push(c.used);
+      perEvent.get(k)!.used.push(c.used * 10);
     }
     const agg = new Map<string, { name: string; area: string | null; pts: number[] }>();
     for (const p of perEvent.values()) {
@@ -246,7 +255,7 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
             </ul>
 
             <H2>Critérios no ciclo</H2>
-            <p className="text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>Média da nota usada (calibrada quando existe) nos eventos confirmados, escala 0 a 10. Critério avaliado por duas áreas aparece uma vez por área; na nota do evento as duas entram pela média. Critério com peso 0 não entra.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>Média da nota usada (calibrada quando existe) nos eventos confirmados, escala 0 a 100 (como a nota final). Critério avaliado por duas áreas aparece uma vez por área; na nota do evento as duas entram pela média. Critério com peso 0 não entra — exceto a cópia por área de um critério multiárea, que entra pela média das áreas.</p>
             <table className="w-full text-[12.5px] border-collapse">
               <thead><tr>
                 <th className={`${TH} text-left`} style={thStyle}>Critério</th>
@@ -257,12 +266,12 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
               <tbody>
                 {criteriaSummary.map(c => (
                   <tr key={`${c.name}|${c.area}`}>
-                    <td className="py-1.5 px-2" style={tdStyle}>{c.name}</td>
+                    <td className="py-1.5 px-2" style={tdStyle}>{displayCriterionName(c.name)}</td>
                     <td className="py-1.5 px-2" style={tdStyle}>{c.area ?? "—"}</td>
                     <td className="py-1.5 px-2 text-right tabular-nums" style={tdStyle}>{c.n}</td>
                     <td className="py-1.5 px-2 text-right tabular-nums" style={tdStyle}>
                       <span className="inline-block align-middle h-2 w-20 rounded-sm overflow-hidden mr-2" style={{ backgroundColor: "var(--secondary)" }} aria-hidden>
-                        <span className="block h-full" style={{ width: `${(c.avg / 10) * 100}%`, backgroundColor: "var(--viz-series-1)" }} />
+                        <span className="block h-full" style={{ width: `${Math.max(0, Math.min(100, c.avg))}%`, backgroundColor: "var(--viz-series-1)" }} />
                       </span>
                       <strong>{f1(c.avg)}</strong>
                     </td>
@@ -305,8 +314,8 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
 
             <H2 breakBefore>Como a nota do evento é calculada</H2>
             <ol className="list-decimal pl-5 space-y-1.5 text-[13px]">
-              <li>Cada critério recebe nota de 0 a 10. Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério.</li>
-              <li>A performance é a média ponderada pelos pesos dos critérios, convertida para 0 a 100. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) entra pela média das duas. Peso 0 não conta.</li>
+              <li>Cada critério recebe nota de 0 a 10 (neste relatório, mostrada de 0 a 100). Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério.</li>
+              <li>A performance é a média ponderada pelos pesos dos critérios, convertida para 0 a 100. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) entra pela média das áreas. Peso 0 não conta (a cópia por área de um critério multiárea entra pela média).</li>
               <li>A matriz de conformidade tem quatro itens (três nos ciclos que tiraram a Conduta, que então conta como "Sim"); cada "Não" tira 10 pontos da nota do evento, que fica entre 0 e 100.</li>
               <li>Só eventos com resultados confirmados entram na nota do ciclo e no bônus. A equipe que conta é a da casa; freela e função "Sup Ceno" são informativos.</li>
               <li>Eventos "importados" vieram com a nota pronta, sem avaliação por critério no app.</li>

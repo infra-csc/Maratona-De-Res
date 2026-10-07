@@ -1,6 +1,7 @@
 import type { ScoreTimelineEntry } from "@workspace/api-client-react";
 // Import relativo (não "@/"): este arquivo também roda no `node --test`.
 import { fmtNum } from "../../lib/utils";
+import { displayCriterionName } from "../../lib/criterion-name";
 
 /**
  * Textos e agrupamento da Linha do tempo. A API devolve entradas de três
@@ -130,10 +131,10 @@ export function sentenceOf(e: ScoreTimelineEntry): { title: string; detail: stri
     case "recalibrate_released":
       return {
         title: CAUSE_LABEL[e.type],
-        detail: join(e.criterionName, e.eventName, e.scoreBefore != null && e.scoreAfter != null ? `${score(e.scoreBefore)} → ${score(e.scoreAfter)}` : e.scoreAfter != null ? `nota ${score(e.scoreAfter)}` : null, e.reason ? `“${e.reason}”` : null),
+        detail: join(displayCriterionName(e.criterionName) || null, e.eventName, e.scoreBefore != null && e.scoreAfter != null ? `${score(e.scoreBefore)} → ${score(e.scoreAfter)}` : e.scoreAfter != null ? `nota ${score(e.scoreAfter)}` : null, e.reason ? `“${e.reason}”` : null),
       };
     default:
-      return { title: CAUSE_LABEL[e.type] ?? (e.kind === "recorded" ? "Nota recalculada" : e.type), detail: join(e.criterionName, e.eventName) };
+      return { title: CAUSE_LABEL[e.type] ?? (e.kind === "recorded" ? "Nota recalculada" : e.type), detail: join(displayCriterionName(e.criterionName) || null, e.eventName) };
   }
 }
 

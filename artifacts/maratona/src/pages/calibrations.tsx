@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { useAllPublicTokens } from "@/lib/routing-api";
 import { Target } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
 import { getCycleWeekends, weekendsEnd } from "@/lib/utils";
@@ -128,7 +129,7 @@ export default function CalibrationsPage() {
 
   // Derivações puras (fusão pai/filho, notas dos avaliadores, pendências).
   // Calculadas antes do fluxo salvar→publicar, que as recebe por parâmetro.
-  const { getAreaScores, getAvgScore, getCalibration, activeCriteria, childCriterionIdsMap, displayActiveCriteria } =
+  const { getAreaScores, getMembers, getAvgScore, getCalibration, activeCriteria, childCriterionIdsMap, displayActiveCriteria } =
     deriveCriteria(criteria, calibrations, evaluations);
   const { pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount } =
     deriveDirtyState({ displayActiveCriteria, getCalibration, calScores, calReasons, weightEdits, publishIntents });
@@ -233,8 +234,13 @@ export default function CalibrationsPage() {
     setFilterDateTo,
   };
 
+  // Links do evento (admin/RH): mostra "via link: Freela" no detalhe por área.
+  const { data: eventTokens } = useAllPublicTokens(["admin", "rh"].includes(user?.role ?? "") ? selectedEventId : null);
+
   const rowProps: CriterionRowSharedProps = {
     getAreaScores,
+    getMembers,
+    tokens: eventTokens,
     getAvgScore,
     getCalibration,
     childCriterionIdsMap,

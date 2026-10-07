@@ -8,7 +8,8 @@ export function MiniBar({ value, total, color, title }: { value: number; total: 
       <div className="h-[5px] rounded-full w-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-      <span className="text-[11px] font-bold" style={{ color }}>{value}/{total}</span>
+      {/* Nada respondido: número em cinza legível (a cor da barra não diz nada com 0). */}
+      <span className="text-[11px] font-bold" style={{ color: value === 0 ? "var(--muted-foreground)" : color }}>{value}/{total}</span>
     </div>
   );
 }
@@ -22,7 +23,7 @@ export function CalBar({ finalCount, partialCount, total }: { finalCount: number
     : finalCount > 0 || partialCount > 0 ? AMBER
     : "var(--muted-foreground)";
   return (
-    <div className="flex flex-col gap-1 w-full" title={`${finalCount} final · ${partialCount} parcial de ${total} critérios`}>
+    <div className="flex flex-col gap-1 w-full" title={`${finalCount} final · ${partialCount} parcial de ${total} critérios calibrados`}>
       <div className="relative h-[5px] rounded-full w-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
         {finalPct > 0 && (
           <div className="absolute left-0 top-0 h-full" style={{ width: `${finalPct}%`, backgroundColor: GOOD }} />

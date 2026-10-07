@@ -4,6 +4,7 @@ import { fmtDateTime, fmtNum } from "@/lib/utils";
 import { INFO } from "@/lib/premium-theme";
 import { scoreColor, scoreBarColor } from "./helpers";
 import type { EventSummary } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /** Cartão de um quesito no detalhamento aberto do EventCard. */
 export function CriterionDetailCard({ event, c }: { event: EventSummary; c: MyPerformanceCriterion }) {
@@ -29,7 +30,7 @@ export function CriterionDetailCard({ event, c }: { event: EventSummary; c: MyPe
               </span>
             ) : null}
           </div>
-          <p className="font-bold text-[13px] text-foreground leading-tight">{c.criterionName}</p>
+          <p className="font-bold text-[13px] text-foreground leading-tight">{displayCriterionName(c.criterionName)}</p>
         </div>
 
         <div className="text-right shrink-0 flex flex-col items-end gap-1">

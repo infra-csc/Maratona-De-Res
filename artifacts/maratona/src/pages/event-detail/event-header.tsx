@@ -58,9 +58,10 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
                   <ShieldAlert size={8} /> Fechamento Forçado
                 </span>
               )}
+              {/* Evento que ainda não abriu (futuro / próximo ciclo): selo único "Abre em DD/MM" ou "Próximo ciclo" — sem "Não confirmado". */}
               {event.resultsConfirmed ? (
                 <span data-testid="badge-results-confirmed" className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>Resultados Confirmados</span>
-              ) : (
+              ) : waiting ? null : (
                 <span data-testid="badge-results-pending" className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Não Confirmado</span>
               )}
               {waiting && (
@@ -75,7 +76,7 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
               {fmtDate(event.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} — {fmtDate(event.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}
             </p>
             {notOpenYet && (
-              <p className="text-[12px] mt-1" style={{ color: "var(--muted-foreground)" }} data-testid="event-opens-help">
+              <p id="event-confirm-opens-reason" className="text-[12px] mt-1" style={{ color: "var(--muted-foreground)" }} data-testid="event-opens-help">
                 A avaliação abre sozinha no dia seguinte ao fim do evento.
               </p>
             )}
@@ -140,11 +141,6 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
                   <CheckCircle2 size={13} /> {resultsConfirmBusy ? "Confirmando..." : "Confirmar Resultados"}
                 </button>
               )
-            )}
-            {canManage && !event.resultsConfirmed && notOpenYet && (
-              <p id="event-confirm-opens-reason" data-testid="event-confirm-opens-reason" className="basis-full text-[11px] font-bold uppercase text-center sm:text-left lg:text-right" style={{ color: "var(--muted-foreground)" }}>
-                A avaliação abre em {opensOnLabel}
-              </p>
             )}
           </div>
         </div>

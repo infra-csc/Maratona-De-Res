@@ -1,5 +1,5 @@
 import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
-import { CheckCircle, Clock, Building2, Save, CornerDownRight, Loader2, Lock, Link2 } from "lucide-react";
+import { CheckCircle, Clock, Save, CornerDownRight, Loader2, Lock, Link2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { CONDENSED, AMBER } from "@/lib/premium-theme";
@@ -49,11 +49,8 @@ export function CriterionCard({
     return (
       <div className="criterion-row border-l-4 pl-6 py-2" style={{ borderLeftColor: "var(--border)" }} data-testid={`criterion-closed-${c.criterionId}`}>
         <div className="flex flex-wrap items-center gap-2 mb-2">
-          {c.responsibleAreaName && (
-            <span className="bg-secondary text-foreground border border-border rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
-              <Building2 size={11} /> {c.responsibleAreaName}
-            </span>
-          )}
+          {/* Sem selo da área: quem avalia é a área do formulário (título acima); o selo
+              "Produção" fazia o avaliador achar que avaliava a Produção (dono, 07/10). */}
           <span className="bg-accent/15 text-accent-text border border-accent rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
             <Lock size={11} /> Já respondido
           </span>
@@ -109,20 +106,16 @@ export function CriterionCard({
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="bg-secondary border border-border rounded-lg px-2 py-0.5 text-[11px] font-black uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
-            {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
+            {/* Critério de várias áreas: a cópia da área tem peso 0 (a nota entra
+                na média do critério) — o peso só aparece no critério de origem. */}
+            {!c.eventScoped && !sharedWithOtherAreas && (
+              <span className="bg-secondary border border-border rounded-lg px-2 py-0.5 text-[11px] font-black uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
+            )}
+            {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && !sharedWithOtherAreas && (
               <span className="bg-destructive/10 border border-destructive rounded-lg text-destructive px-2 py-0.5 text-[11px] font-black uppercase">Peso 0 — não conta na média</span>
             )}
-            {sharedWithOtherAreas ? (
-              <span title="Outras áreas também avaliam este critério; a nota dele no evento é a média das áreas." className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Avaliado também por outras áreas</span>
-            ) : c.eventScoped && (
-              <span className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Entra na média do critério</span>
-            )}
-            {c.responsibleAreaName && (
-              <span className="bg-secondary text-foreground border border-border rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
-                <Building2 size={11} /> {c.responsibleAreaName}
-              </span>
-            )}
+            {/* Sem selo da área: quem avalia é a área do formulário (título acima); o selo
+                "Produção" fazia o avaliador achar que avaliava a Produção (dono, 07/10). */}
             {submitted && (
               <span className="bg-accent/15 text-accent-text border border-accent rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
                 <CheckCircle size={12} /> Lançado

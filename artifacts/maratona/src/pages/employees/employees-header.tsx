@@ -119,7 +119,7 @@ export function EmployeesHeader({
   );
 }
 
-export type EmployeeStats = { noCiclo: number; elegiveis: number; foraDoCiclo: number };
+export type EmployeeStats = { noCiclo: number; listaNoCiclo: number; elegiveis: number; foraDoCiclo: number };
 
 /** Cartões de KPI do ciclo atual: com nota, elegíveis (barra sobre quem tem nota) e fora do ciclo. */
 export function EmployeesKpis({ stats }: { stats: EmployeeStats }) {
@@ -129,7 +129,13 @@ export function EmployeesKpis({ stats }: { stats: EmployeeStats }) {
       <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Com nota no ciclo</span>
         <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{stats.noCiclo}</p>
-        <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
+        {stats.listaNoCiclo > stats.noCiclo ? (
+          <p className="text-xs mt-3" style={{ color: "var(--muted-foreground)" }} data-testid="stat-lista-no-ciclo">
+            de {stats.listaNoCiclo} na lista "No ciclo" — {stats.listaNoCiclo - stats.noCiclo} do ciclo anterior ainda sem nota
+          </p>
+        ) : (
+          <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
+        )}
       </div>
       <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Elegíveis para Bônus</span>

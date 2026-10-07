@@ -9,8 +9,24 @@ import { displayCriterionName, fmtDT } from "./helpers";
 import { cenografiaItemsLabel } from "./constants";
 import type { PublicLinkEligibleCriterion, ToastFn } from "./types";
 
+/** Evento do link: o avaliador confere para qual evento está gerando. */
+export type LinkEventInfo = { name: string; detail: string | null } | null;
+
+/** "Evento" no topo dos diálogos de link para freela. */
+export function LinkEventLine({ event }: { event: LinkEventInfo }) {
+  if (!event) return null;
+  return (
+    <div className="border-l-4 border-accent pl-3" data-testid="public-link-event">
+      <p className="text-[11px] font-bold uppercase text-muted-foreground">Evento</p>
+      <p className="text-sm font-black uppercase break-words">{event.name}</p>
+      {event.detail && <p className="text-xs text-muted-foreground">{event.detail}</p>}
+    </div>
+  );
+}
+
 interface PublicLinkDialogProps {
   criteriaIds: number[] | null;
+  event: LinkEventInfo;
   areaName: string | null;
   recipientName: string;
   setRecipientName: (value: string) => void;
@@ -40,7 +56,7 @@ interface PublicLinkDialogProps {
 
 // Public link dialog — link único por formulário/área para freelas
 export function PublicLinkDialog({
-  criteriaIds, areaName, recipientName, setRecipientName, includeConformity, setIncludeConformity, forceConformity,
+  criteriaIds, event, areaName, recipientName, setRecipientName, includeConformity, setIncludeConformity, forceConformity,
   canIncludeConformity, withoutConduta, generatedUrl, linkCopied, setLinkCopied, eligibleCriteria, activeCriteria, history, isGenerating, isDeleting,
   onGenerate, onDeleteToken, onClose, toast,
 }: PublicLinkDialogProps) {
@@ -60,6 +76,7 @@ export function PublicLinkDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          <LinkEventLine event={event} />
           {areaName && (
             <div className="border-l-4 border-accent pl-3">
               <p className="text-[11px] font-bold uppercase text-muted-foreground">Formulário</p>

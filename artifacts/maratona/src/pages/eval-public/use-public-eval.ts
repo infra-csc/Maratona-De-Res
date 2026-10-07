@@ -6,6 +6,7 @@ import {
 import { serverErrorMessage, cenoItems, cenoCommentKeyOf, cenoLabels } from "./helpers";
 import { apiErrorCode, EVENT_NEXT_CYCLE } from "@/lib/utils";
 import type { CriterionAnswer, ConformityAnswers, PendingItem } from "./types";
+import { displayCriterionName } from "../../lib/criterion-name";
 
 /**
  * Estado do formulário público (link de uso único): carga do token, respostas
@@ -231,8 +232,8 @@ export function usePublicEval(token: string | undefined) {
   if (showCriteria) {
     for (const c of criteria) {
       const ans = answers[c.criterionId];
-      if (ans?.score === null || ans?.score === undefined) pending.push({ label: `Nota do critério ${c.criterionName}`, targetId: `crit-${c.criterionId}-score` });
-      if (!ans?.comments?.trim()) pending.push({ label: `Comentário do critério ${c.criterionName}`, targetId: `crit-${c.criterionId}-comment` });
+      if (ans?.score === null || ans?.score === undefined) pending.push({ label: `Nota do critério ${displayCriterionName(c.criterionName)}`, targetId: `crit-${c.criterionId}-score` });
+      if (!ans?.comments?.trim()) pending.push({ label: `Comentário do critério ${displayCriterionName(c.criterionName)}`, targetId: `crit-${c.criterionId}-comment` });
     }
   }
   if (showCenografiaConformity) {

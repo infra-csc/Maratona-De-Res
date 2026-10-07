@@ -129,14 +129,27 @@ export function EvaluationSummaryPanel({
   const emptyMark = (label = "pendente") => cenografiaByOther !== undefined && cenografiaByOther !== null
     ? <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">não respondida</span>
     : <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>{label}</span>;
+  // Tudo respondido por OUTRA pessoa da área (e nenhuma matriz minha): não é
+  // "sua avaliação" nem "100%" — é "respondido pela área".
+  const allByOthers = myCriteria.length > 0 && extraConformityItemsTotal === 0
+    && !!closedNames && myCriteria.every(c => closedNames.has(c.criterionId));
   return (
     <div className="@4xl:sticky @4xl:top-4 space-y-6">
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="bg-secondary px-5 py-4 border-b border-border">
           <h3 className="text-lg font-black uppercase tracking-tight text-foreground" style={{ fontFamily: CONDENSED }}>Resumo da Avaliação</h3>
-          <p className="text-[11px] font-bold uppercase text-muted-foreground">Sua avaliação para este evento</p>
+          <p className="text-[11px] font-bold uppercase text-muted-foreground" data-testid="summary-subtitle">{allByOthers ? "Respondido pela área" : "Sua avaliação para este evento"}</p>
         </div>
 
+        {allByOthers ? (
+          <div className="p-5 border-b-2 border-border" data-testid="summary-answered-by-area">
+            <p className="text-[12px] text-muted-foreground leading-snug">
+              {myCriteria.length === 1
+                ? "O critério deste evento já foi respondido por outra pessoa da sua área. Nada a enviar por você."
+                : `Os ${myCriteria.length} critérios deste evento já foram respondidos pela sua área. Nada a enviar por você.`}
+            </p>
+          </div>
+        ) : (
         <div className="p-5 border-b-2 border-border">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
@@ -151,6 +164,7 @@ export function EvaluationSummaryPanel({
               : `${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")}${closedNames && closedNames.size > 0 ? ` (${closedNames.size} ${closedNames.size === 1 ? "fechado por quem respondeu primeiro" : "fechados por quem respondeu primeiro"})` : ""}.`}
           </p>
         </div>
+        )}
 
         {/* Grade summary — evaluators only. Includes both scored
             criteria AND the extra Sim/Não questions from the

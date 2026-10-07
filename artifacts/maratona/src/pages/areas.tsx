@@ -24,6 +24,7 @@ import { useForm } from "react-hook-form";
 import { Plus, Search, Building2, LayoutGrid, Settings, ListChecks, Users, ArrowRightLeft } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { CONDENSED, BODY, PremiumCard, DANGER_TEXT } from "@/lib/premium-theme";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -302,7 +303,7 @@ export default function AreasPage() {
                             onCheckedChange={() => toggleCriterion(c.id, belongs, manageArea.id)}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold uppercase text-sm truncate">{c.name}</p>
+                            <p className="font-bold uppercase text-sm truncate">{displayCriterionName(c.name)}</p>
                             {elsewhere && (
                               <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: DANGER_TEXT }}>
                                 <ArrowRightLeft size={11} /> Atualmente em: {c.responsibleAreaName}

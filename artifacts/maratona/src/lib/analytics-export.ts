@@ -1,5 +1,6 @@
 import type { AnalyticsOverview } from "@workspace/api-client-react";
 import { funnelSteps } from "./bonus-funnel";
+import { displayCriterionName } from "./criterion-name";
 
 /** Nome de arquivo seguro a partir do nome do ciclo ("Ciclo 2 · 2026" → "ciclo-2-2026"). */
 export function cycleSlug(name: string): string {
@@ -24,7 +25,7 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
   add("Resumo", [
     { Indicador: "Ciclo", Valor: data.cycle.name },
     { Indicador: "Período", Valor: data.cycle.startDate && data.cycle.endDate ? `${data.cycle.startDate} a ${data.cycle.endDate}` : "" },
-    { Indicador: "Nota final média (colaboradores)", Valor: r1(k.avgFinalResult) },
+    { Indicador: "Nota média (colaboradores)", Valor: r1(k.avgFinalResult) },
     { Indicador: "Nota média dos eventos", Valor: r1(k.avgEventScore) },
     { Indicador: "Eventos no ciclo", Valor: k.eventsTotal },
     { Indicador: "Eventos confirmados", Valor: k.eventsConfirmed },
@@ -43,7 +44,7 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
   ]);
   add("Evolução", data.scoreTrend.map(t => ({ "Fim de semana": t.label, "Nota média": t.avgScore, Eventos: t.events })));
   add("Critérios", data.criteria.map(c => ({
-    Critério: c.name, Área: c.area ?? "", "Nota usada": c.avgScore, "Média dos avaliadores": c.evaluatorAvg,
+    Critério: displayCriterionName(c.name), Área: c.area ?? "", "Nota usada": c.avgScore, "Média dos avaliadores": c.evaluatorAvg,
     "Média calibrada": c.calibratedAvg, "Calibrados": c.calibratedCount, Eventos: c.eventsCount,
   })));
   add("Conformidade", data.conformity.map(c => ({ Item: c.label, Respostas: c.answered, "Não": c.nao, "% Não": c.naoPct })));
@@ -52,7 +53,7 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
     "Por evento extra (R$)": f.bonusPerExtraEvent, Pessoas: f.count, "Bônus projetado (R$)": f.bonusTotal,
   })));
   const isAll = data.scope?.kind === "all";
-  add("Funil", funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents }).map(f => ({ Etapa: f.label, [isAll ? "Participações" : "Pessoas"]: f.count })));
+  add("Funil", funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents }).map(f => ({ Etapa: f.label, [isAll ? "Participações" : "Colaboradores"]: f.count })));
   add("Perto da próxima faixa", data.nearNextFaixa.map(r => ({
     Colaborador: r.name, "Nota final": r.finalResult, "Faixa atual": r.currentFaixa ?? "", "Próxima faixa": r.nextFaixa,
     "Faltam (pts)": r.gap, "Bônus hoje (R$)": r.currentBonus, "Na próxima (R$)": r.potentialBonus,
@@ -95,7 +96,7 @@ export async function exportEventsReportXlsx(report: import("@workspace/api-clie
     "Equipe (contam para nota)": e.team.filter(t => t.countsForScore).length, "Equipe (total)": e.team.length,
   })), [11, 46, 20, 16, 22, 14, 12, 12, 11, 12, 10]);
   add("Critérios por evento", events.flatMap(e => e.criteria.map(c => ({
-    Data: br(e.startDate), Evento: e.name, Critério: c.name, Área: c.area ?? "", Peso: c.weight,
+    Data: br(e.startDate), Evento: e.name, Critério: displayCriterionName(c.name), Área: c.area ?? "", Peso: c.weight,
     "Média dos avaliadores (0-10)": n2(c.evaluatorAvg), "Calibrada (0-10)": n2(c.calibrated), "Nota usada (0-10)": n2(c.used),
     "Justificativa da calibração": c.calibrationReason ?? "",
     "Conta na nota": c.weight > 0 ? "Sim" : "Não (peso 0)",

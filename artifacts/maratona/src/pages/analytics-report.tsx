@@ -10,6 +10,7 @@ import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
 import { bonusSplit } from "@/lib/bonus-split";
 import { funnelSteps } from "@/lib/bonus-funnel";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /*
  * Relatório do ciclo para imprimir ou salvar em PDF (Análises → Exportar).
@@ -111,7 +112,7 @@ function summaryLines(d: AnalyticsOverview): string[] {
   const closed = !isAll && d.scope?.status === "closed";
   const where = isAll ? "em todos os ciclos" : "no ciclo";
   out.push(`${plural(k.eventsConfirmed, "evento confirmado", "eventos confirmados")} de ${k.eventsTotal} ${where} (${pct(k.eventsConfirmed, k.eventsTotal)}%). Só os confirmados entram na nota e no bônus.`);
-  if (k.avgFinalResult != null) out.push(`Nota final média de ${n1(k.avgFinalResult)} entre ${plural(k.collaborators, "colaborador", "colaboradores")} do ranking; a nota média dos eventos é ${n1(k.avgEventScore)}.`);
+  if (k.avgFinalResult != null) out.push(`Nota média de ${n1(k.avgFinalResult)} entre ${plural(k.collaborators, "colaborador", "colaboradores")} do ranking; a nota média dos eventos é ${n1(k.avgEventScore)}.`);
   const minText = minEventsText(d.ruleSet);
   out.push(`${plural(k.eligible, isAll ? "participação elegível" : "pessoa elegível", isAll ? "participações elegíveis" : "pessoas elegíveis")} ao bônus e ${plural(k.withBonus, "com bônus", "com bônus")}${closed || isAll ? "" : " hoje"}, somando ${bonusSplit(k, brl, { label: "", detail: "" }).sentence}. ${plural(k.reachedMinEvents, isAll ? "participação atingiu" : "pessoa atingiu", isAll ? "participações atingiram" : "pessoas atingiram")} ${/^\d+$/.test(minText) ? `o mínimo de ${minText} eventos` : minText}.`);
   const weakest = d.criteria[0];
@@ -200,7 +201,7 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
 
         <Section title="Indicadores">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            <Kpi label="Nota final média" value={n1(k.avgFinalResult)} detail={`${k.collaborators} no ranking`} />
+            <Kpi label="Nota média" value={n1(k.avgFinalResult)} detail={`${k.collaborators} no ranking`} />
             <Kpi label="Nota média dos eventos" value={n1(k.avgEventScore)} detail={`${k.eventsScored} com nota oficial`} />
             <Kpi label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
             <Kpi label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus`} />
@@ -223,7 +224,7 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
 
         <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada quando existe; senão, média dos avaliadores. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) aparece uma vez por área; na nota do evento as duas entram pela média.">
           <Table head={["Critério", "Área", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]} align={["l", "l", "r", "r", "r", "r"]}
-            rows={data.criteria.map(c => [c.name, c.area ?? "—", <span key="v"><Bar value={c.avgScore} max={100} />{n1(c.avgScore)}</span>, n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])} />
+            rows={data.criteria.map(c => [displayCriterionName(c.name), c.area ?? "—", <span key="v"><Bar value={c.avgScore} max={100} />{n1(c.avgScore)}</span>, n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])} />
         </Section>
 
         <Section title="Matriz de conformidade" lead={'Eventos confirmados: quanto das respostas foi "Não" em cada item.'}>
@@ -231,12 +232,12 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
         </Section>
 
         <Section title="Faixas e bônus" lead="Onde cada colaborador do ranking está hoje e o bônus projetado dos elegíveis." breakBefore>
-          <Table head={["Faixa", "Nota", "Pessoas", "Bônus projetado"]} align={["l", "r", "r", "r"]}
+          <Table head={["Faixa", "Nota", "Colaboradores", "Bônus projetado"]} align={["l", "r", "r", "r"]}
             rows={data.faixas.map(f => [f.name, f.minScore != null ? `${lim(f.minScore)}–${lim(f.maxScore)}` : "—", <span key="v"><Bar value={f.count} max={maxFaixa} />{f.count}</span>, f.bonusTotal > 0 ? brl(f.bonusTotal) : "—"])} />
           {(() => {
             const isAll = data.scope?.kind === "all";
             const funnel = funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents });
-            return <Table head={["Funil do bônus", isAll ? "Participações" : "Pessoas", "% do total"]} rows={funnel.map(f => [f.label, f.count, `${pct(f.count, funnel[0]?.count ?? 0)}%`])} />;
+            return <Table head={["Funil do bônus", isAll ? "Participações" : "Colaboradores", "% do total"]} rows={funnel.map(f => [f.label, f.count, `${pct(f.count, funnel[0]?.count ?? 0)}%`])} />;
           })()}
         </Section>
 
@@ -251,7 +252,7 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
         </Section>
 
         <Section title="Penalidades e méritos">
-          <Table head={["Lançamento", "Tipo", "Ocorrências", "Pontos", "Pessoas"]} align={["l", "l", "r", "r", "r"]}
+          <Table head={["Lançamento", "Tipo", "Ocorrências", "Pontos", "Colaboradores"]} align={["l", "l", "r", "r", "r"]}
             rows={data.adjustments.map(a => [a.label, a.kind === "merit" ? "Mérito" : "Penalidade", a.occurrences, `${a.kind === "merit" ? "+" : "−"}${a.points}`, a.employees])} />
           {data.topPenalized.length > 0 && (
             <Table head={["Mais penalidades", "Tipos", "Ocorrências", "Pontos"]} align={["l", "l", "r", "r"]}

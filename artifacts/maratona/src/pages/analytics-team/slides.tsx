@@ -232,8 +232,8 @@ export function buildSlides(s: TeamStory): SlideDef[] {
         {all
           ? <>Resultados de todos os ciclos: cada pessoa conta uma vez por ciclo. Em {s.reachedMinEvents} de {s.people} participações a pessoa atingiu o mínimo de eventos do ciclo.</>
           : s.scopeKind === "past"
-            ? <>{s.reachedMinEvents} de {s.people} pessoas tiveram o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>
-            : <>{s.reachedMinEvents} de {s.people} pessoas já têm o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>}
+            ? <>{s.reachedMinEvents} de {s.people} colaboradores tiveram o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>
+            : <>{s.reachedMinEvents} de {s.people} colaboradores já têm o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>}
         {!all && s.nearNextFaixa > 0 ? <> <strong>{s.nearNextFaixa}</strong> {s.nearNextFaixa === 1 ? "pessoa está" : "pessoas estão"} a menos de 3 pontos da próxima faixa.</> : null}
       </>
     ),

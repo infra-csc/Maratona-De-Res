@@ -18,6 +18,7 @@ import { isAuthError, errorMessage, SESSION_EXPIRED_TOAST } from "./helpers";
 import type { DerivedCriteria } from "./derive";
 import type { deriveDirtyState } from "./derive";
 import type { EventCriterion, PublishIntent, QueryClientLike, ToastFn } from "./types";
+import { displayCriterionName } from "../../lib/criterion-name";
 
 type DirtyState = ReturnType<typeof deriveDirtyState>;
 
@@ -123,7 +124,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
 
   // Nome legível de um critério para as mensagens de erro em lote.
   function criterionLabel(critId: number): string {
-    return (criteria ?? []).find(c => c.criterionId === critId)?.criterionName ?? `#${critId}`;
+    return displayCriterionName((criteria ?? []).find(c => c.criterionId === critId)?.criterionName) || `#${critId}`;
   }
   function failedDescription(failedIds: number[], firstError: string | null): string {
     const names = failedIds.map(criterionLabel).join(", ");

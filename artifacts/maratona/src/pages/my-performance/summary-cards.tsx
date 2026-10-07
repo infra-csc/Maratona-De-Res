@@ -4,13 +4,13 @@ import { scoreColor, scoreBarColor, scoreLabel } from "./helpers";
 
 type SummaryProps = { summary: MyPerformanceSummary };
 
-/** Grade de resumo: Média do Ciclo, Elegibilidade ao Bônus e Faixa. */
+/** Grade de resumo: Nota média, Elegibilidade ao Bônus e Faixa. */
 export function SummaryCards({ summary, result }: SummaryProps & { result: number | null }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px]">
-      {/* Média do Ciclo */}
+      {/* Nota média (ciclo) */}
       <div className="rounded-xl p-[18px] relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Média do Ciclo</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nota média</span>
         {result !== null ? (
           <>
             <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
