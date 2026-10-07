@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
-import { cn, fmtDate, fmtDateTime, fmtNum } from "@/lib/utils";
+import { cn, fmtDate, fmtDateTime, fmtNum, faixaEdge } from "@/lib/utils";
 import { contrastingTextColor, scoreColor } from "./helpers";
 import { CriterionDetailCard } from "./criterion-detail-card";
 import type { EventSummary } from "./types";
@@ -129,7 +129,7 @@ export function EventCard({ event }: { event: EventSummary }) {
               {event.projectedPlatoon && event.projectedPlatoonColor && (
                 <span
                   className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: event.projectedPlatoonColor, color: contrastingTextColor(event.projectedPlatoonColor) }}
+                  style={{ backgroundColor: event.projectedPlatoonColor, color: contrastingTextColor(event.projectedPlatoonColor), ...faixaEdge(event.projectedPlatoonColor) }}
                 >
                   {event.projectedPlatoon}
                 </span>

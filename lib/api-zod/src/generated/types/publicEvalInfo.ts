@@ -9,6 +9,29 @@ import type { PublicEvalCriterion } from './publicEvalCriterion';
 import type { PublicTokenType } from './publicTokenType';
 
 export interface PublicEvalInfo {
+  /**
+     * Evento do PRÓXIMO ciclo (começa depois do fim do ciclo em que está): o link ainda não aceita envio
+     * (o POST responde 409 code EVENT_NEXT_CYCLE, nada gravado e o link continua sem uso). A tela deve avisar
+     * "abre para avaliação quando o ciclo novo for criado" em vez de mostrar o formulário.
+     */
+  nextCycle?: boolean;
+  /** O ciclo do evento está FECHADO (só consulta) — o link não aceita envio (o POST responde 409 code CLOSED_CYCLE). A tela deve avisar "ciclo fechado" em vez de mostrar o formulário. */
+  cycleClosed?: boolean;
+  /** Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e o servidor não a cobra. */
+  conformityWithoutConduta?: boolean;
+  /** Todos os critérios do link já foram respondidos (no link combinado, ainda pode faltar a matriz — ver conformityAnswered). */
+  allClosed?: boolean;
+  /**
+     * A Matriz de Conformidade (a parte que o link responde) já tem resposta; o link não a pede nem a sobrescreve.
+     * Link combinado: a parte de Cenografia. Links só de matriz: conformity_cenografia = Cenografia;
+     * conformity_ferramentas = Guarda de Equipamentos — nesses, o envio responde 409 code CONFORMITY_ALREADY_ANSWERED.
+     */
+  conformityAnswered?: boolean;
+  /**
+     * Quem respondeu a matriz (nome gravado no envio), quando se sabe.
+     * @nullable
+     */
+  conformityAnsweredByName?: string | null;
   tokenId: string;
   tokenType: PublicTokenType;
   isUsed: boolean;

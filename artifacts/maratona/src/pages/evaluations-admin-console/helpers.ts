@@ -5,6 +5,7 @@ import { WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/
 import type {
   CritFilter, CritPillCounts, CritRow, CritState, ConformityRow, EnrichedEvent, QueueFilters,
 } from "./types";
+import { cenografiaItemCount } from "../evaluations/constants";
 
 export function fmtDT(v: string | null | undefined): string {
   if (!v) return "—";
@@ -120,8 +121,11 @@ export function computeCriteriaFilter(selected: EnrichedEvent | null, critFilter
 /** Linhas da Matriz de conformidade (Cenografia + Ferramentas) do evento selecionado. */
 export function buildConformityRows(selectedDetail: EventDetail | undefined): ConformityRow[] {
   const conformity = selectedDetail?.conformity ?? null;
+  // Ciclo sem "Conduta" na matriz: 4 itens (EPI, Estaiamentos, Faltas, Destaque).
+  const withoutConduta = !!selectedDetail?.conformityWithoutConduta;
+  const cenografiaTotal = cenografiaItemCount(withoutConduta);
   const cenografiaFilled = conformity
-    ? [conformity.epi, conformity.estaiamentos, conformity.conduta, conformity.standoutResponse].filter(v => v != null).length
+    ? [conformity.epi, conformity.estaiamentos, ...(withoutConduta ? [] : [conformity.conduta]), conformity.standoutResponse].filter(v => v != null).length
       + (conformity.absencesReport?.trim() ? 1 : 0)
     : 0;
   const ferramentasFilled = conformity?.guardaEquipamentos != null ? 1 : 0;
@@ -129,10 +133,10 @@ export function buildConformityRows(selectedDetail: EventDetail | undefined): Co
     {
       key: "cenografia" as const,
       name: "Matriz de Conformidade",
-      scope: "Cenografia · 5 itens",
+      scope: `Cenografia · ${cenografiaTotal} itens`,
       evaluatorId: selectedDetail?.conformityEvaluatorUserId ?? null,
       evaluatorName: selectedDetail?.conformityEvaluatorName ?? null,
-      filled: cenografiaFilled, total: 5,
+      filled: cenografiaFilled, total: cenografiaTotal,
       areaId: CENOGRAFIA_AREA_ID,
     },
     {

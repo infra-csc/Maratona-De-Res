@@ -3,12 +3,14 @@ import { focusPending } from "./helpers";
 import type { PendingItem } from "./types";
 
 /** Erro de envio, lista "Falta preencher", botão de envio e aviso de uso único. */
-export function SubmitSection({ submitError, pending, isSubmitting, canSubmit, onSubmit }: {
+export function SubmitSection({ submitError, pending, isSubmitting, canSubmit, onSubmit, onAttempt }: {
   submitError: string | null;
   pending: PendingItem[];
   isSubmitting: boolean;
   canSubmit: boolean;
   onSubmit: () => void;
+  /** Clique com algo faltando: a tela passa a apontar os campos vazios. */
+  onAttempt?: () => void;
 }) {
   return (
     <>
@@ -45,15 +47,17 @@ export function SubmitSection({ submitError, pending, isSubmitting, canSubmit, o
         onClick={() => {
           // "Desabilitado" só visualmente: o clique leva ao primeiro campo
           // pendente (os handlers já recusam envio incompleto por conta própria).
-          if (!canSubmit) { if (pending[0]) focusPending(pending[0].targetId); return; }
+          if (!canSubmit) { onAttempt?.(); if (pending[0]) focusPending(pending[0].targetId); return; }
           onSubmit();
         }}
         className="w-full rounded-xl py-4 font-black text-sm tracking-[0.2em] uppercase transition-all active:scale-[0.98]"
+        // Sem opacidade baixa: no tema escuro o botão "com pendências" sumia.
+        // Fundo neutro + texto e borda com contraste, e o clique leva ao que falta.
         style={{
           fontFamily: CONDENSED,
           backgroundColor: canSubmit ? "var(--primary)" : "var(--secondary)",
-          color: canSubmit ? "var(--primary-foreground)" : "var(--muted-foreground)",
-          opacity: canSubmit ? 1 : 0.5,
+          color: canSubmit ? "var(--primary-foreground)" : "var(--foreground)",
+          border: canSubmit ? "1px solid var(--primary)" : "1px dashed var(--muted-foreground)",
           cursor: canSubmit ? "pointer" : "not-allowed",
         }}
       >

@@ -1,5 +1,5 @@
 import { Crown } from "lucide-react";
-import { cn, fmtNum } from "@/lib/utils";
+import { cn, fmtNum, faixaEdge } from "@/lib/utils";
 import { CONDENSED } from "@/lib/premium-theme";
 import { contrastingTextColor, initials } from "./helpers";
 
@@ -54,7 +54,7 @@ export function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; ca
               {(entry as any).platoonColor && (
                 <span
                   className="inline-flex items-center text-[11px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5"
-                  style={{ backgroundColor: (entry as any).platoonColor, color: contrastingTextColor((entry as any).platoonColor) }}
+                  style={{ backgroundColor: (entry as any).platoonColor, color: contrastingTextColor((entry as any).platoonColor), ...faixaEdge((entry as any).platoonColor) }}
                 >
                   {(entry as any).platoon ?? `${(entry as any).platoonMinScore}–${(entry as any).platoonMaxScore}`}
                 </span>

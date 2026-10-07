@@ -6,6 +6,7 @@ import type { PublicToken } from "@/lib/routing-api";
 import { cn } from "@/lib/utils";
 import { CONDENSED } from "@/lib/premium-theme";
 import { displayCriterionName, fmtDT } from "./helpers";
+import { cenografiaItemsLabel } from "./constants";
 import type { PublicLinkEligibleCriterion, ToastFn } from "./types";
 
 interface PublicLinkDialogProps {
@@ -16,6 +17,13 @@ interface PublicLinkDialogProps {
   includeConformity: boolean;
   setIncludeConformity: (value: boolean) => void;
   forceConformity: boolean;
+  /**
+   * Pode incluir a Matriz de Conformidade? Só o responsável pela matriz do
+   * evento, e só enquanto ela não tem resposta (o servidor confere igual).
+   */
+  canIncludeConformity: boolean;
+  /** Ciclo sem "Conduta" na matriz: a lista de itens não a mostra. */
+  withoutConduta: boolean;
   generatedUrl: string | null;
   linkCopied: boolean;
   setLinkCopied: (value: boolean) => void;
@@ -30,10 +38,10 @@ interface PublicLinkDialogProps {
   toast: ToastFn;
 }
 
-// Public link dialog — link único por formulário/área para freelancers
+// Public link dialog — link único por formulário/área para freelas
 export function PublicLinkDialog({
   criteriaIds, areaName, recipientName, setRecipientName, includeConformity, setIncludeConformity, forceConformity,
-  generatedUrl, linkCopied, setLinkCopied, eligibleCriteria, activeCriteria, history, isGenerating, isDeleting,
+  canIncludeConformity, withoutConduta, generatedUrl, linkCopied, setLinkCopied, eligibleCriteria, activeCriteria, history, isGenerating, isDeleting,
   onGenerate, onDeleteToken, onClose, toast,
 }: PublicLinkDialogProps) {
   return (
@@ -48,7 +56,7 @@ export function PublicLinkDialog({
       <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
         <DialogHeader>
           <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Link2 size={18} /> Link para Freelancer
+            <Link2 size={18} /> Link para freela
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
@@ -76,7 +84,7 @@ export function PublicLinkDialog({
                   <div className="space-y-1">
                     <p className="text-xs font-black uppercase text-destructive">Nenhum critério disponível para link</p>
                     <p className="text-xs text-destructive leading-snug">
-                      Nenhum dos critérios deste formulário pode ser respondido por link público para este avaliador/área — em geral porque já foram submetidos ou estão atribuídos a outra pessoa. Responda os critérios diretamente nesta tela ou use "Redirecionar Formulário" para passá-los a um colega.
+                      Nenhum dos critérios deste formulário pode ir num link de freela — em geral porque a área já respondeu, o critério não permite link ou está com outra pessoa. Responda os critérios diretamente nesta tela.
                     </p>
                   </div>
                 </div>
@@ -105,7 +113,7 @@ export function PublicLinkDialog({
                       ))}
                     </ul>
                     <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                      Estes critérios não podem ir no link (já submetidos ou atribuídos a outra pessoa) e continuam sob sua responsabilidade nesta tela.
+                      Estes critérios não podem ir no link (já respondidos, sem permissão de link ou com outra pessoa) e continuam sendo respondidos nesta tela.
                     </p>
                   </div>
                 )}
@@ -116,7 +124,7 @@ export function PublicLinkDialog({
           {!generatedUrl ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Gere um link único para que um freelancer responda este formulário. O link expira após o primeiro uso.
+                Gere um link único para um freela responder este formulário. A resposta dele vale como a sua. O link expira após o primeiro uso.
               </p>
               <div className="space-y-3">
                 <div>
@@ -128,26 +136,28 @@ export function PublicLinkDialog({
                     type="text"
                     value={recipientName}
                     onChange={e => setRecipientName(e.target.value)}
-                    placeholder="Ex: João Freelancer"
+                    placeholder="Ex.: João da Silva"
                     className="w-full border border-border rounded-lg bg-card px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
-                <label className={cn("flex items-start gap-2.5 select-none", forceConformity ? "cursor-not-allowed opacity-90" : "cursor-pointer")}>
-                  <input
-                    type="checkbox"
-                    checked={includeConformity}
-                    disabled={forceConformity}
-                    onChange={e => setIncludeConformity(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 border border-border rounded-lg accent-primary cursor-pointer shrink-0 disabled:cursor-not-allowed"
-                  />
-                  <span className="text-xs font-bold text-muted-foreground leading-tight">
-                    Incluir matriz de conformidade no questionário<br />
-                    <span className="font-normal text-muted-foreground">EPI · Estaiamentos · Conduta · Faltas/Atrasos · Destaque</span>
-                    {forceConformity && (
-                      <><br /><span className="font-bold text-accent-text">Obrigatório para Cenografia — o avaliador responde critério e conformidade no mesmo formulário.</span></>
-                    )}
-                  </span>
-                </label>
+                {canIncludeConformity && (
+                  <label className={cn("flex items-start gap-2.5 select-none", forceConformity ? "cursor-not-allowed opacity-90" : "cursor-pointer")}>
+                    <input
+                      type="checkbox"
+                      checked={includeConformity}
+                      disabled={forceConformity}
+                      onChange={e => setIncludeConformity(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 border border-border rounded-lg accent-primary cursor-pointer shrink-0 disabled:cursor-not-allowed"
+                    />
+                    <span className="text-xs font-bold text-muted-foreground leading-tight">
+                      Incluir matriz de conformidade no questionário<br />
+                      <span className="font-normal text-muted-foreground">{cenografiaItemsLabel(withoutConduta)}</span>
+                      {forceConformity && (
+                        <><br /><span className="font-bold text-accent-text">Você responde pela matriz deste evento: critério e matriz vão no mesmo formulário.</span></>
+                      )}
+                    </span>
+                  </label>
+                )}
               </div>
             </>
           ) : (
@@ -169,7 +179,7 @@ export function PublicLinkDialog({
                 </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Este link é de uso único e expira após o freelancer submeter a avaliação.
+                Este link é de uso único e expira depois que o freela envia a avaliação.
               </p>
             </>
           )}

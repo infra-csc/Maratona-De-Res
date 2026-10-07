@@ -89,9 +89,10 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
       await expect(dialogo).toBeVisible();
       await dialogo.getByRole("button", { name: "Lançar agora" }).click();
       await expect(av.getByText("Avaliação lançada com sucesso").first()).toBeVisible();
-      // O evento sai de "A Fazer" e vai para "Concluídas".
-      await expect(av.getByTestId(`evaluator-event-done-${TARGET_EVENT.id}`)).toBeVisible();
+      // O evento sai de "A responder" e vai para "Respondidos".
       await expect(av.getByTestId(`evaluator-event-${TARGET_EVENT.id}`)).toHaveCount(0);
+      await av.getByTestId("filter-status-done").click();
+      await expect(av.getByTestId(`evaluator-event-done-${TARGET_EVENT.id}`)).toBeVisible();
     } finally {
       await ctx.close();
     }
@@ -164,7 +165,8 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     await expect(ana).not.toContainText("Inelegível");
     await expect(ana).toContainText("Quênia");
     await expect(page.getByTestId(`text-final-result-${ANA.id}`)).toHaveText(/^90([,.]0+)?$/);
-    await expect(ana).toContainText(/Bônus\s*R\$\s*3\.200/);
+    // Ciclo aberto: o selo diz que o bônus é projetado (muda até o fechamento).
+    await expect(ana).toContainText(/Bônus projetado\s*R\$\s*3\.200/);
     // Carla só tem o evento alvo: continua fora do bônus.
     await expect(rankingDe(page, 3)).toContainText("Inelegível");
     await checkA11y(page, "resultados", testInfo);

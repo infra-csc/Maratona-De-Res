@@ -162,7 +162,7 @@ export function EmployeesTable({
           <thead>
             <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
               {mergeMode && <th className="px-4 py-3 text-[11px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
-              <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
+              <th className="px-5 py-3 text-[11px] font-bold uppercase min-w-[210px]" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
               <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>

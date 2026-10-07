@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useImportEmployeesCSV, getGetEmployeesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,10 @@ export function EmployeesImportCard() {
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
-        toast({ title: `${data.inserted} colaborador(es) importado(s)` });
+        toast({ title: plural(data.inserted, "colaborador importado", "colaboradores importados") });
         if (data.errors.length > 0) {
           toast({
-            title: `${data.errors.length} linha(s) com problema`,
+            title: `${plural(data.errors.length, "linha")} com problema`,
             description: data.errors.slice(0, 5).join(" · ") + (data.errors.length > 5 ? ` · e mais ${data.errors.length - 5}` : ""),
             variant: "destructive",
           });

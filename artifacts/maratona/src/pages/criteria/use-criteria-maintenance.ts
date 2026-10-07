@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useState } from "react";
 import { useResyncAllEventsCriteria } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,7 +23,7 @@ export function useCriteriaMaintenance(qKey: QueryKey) {
       const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
       const data = await customFetch<FixCalibrationResult>(`${base}/events/admin/fix-calibration-criteria`, { method: "POST" });
       setFixCalibResult(data);
-      toast({ title: `Calibrações corrigidas — ${data.totalUpdated} linha(s) atualizada(s)` });
+      toast({ title: `Calibrações corrigidas — ${plural(data.totalUpdated, "linha atualizada", "linhas atualizadas")}` });
     } catch (e: unknown) {
       toast({ title: "Erro ao corrigir calibrações", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -38,7 +39,7 @@ export function useCriteriaMaintenance(qKey: QueryKey) {
       const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
       const data = await customFetch<{ updated: number }>(`${base}/criteria/admin/sync-area-labels`, { method: "POST" });
       setSyncLabelsResult(data.updated);
-      toast({ title: `Rótulos de área sincronizados — ${data.updated} critério(s) atualizado(s)` });
+      toast({ title: `Rótulos de área sincronizados — ${plural(data.updated, "critério atualizado", "critérios atualizados")}` });
       qc.invalidateQueries({ queryKey: qKey });
     } catch (e: unknown) {
       toast({ title: "Erro ao sincronizar rótulos", description: (e as Error).message, variant: "destructive" });
@@ -62,7 +63,7 @@ export function useCriteriaMaintenance(qKey: QueryKey) {
             activated: (ev as { activated?: number }).activated ?? 0,
           })),
         });
-        toast({ title: `Sincronização concluída — ${data.processed ?? 0} evento(s) atualizado(s)` });
+        toast({ title: `Sincronização concluída — ${plural(data.processed ?? 0, "evento atualizado", "eventos atualizados")}` });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
     },

@@ -1,4 +1,5 @@
 // Cabeçalho fixo da página: título, seletor de eventos e badges de publicação/pendências.
+import { plural } from "@/lib/utils";
 import { SlidersHorizontal } from "lucide-react";
 import { CONDENSED, AMBER_TEXT } from "@/lib/premium-theme";
 import { formatDateTime } from "./helpers";
@@ -48,7 +49,7 @@ export function CalibrationHeader({
         {/* Pending calibrations badge */}
         {pendingCount > 0 && (
           <span
-            title={`${pendingCount} critério(s) sem calibração`}
+            title={`${plural(pendingCount, "critério")} sem calibração`}
             className="shrink-0 font-black text-[11px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1"
             style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
           >

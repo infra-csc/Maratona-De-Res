@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LabelList } from "recharts";
 import { ThumbsUp, Target, Trophy, Award, Sparkles, Calculator, Flag, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { CONDENSED, AMBER, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
-import { cn, fmtNum } from "@/lib/utils";
+import { cn, fmtNum, faixaEdge } from "@/lib/utils";
 import type { Highlight, TeamStory } from "./derive";
 
 const SERIES = "var(--viz-series-1)";
@@ -99,15 +99,17 @@ export function buildSlides(s: TeamStory): SlideDef[] {
   const pts = (v: number) => n1(v);
   const pct0 = (v: number) => `${Math.round(v)}%`;
   const slides: SlideDef[] = [];
+  const all = s.scopeKind === "all";
+  const noCiclo = all ? "em todos os ciclos" : "no ciclo";
 
   slides.push({
-    id: "capa", eyebrow: `Maratona de Resultados · ${s.cycleName}`, title: "Como a equipe foi no ciclo", icon: Sparkles,
+    id: "capa", eyebrow: `Maratona de Resultados · ${s.cycleName}`, title: all ? "Como a equipe foi em todos os ciclos" : "Como a equipe foi no ciclo", icon: Sparkles,
     lead: () => <>Resultado de todos, pela média dos eventos confirmados{s.period ? ` (${s.period})` : ""}. Aqui não aparece quem avaliou nem a nota de ninguém em particular.</>,
     body: big => (
       <div className={cn("grid gap-4", big ? "grid-cols-3" : "grid-cols-1 sm:grid-cols-3")}>
         <BigNumber big={big} value={n1(s.teamScore)} label="Nota média dos eventos (0 a 100)" />
         <BigNumber big={big} value={String(s.eventsConfirmed)} label={`Eventos com resultado confirmado${s.eventsTotal > s.eventsConfirmed ? ` (de ${s.eventsTotal})` : ""}`} />
-        <BigNumber big={big} value={String(s.people)} label="Pessoas da casa no ranking" />
+        <BigNumber big={big} value={String(s.people)} label={all ? "Participações nos rankings dos ciclos" : "Pessoas da casa no ranking"} />
       </div>
     ),
   });
@@ -115,13 +117,13 @@ export function buildSlides(s: TeamStory): SlideDef[] {
   if (s.trend.length > 0) {
     const TrendIcon = s.trendDelta == null || Math.abs(s.trendDelta) < 0.5 ? Minus : s.trendDelta > 0 ? TrendingUp : TrendingDown;
     slides.push({
-      id: "evolucao", eyebrow: "Ao longo do ciclo", title: "Nossa evolução", icon: TrendIcon,
+      id: "evolucao", eyebrow: all ? "Ao longo dos ciclos" : "Ao longo do ciclo", title: "Nossa evolução", icon: TrendIcon,
       lead: () => (
         <>
           {s.trendDelta == null ? "Um fim de semana com eventos confirmados até agora." :
-            Math.abs(s.trendDelta) < 0.5 ? "A nota ficou estável da primeira para a segunda metade do ciclo." :
-            s.trendDelta > 0 ? <>Da primeira para a segunda metade do ciclo a nota média <strong style={{ color: GOOD_TEXT }}>subiu {pts(s.trendDelta)} pontos</strong>.</> :
-            <>Da primeira para a segunda metade do ciclo a nota média <strong style={{ color: AMBER_TEXT }}>caiu {pts(Math.abs(s.trendDelta))} pontos</strong>.</>}
+            Math.abs(s.trendDelta) < 0.5 ? `A nota ficou estável da primeira para a segunda metade do ${all ? "período" : "ciclo"}.` :
+            s.trendDelta > 0 ? <>Da primeira para a segunda metade do {all ? "período" : "ciclo"} a nota média <strong style={{ color: GOOD_TEXT }}>subiu {pts(s.trendDelta)} pontos</strong>.</> :
+            <>Da primeira para a segunda metade do {all ? "período" : "ciclo"} a nota média <strong style={{ color: AMBER_TEXT }}>caiu {pts(Math.abs(s.trendDelta))} pontos</strong>.</>}
           {s.bestWeekend ? <> Melhor fim de semana: <strong>{s.bestWeekend.label}</strong>, com {pts(s.bestWeekend.avgScore)}.</> : null}
         </>
       ),
@@ -135,7 +137,7 @@ export function buildSlides(s: TeamStory): SlideDef[] {
               <Line type="monotone" dataKey="avgScore" stroke={SERIES} strokeWidth={big ? 3 : 2} isAnimationActive={false}
                 dot={{ r: big ? 6 : 4, fill: SERIES, stroke: "var(--card)", strokeWidth: 2 }}>
                 <LabelList dataKey="avgScore" position="top" content={({ x, y, value }) => (
-                  <text x={Number(x)} y={Number(y) - 12} textAnchor="middle" fontSize={big ? 16 : 11} fontWeight={700} fill="var(--foreground)">{n1(Number(value))}</text>
+                  <text x={Number(x)} y={Number(value) >= 80 ? Number(y) + (big ? 26 : 18) : Number(y) - 12} textAnchor="middle" fontSize={big ? 16 : 11} fontWeight={700} fill="var(--foreground)">{n1(Number(value))}</text>
                 )} />
               </Line>
             </LineChart>
@@ -158,7 +160,7 @@ export function buildSlides(s: TeamStory): SlideDef[] {
           {s.merits.occurrences > 0 ? (
             <p className={cn("flex items-center gap-2 font-semibold", big ? "text-[22px]" : "text-[14px]")}>
               <Award size={big ? 26 : 18} aria-hidden style={{ color: "var(--accent-text)" }} />
-              {s.merits.occurrences} {s.merits.occurrences === 1 ? "mérito reconhecido" : "méritos reconhecidos"} no ciclo.
+              {s.merits.occurrences} {s.merits.occurrences === 1 ? "mérito reconhecido" : "méritos reconhecidos"} {noCiclo}.
             </p>
           ) : null}
         </Column>
@@ -169,7 +171,7 @@ export function buildSlides(s: TeamStory): SlideDef[] {
   if (s.topEvents.length) {
     slides.push({
       id: "destaques", eyebrow: "Para comemorar", title: "Eventos destaque", icon: Trophy,
-      lead: () => "As maiores notas finais do ciclo, com a calibração e a matriz já aplicadas.",
+      lead: () => `As maiores notas finais ${all ? "de todos os ciclos" : "do ciclo"}, com a calibração e a matriz já aplicadas.`,
       body: big => (
         <ol className={cn("grid gap-4", big ? "grid-cols-3" : "grid-cols-1 md:grid-cols-3")}>
           {s.topEvents.map((e, i) => (
@@ -227,8 +229,12 @@ export function buildSlides(s: TeamStory): SlideDef[] {
     id: "faixas", eyebrow: "Bônus", title: "Onde a equipe está nas faixas", icon: Award,
     lead: () => (
       <>
-        {s.reachedMinEvents} de {s.people} pessoas já têm o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.
-        {s.nearNextFaixa > 0 ? <> <strong>{s.nearNextFaixa}</strong> {s.nearNextFaixa === 1 ? "pessoa está" : "pessoas estão"} a menos de 3 pontos da próxima faixa.</> : null}
+        {all
+          ? <>Resultados de todos os ciclos: cada pessoa conta uma vez por ciclo. Em {s.reachedMinEvents} de {s.people} participações a pessoa atingiu o mínimo de eventos do ciclo.</>
+          : s.scopeKind === "past"
+            ? <>{s.reachedMinEvents} de {s.people} pessoas tiveram o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>
+            : <>{s.reachedMinEvents} de {s.people} pessoas já têm o mínimo de <strong>{s.minEvents} eventos</strong> do ciclo.</>}
+        {!all && s.nearNextFaixa > 0 ? <> <strong>{s.nearNextFaixa}</strong> {s.nearNextFaixa === 1 ? "pessoa está" : "pessoas estão"} a menos de 3 pontos da próxima faixa.</> : null}
       </>
     ),
     body: big => {
@@ -238,9 +244,9 @@ export function buildSlides(s: TeamStory): SlideDef[] {
           {payingFaixas.map(f => (
             <li key={f.name} className="rounded-xl p-4 flex flex-col gap-2" style={{ backgroundColor: "var(--secondary)" }}>
               <span className="flex items-center justify-between gap-3">
-                <span className={cn("flex items-center gap-2 font-bold", big ? "text-[24px]" : "text-[15px]")}>
-                  <span aria-hidden className={cn("rounded-sm shrink-0", big ? "h-4 w-4" : "h-3 w-3")} style={{ backgroundColor: f.color ?? "var(--muted-foreground)", boxShadow: "inset 0 0 0 1px var(--border)" }} />
-                  {f.name}
+                <span className={cn("flex flex-wrap items-center gap-x-2 gap-y-0.5 font-bold min-w-0", big ? "text-[24px]" : "text-[15px]")}>
+                  <span aria-hidden className={cn("rounded-sm shrink-0", big ? "h-4 w-4" : "h-3 w-3")} style={{ backgroundColor: f.color ?? "var(--muted-foreground)", ...faixaEdge(f.color) }} />
+                  <span className="break-words min-w-0">{f.name}</span>
                   {f.minScore != null ? <span className={big ? "text-[16px]" : "text-[12px]"} style={{ color: "var(--muted-foreground)", fontWeight: 500 }}>a partir de {n1(f.minScore)}</span> : null}
                 </span>
                 <span className={cn("font-black tabular-nums", big ? "text-[34px]" : "text-[22px]")} style={{ fontFamily: CONDENSED }}>{f.count}</span>

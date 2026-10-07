@@ -54,4 +54,22 @@ export const FALTAS_EVENT = { id: 9, name: "Corrida E2E Faltas" } as const;
 
 /** auditoria.spec.ts: evento já calibrado e ainda não confirmado; o spec confirma e confere a trilha. */
 export const AUDIT_EVENT = { id: 11, name: "Meia Maratona E2E Auditoria" } as const;
+
+/**
+ * avaliacao-por-area.spec.ts: área própria (3) com DOIS avaliadores e um
+ * evento aberto cujo critério é da área, SEM designação nenhuma — quem
+ * responder primeiro fecha o critério para o outro.
+ */
+export const AREA_E2E = { id: 3, name: "Cenários E2E" } as const;
+export const AREA_ANA = { id: 4, name: "Avaliadora Área E2E", cpf: "44477711107" } as const;
+export const AREA_BETO = { id: 5, name: "Beto Área E2E", cpf: "55588822200" } as const;
+export const AREA_CRITERION = { id: 3, name: "Montagem do cenário" } as const;
+export const AREA_EVENT = { id: 12, name: "Maratona E2E Por Area" } as const;
 export const FABIO = { id: 6, name: "Fabio Nunes E2E" } as const;
+
+/**
+ * seletor-de-ciclo.spec.ts: ciclo ANTERIOR já fechado, com um evento e o
+ * resultado gravado de Ana e Bruno — só consulta no seletor de ciclo.
+ */
+export const PREVIOUS_CYCLE = { id: 2, name: "Ciclo E2E Anterior" } as const;
+export const PREVIOUS_EVENT = { id: 60, name: "Corrida E2E Ciclo Anterior" } as const;

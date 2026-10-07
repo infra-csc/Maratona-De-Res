@@ -3,12 +3,14 @@ import {
   useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey,
   useGetAnalyticsEventsReport, getGetAnalyticsEventsReportQueryKey,
 } from "@workspace/api-client-react";
-import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Presentation, ShieldCheck, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Presentation, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader, EmptyState, LoadingState } from "@/components/shared";
+import { PageHeader } from "@/components/shared";
 import { BODY, CONDENSED } from "@/lib/premium-theme";
 import { fmtDate } from "@/lib/utils";
-import { AnalyticsTabs } from "./analytics-tabs";
+import { AnalyticsTabs, AnalyticsScopeFallback } from "./analytics-tabs";
+import { keepPreviousData } from "@tanstack/react-query";
+import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
 import { buildTeamStory } from "./derive";
 import { buildSlides, Slide, type SlideDef } from "./slides";
 
@@ -21,26 +23,27 @@ const fmtDay = (iso: string) => fmtDate(iso, { day: "2-digit", month: "2-digit",
  * tela cheia uma parte por vez (setas do teclado) e sai em PDF uma parte por folha.
  */
 export default function AnalyticsTeamPage() {
-  const overview = useGetAnalyticsOverview({ query: { queryKey: getGetAnalyticsOverviewQueryKey(), staleTime: 60_000 } });
-  const report = useGetAnalyticsEventsReport(undefined, { query: { queryKey: getGetAnalyticsEventsReportQueryKey(), staleTime: 60_000 } });
+  // Seletor de ciclo: atual (padrão), anterior ou Total geral (todos os ciclos).
+  const scope = useCycleScope();
+  const p = scope.params;
+  const overview = useGetAnalyticsOverview(p, { query: { queryKey: getGetAnalyticsOverviewQueryKey(p), staleTime: 60_000, placeholderData: keepPreviousData } });
+  const report = useGetAnalyticsEventsReport(p, { query: { queryKey: getGetAnalyticsEventsReportQueryKey(p), staleTime: 60_000, placeholderData: keepPreviousData } });
+  const scopeKind = scope.isAll ? "all" : scope.readOnly ? "past" : "current";
 
   const slides = useMemo(
-    () => (overview.data ? buildSlides(buildTeamStory(overview.data, report.data, fmtDay)) : []),
-    [overview.data, report.data],
+    () => (overview.data ? buildSlides(buildTeamStory(overview.data, report.data, fmtDay, scopeKind)) : []),
+    [overview.data, report.data, scopeKind],
   );
   const [presenting, setPresenting] = useState<number | null>(null);
   // Estável: o efeito de tela cheia do Presenter depende dela.
   const closePresenter = useCallback(() => setPresenting(null), []);
 
   if (overview.isLoading) {
-    return <div className="px-6 py-6"><LoadingState lines={8} withHeader label="Montando a apresentação" /></div>;
+    return <AnalyticsScopeFallback scope={scope} current="equipe" state="loading" loadingLabel="Montando a apresentação" errorTitle="" />;
   }
   if (overview.isError || !overview.data) {
-    return (
-      <div className="px-6 py-10">
-        <EmptyState icon={AlertTriangle} title="Não foi possível montar a apresentação" description="Tente novamente em instantes." />
-      </div>
-    );
+    return <AnalyticsScopeFallback scope={scope} current="equipe" state="error" loadingLabel="" errorTitle="Não foi possível montar a apresentação"
+      errorDetail={(overview.error as { data?: { error?: string } } | null)?.data?.error} />;
   }
 
   return (
@@ -49,9 +52,10 @@ export default function AnalyticsTeamPage() {
         <PageHeader
           eyebrow={overview.data.cycle.name}
           title="Análises"
-          description="Apresentação para a equipe: o que foi bom e o que precisa melhorar no ciclo, só com números da equipe. Não mostra quem avaliou, calibrações nem notas individuais."
+          description={`Apresentação para a equipe: o que foi bom e o que precisa melhorar ${scope.isAll ? "em todos os ciclos" : "no ciclo"}, só com números da equipe. Não mostra quem avaliou, calibrações nem notas individuais.`}
           actions={
             <div className="flex flex-wrap items-center gap-2">
+              <CycleSelect scope={scope} />
               <Button variant="outline" onClick={() => window.print()} data-testid="button-team-pdf">
                 <FileText size={15} className="mr-1.5" aria-hidden /> Exportar PDF
               </Button>
@@ -62,6 +66,7 @@ export default function AnalyticsTeamPage() {
           }
         />
         <AnalyticsTabs current="equipe" />
+        <CycleScopeNotice scope={scope} allHelp={<>Os números somam <strong>todos os ciclos</strong>: eventos e critérios de todos eles; nas faixas cada pessoa conta uma vez por ciclo.</>} />
         <p className="flex items-center gap-2 text-[13px]" style={{ color: "var(--muted-foreground)" }}>
           <ShieldCheck size={16} aria-hidden style={{ color: "var(--accent-text)" }} />
           Pronta para mostrar a todos: nenhum nome de avaliador ou de colaborador aparece nesta visão.

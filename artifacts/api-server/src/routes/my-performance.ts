@@ -8,11 +8,12 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, roundFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
-import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
+import { getCurrentCycle, getMinEventsForEligibility, eventWithinItsCycleSql } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
-import { heapOrder } from "../lib/cycle-data.js";
+import { heapOrder, eventsWithoutConduta, withoutConduta } from "../lib/cycle-data.js";
 import { pgNum } from "../lib/pg-num.js";
+import { areaModeEventIds, requiredAssignmentsFor } from "../lib/area-mode.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -79,6 +80,9 @@ router.get("/my-performance", async (req, res) => {
     .where(and(
       eq(eventParticipantsTable.employeeId, employeeId),
       eq(eventsTable.cycleId, cycle.id),
+      // Evento "fora do período" (começa depois do fim do ciclo) não conta
+      // neste ciclo — vai para o próximo (M4; mesmo critério do recálculo).
+      eventWithinItsCycleSql(),
     ));
 
   // Notas OFICIAIS por evento — mesma fonte usada por Resultados, Ranking e o
@@ -203,13 +207,16 @@ router.get("/my-performance", async (req, res) => {
     condutaComment: eventConformitiesTable.condutaComment,
   }).from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, countedEventIds));
 
+  const areaModeIds = hasEvents ? await areaModeEventIds(countedEventIds) : new Set<number>();
   const criteriaByEvent = groupByEvent(criteriaRows);
   const evalsByEvent = groupByEvent(evals);
   const calibrationsByEvent = groupByEvent(calibrations);
   const assignmentsByEvent = groupByEvent(assignments);
   // Índice único por evento; a consulta antiga usava limit(1) (fica a primeira).
   const conformityByEvent = new Map<number, typeof conformities[number]>();
-  for (const c of conformities) if (!conformityByEvent.has(c.eventId)) conformityByEvent.set(c.eventId, c);
+  // Ciclo novo: a Conduta saiu da matriz — não aparece como item reprovado.
+  const noConduta = await eventsWithoutConduta(conformities.map(c => c.eventId));
+  for (const c of conformities) if (!conformityByEvent.has(c.eventId)) conformityByEvent.set(c.eventId, withoutConduta(c, noConduta.has(c.eventId))!);
 
   const eventSummaries = [];
   for (const p of participations) {
@@ -237,7 +244,8 @@ router.get("/my-performance", async (req, res) => {
           .map(item => ({ label: item.label, comment: conformity[item.commentKey] ?? null }))
       : [];
 
-    const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentsRaw);
+    // Avaliação por área (ciclo com a marca): uma resposta enviada basta.
+    const assignedByArea = buildAssignedEvaluatorsByArea(requiredAssignmentsFor(areaAssignmentsRaw, areaModeIds.has(p.eventId)));
 
     // Constrói criteriaDetails diretamente dos critérios do evento (não-eventScoped).
     // Inclui critério se: active=true OU tem calibração (eventos históricos podem ter
@@ -446,7 +454,7 @@ router.get("/my-performance", async (req, res) => {
   const openEvents = eventSummaries.filter(e => e.status === "open").length;
   const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
-  const minEventsForEligibility = await getMinEventsForEligibility();
+  const minEventsForEligibility = await getMinEventsForEligibility(cycle.id);
   const scoredEvents = eventSummaries.filter(e => e.hasScore && e.countsForScore && e.resultsConfirmed);
   // Média bruta ao vivo — usada apenas quando não há snapshot de quarterly_results
   // (ou seja, para a projeção de ciclos ainda sem nenhum resultado calculado).

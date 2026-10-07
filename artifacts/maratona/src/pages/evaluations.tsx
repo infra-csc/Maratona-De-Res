@@ -1,15 +1,21 @@
-import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventCriteria, useGetEvent, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, createEvaluation, submitEvaluation, type EventConformityInput } from "@workspace/api-client-react";
+import { useState, useEffect, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
+import { ArrowLeft, Rocket, SearchX } from "lucide-react";
+import { useGetEvent, getGetEventQueryKey, useGetEvaluations, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, useDeleteEvaluationDraft, getGetEvaluationsQueryKey, createEvaluation, submitEvaluation, ApiError, type EventConformityInput, type EventCriterion } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { withServerMessage } from "@/lib/calibration-api";
+import { apiErrorCode, EVENT_NEXT_CYCLE } from "@/lib/utils";
+import { isNextCycleEvent, opensLabelFor, NEXT_CYCLE_NOTICE } from "./events/rules";
+import { serverErrorMessage } from "./eval-public/helpers";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken } from "@/lib/routing-api";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { CENOGRAFIA_AREA_ID, FERRAMENTAS_AREA_ID } from "./evaluations/constants";
-import { conformityFormFromData, displayCriterionName, emptyConformityForm, groupCriteriaByArea, multiAreaCriterionIds, publicEvalBaseUrl } from "./evaluations/helpers";
-import type { AreaAssignTarget, AreaGroup, ConformityEvalForm, ConformityLinkType, EvalTab, RedirectDialogArea } from "./evaluations/types";
-import { useEvaluatorOverview } from "./evaluations/use-evaluator-overview";
+import { CENOGRAFIA_AREA_ID, FERRAMENTAS_AREA_ID, cenografiaItemCount, cenografiaItemsFor } from "./evaluations/constants";
+import { conformityFormFromData, displayCriterionName, emptyConformityForm, groupCriteriaByArea, publicEvalBaseUrl } from "./evaluations/helpers";
+import type { AreaAssignTarget, AreaGroup, ConformityEvalForm, ConformityLinkType, RedirectDialogArea } from "./evaluations/types";
+import { useMyAreaList, useMyAreaEvent, invalidateMyArea, periodFrom, type PeriodFilter, type StatusFilter } from "./evaluations/use-my-area";
 import { EvaluatorSidebar } from "./evaluations/evaluator-sidebar";
 import { PrincipalAreaCriteriaSection, AreaAssignDialog } from "./evaluations/principal-area-criteria";
 import { NoEventSelected, EventHeaderStrip } from "./evaluations/event-header";
@@ -29,8 +35,59 @@ export default function EvaluationsPage() {
   const isConsultation = !!user && !isEvaluator;
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [activeEvalTab, setActiveEvalTab] = useState<EvalTab>("todo");
+  // Evento aberto vive na URL (?evento=ID): o portal NORTE abre direto nele e
+  // o voltar do navegador funciona.
+  const urlSearch = useSearch();
+  const [, navigate] = useLocation();
+  const selectedEventId = useMemo(() => {
+    const v = Number(new URLSearchParams(urlSearch).get("evento"));
+    return Number.isInteger(v) && v > 0 ? v : null;
+  }, [urlSearch]);
+  function setSelectedEventId(id: number | null) {
+    navigate(id ? `/evaluations?evento=${id}` : "/evaluations");
+  }
+  // Entrada pelo portal sem sessão ou com a sessão vencida: o main.tsx (ou o
+  // tratamento do 401 no App.tsx) guardou o destino antes do login. Consome
+  // SEMPRE (para não sobrar um destino velho) e, se a URL chegou sem evento,
+  // retoma o evento pedido.
+  useEffect(() => {
+    let destino: string | null = null;
+    try { destino = sessionStorage.getItem("maratona_destino"); sessionStorage.removeItem("maratona_destino"); } catch { /* sem storage */ }
+    if (selectedEventId != null) return;
+    const m = destino ? /\/evaluations\?(.*)$/.exec(destino) : null;
+    const id = m ? Number(new URLSearchParams(m[1]).get("evento")) : NaN;
+    if (Number.isInteger(id) && id > 0) navigate(`/evaluations?evento=${id}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lista de eventos recolhível (desktop): com um evento aberto em telas até
+  // 1535 px, ela começa recolhida para o critério não ficar espremido entre a
+  // lista e o resumo. A escolha da pessoa fica lembrada neste navegador.
+  const [listCollapsed, setListCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("maratona_avaliador_lista");
+      if (saved === "recolhida") return true;
+      if (saved === "aberta") return false;
+    } catch { /* sem storage */ }
+    return typeof window !== "undefined" && window.matchMedia?.("(max-width: 1535px)").matches === true;
+  });
+  function toggleList() {
+    setListCollapsed(v => {
+      try { localStorage.setItem("maratona_avaliador_lista", v ? "aberta" : "recolhida"); } catch { /* sem storage */ }
+      return !v;
+    });
+  }
+
+  // Filtros da lista (busca com atraso curto para não consultar a cada tecla).
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("cycle");
+
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   // Per-criterion audio override (objectPath). "" means the user cleared a
@@ -45,19 +102,50 @@ export default function EvaluationsPage() {
   const [redirectFerramentasOpen, setRedirectFerramentasOpen] = useState(false);
   const [redirectFerramentasTargetId, setRedirectFerramentasTargetId] = useState<number | null>(null);
 
-  const { data: events } = useGetEvents({});
   const { data: cycle } = useGetCurrentCycle();
 
-  const { data: criteria } = useGetEventCriteria(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: ["event-criteria", selectedEventId] as unknown[] },
-  });
+  // Lista da barra lateral e o evento aberto: GET /evaluations/my-area.
+  const listParams = useMemo(() => ({
+    status: statusFilter,
+    ...(searchTerm ? { search: searchTerm } : {}),
+    ...(periodFrom(periodFilter) ? { from: periodFrom(periodFilter) } : {}),
+  }), [statusFilter, searchTerm, periodFilter]);
+  const areaList = useMyAreaList(listParams, isEvaluator);
+  const areaEvent = useMyAreaEvent(selectedEventId, isEvaluator);
+  const selectedInfo = areaEvent.event;
 
-  const { data: selectedEventDetail } = useGetEvent(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: getGetEventQueryKey(selectedEventId ?? 0) },
-  });
+  // Trocou de evento (clique, voltar do navegador, link do portal): limpa o
+  // que estava sendo digitado no evento anterior.
+  useEffect(() => {
+    setScores({}); setComments({}); setAudioOverrides({});
+  }, [selectedEventId]);
 
-  const isConformityEvaluatorForEvent = !!selectedEventId && !!user && selectedEventDetail?.conformityEvaluatorUserId === user.id;
-  const isFerramentasEvaluatorForEvent = !!selectedEventId && !!user && selectedEventDetail?.conformityEvaluatorFerramentasUserId === user.id;
+  // Critérios do evento: SÓ os que o avaliador responde, vindos do my-area
+  // (regra do dono: o avaliador só vê o que é da área dele). A tela não lê
+  // mais GET /events/:id/criteria, que traz o evento inteiro. O formato é o
+  // mesmo de EventCriterion para os cartões continuarem iguais.
+  const criteria: EventCriterion[] = useMemo(() => (selectedInfo?.criteria ?? []).map(c => ({
+    id: 0,
+    eventId: selectedInfo!.id,
+    criterionId: c.criterionId,
+    criterionName: c.name,
+    criterionDescription: c.description,
+    responsibleAreaId: c.areaId,
+    responsibleAreaName: c.areaName,
+    active: true,
+    originalWeight: c.weight,
+    weightOverride: c.weight,
+    normalizedWeight: 0,
+    eventScoped: c.eventScoped,
+    sourceCriterionId: c.sourceCriterionId,
+  })), [selectedInfo]);
+  const areaMode = !!selectedInfo?.areaMode;
+  const withoutConduta = !!selectedInfo?.conformityWithoutConduta;
+
+  // Responsável pela Matriz de Conformidade neste evento: vem do my-area (o
+  // avaliador não lê mais o detalhe completo do evento — só o que avalia).
+  const isConformityEvaluatorForEvent = !!selectedInfo?.conformityCenografia;
+  const isFerramentasEvaluatorForEvent = !!selectedInfo?.conformityFerramentas;
   const isAnyConformityEvaluator = isConformityEvaluatorForEvent || isFerramentasEvaluatorForEvent;
   const { data: myConformityData } = useGetEventConformity(selectedEventId!, {
     query: { enabled: isAnyConformityEvaluator, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
@@ -77,16 +165,22 @@ export default function EvaluationsPage() {
   const { data: ferramentasUsers } = useGetUsersByArea(FERRAMENTAS_AREA_ID, {
     query: { enabled: isFerramentasEvaluatorForEvent, queryKey: ["users-by-area", FERRAMENTAS_AREA_ID] as unknown[] },
   });
+  const invalidateConformityViews = () => {
+    qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] });
+    if (selectedEventId != null) qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId) });
+  };
   const redirectConformityMutation = useRedirectConformityEvaluator({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setRedirectConformityOpen(false); toast({ title: "Avaliação redirecionada" }); },
-      onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
+      // A resposta traz só { ok, conformityEvaluatorUserId }: a tela não lê o
+      // corpo — refaz as consultas do evento (my-area, matriz e detalhe).
+      onSuccess: () => { invalidateMyArea(qc); invalidateConformityViews(); setRedirectConformityOpen(false); toast({ title: "Avaliação redirecionada" }); },
+      onError: (e: unknown) => toast({ title: "Erro ao redirecionar", description: serverErrorMessage(e, s => `Erro ${s}`), variant: "destructive" }),
     },
   });
   const redirectFerramentasMutation = useRedirectConformityEvaluatorFerramentas({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setRedirectFerramentasOpen(false); toast({ title: "Avaliação redirecionada" }); },
-      onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
+      onSuccess: () => { invalidateMyArea(qc); invalidateConformityViews(); setRedirectFerramentasOpen(false); toast({ title: "Avaliação redirecionada" }); },
+      onError: (e: unknown) => toast({ title: "Erro ao redirecionar", description: serverErrorMessage(e, s => `Erro ${s}`), variant: "destructive" }),
     },
   });
   useEffect(() => {
@@ -154,51 +248,54 @@ export default function EvaluationsPage() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: evalsQKey });
+        invalidateMyArea(qc);
         toast({ title: "Rascunho salvo" });
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => {
+        // 409 = a área já respondeu enquanto eu preenchia: a tela recarrega e
+        // o critério passa a mostrar quem respondeu.
+        if (e instanceof ApiError && e.status === 409) { invalidateMyArea(qc); qc.invalidateQueries({ queryKey: evalsQKey }); }
+        // 409 EVENT_NEXT_CYCLE: o evento é do próximo ciclo — a mensagem é do servidor.
+        const nextCycle = apiErrorCode(e) === EVENT_NEXT_CYCLE;
+        toast({ title: nextCycle ? "Evento do próximo ciclo" : e instanceof ApiError && e.status === 409 ? "Critério já respondido pela área" : "Erro ao salvar", description: serverErrorMessage(e, s => `Erro ${s}`), variant: "destructive" });
+      },
     },
   });
 
-  const activeCriteria = (criteria ?? []).filter(c => c.active);
-  const sharedCriterionIds = multiAreaCriterionIds(activeCriteria);
+  const activeCriteria = criteria;
+  // Critério respondido também por outra área (o servidor sabe; a tela só vê os meus).
+  const sharedCriterionIds = new Set((selectedInfo?.criteria ?? []).filter(c => c.multiArea).map(c => c.criterionId));
 
-  // Sidebar do avaliador (A Fazer / Publicado / Concluídas) — useQueries por evento liberado.
-  const { configuredEvents, relevantEvaluatorEvents, evaluatorEventStats, publishedNotDoneEvents, todoEvents, doneEvents } =
-    useEvaluatorOverview({ isEvaluator, events, userId: user?.id, myPrincipalAreas });
-
-  // If the selected event stops being selectable (closed or criteria unconfirmed
-  // server-side), clear the selection so trigger text and loaded data stay in sync.
-  useEffect(() => {
-    if (selectedEventId == null || !events) return;
-    const stillValid = events.some(e => e.id === selectedEventId && (e.status === "open" || e.status === "closed") && (isEvaluator ? e.criteriaConfirmed : true));
-    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }
-  }, [selectedEventId, events, isEvaluator]);
-
-  const currentEvent = events?.find(e => e.id === selectedEventId);
-  const criteriaLocked = currentEvent ? !currentEvent.criteriaConfirmed : false;
-
-  // Avaliadores only see/evaluate the areas assigned to them FOR THIS EVENT
-  // (atribuição evento→área→avaliador), not the fixed profile area.
-  const myAssignedAreaIds = new Set(
-    (selectedEventDetail?.areaAssignments ?? [])
-      .filter(a => a.evaluatorUserId === user?.id)
-      .map(a => a.areaId),
-  );
-  // Quando um critério já tem um registro de roteamento (foi atribuído/
-  // redirecionado individualmente), ele manda: só quem está atualmente
-  // designado enxerga o critério, mesmo que outra pessoa também pertença à
-  // área responsável — é isso que faz um redirecionamento remover de vez o
-  // critério da lista de quem redirecionou. Sem registro de roteamento
-  // (evento legado / nunca atribuído individualmente), cai na área.
-  const criterionAssignmentByCriterionId = new Map(
-    (criterionAssignments ?? []).map(a => [a.criterionId, a]),
-  );
-  const myCriteria = activeCriteria.filter(c => {
-    const assignment = criterionAssignmentByCriterionId.get(c.criterionId);
-    if (assignment) return assignment.assignedToId === user?.id;
-    return c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId);
+  // O evento da URL só abre se tiver algo meu (designado, critério da área do
+  // cadastro no ciclo com avaliação por área, ou matriz) e a avaliação já
+  // tiver aberto (dia seguinte ao evento) — o servidor (GET
+  // /evaluations/my-area) decide. Sem isso, a tela explica.
+  const currentEvent = selectedInfo;
+  const eventUnavailable = selectedEventId != null && areaEvent.isSuccess && !selectedInfo;
+  // Evento indisponível: as datas dizem se a avaliação ainda vai abrir
+  // ("Abre em DD/MM", dia seguinte ao fim, BRT) ou se o evento é do próximo
+  // ciclo (selo "Próximo ciclo" + a frase única) — mesma regra da lista de Eventos.
+  const unavailableEventQ = useGetEvent(selectedEventId ?? 0, {
+    // O papel avaliador não lê GET /events/:id (lib/evaluator-scope.ts na API): para ele fica o texto geral.
+    query: { queryKey: getGetEventQueryKey(selectedEventId ?? 0), enabled: eventUnavailable && user?.role !== "avaliador", retry: false },
   });
+  // Avaliador: o próprio my-area diz quando abre (nome, datas e "próximo ciclo"), só para evento DELE.
+  const areaUnavailable = eventUnavailable ? areaEvent.data?.unavailable ?? null : null;
+  const unavailableEvent = eventUnavailable
+    ? unavailableEventQ.data ?? (areaUnavailable ? { name: areaUnavailable.eventName, startDate: areaUnavailable.startDate, endDate: areaUnavailable.endDate, nextCycle: areaUnavailable.nextCycle, status: "open", cycleId: null as number | null } : null)
+    : null;
+  const unavailableCycle = unavailableEvent && cycle && unavailableEvent.cycleId === cycle.id ? cycle : null;
+  const unavailableOpens = unavailableEvent ? opensLabelFor(unavailableEvent, unavailableCycle) : null;
+  const unavailableNextCycle = !!unavailableEvent && isNextCycleEvent(unavailableEvent, unavailableCycle);
+  const selectedIsNextCycle = !!selectedInfo && !!cycle && (!selectedInfo.cycleName || selectedInfo.cycleName === cycle.name) && isNextCycleEvent(selectedInfo, cycle);
+
+  // Critérios que respondo neste evento — quem decide é o servidor.
+  const infoByCriterionId = new Map((selectedInfo?.criteria ?? []).map(c => [c.criterionId, c]));
+  const criterionInfo = (criterionId: number) => infoByCriterionId.get(criterionId);
+  const myCriteria = activeCriteria;
+  const isClosed = (criterionId: number) => infoByCriterionId.get(criterionId)?.state === "closed";
+  // Fechados (no modo por área, outra pessoa respondeu primeiro) não entram no envio.
+  const launchCriteria = myCriteria.filter(c => !isClosed(c.criterionId));
 
   // For primary-area evaluators: fallback redirect options from the criterion's responsible area.
   // Placed after myCriteria because it references myCriteria.find() to look up the area.
@@ -220,6 +317,23 @@ export default function EvaluationsPage() {
   // Agrupa os critérios do avaliador logado por área — inclui areaId para
   // suportar botões de redirecionar/link-público por formulário (grupo de área).
   const myAreaGroups = groupCriteriaByArea(myCriteria);
+
+  // Resposta que fechou o critério (a primeira enviada por outra pessoa da
+  // área): o avaliador vê o que foi avaliado — nota, comentário, quem e quando.
+  function closingEval(criterionId: number) {
+    return (evaluations ?? [])
+      .filter(e => e.criterionId === criterionId && e.status === "submitted" && e.evaluatorUserId !== user?.id)
+      .sort((a, b) => String(a.submittedAt ?? "").localeCompare(String(b.submittedAt ?? "")))[0];
+  }
+  // Resumo das notas: critério fechado mostra "9 · por Fulano de Tal" (nome completo).
+  const closedNames = new Map(
+    myCriteria.filter(c => isClosed(c.criterionId)).map(c => {
+      const info = infoByCriterionId.get(c.criterionId);
+      const closing = closingEval(c.criterionId);
+      const name = info?.answeredByName ?? closing?.evaluatorName ?? "avaliador da área";
+      return [c.criterionId, { name, score: closing?.score != null ? Number(closing.score) : null }] as const;
+    }),
+  );
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -250,6 +364,23 @@ export default function EvaluationsPage() {
     // Áudio é opcional — complemento ao comentário, não trava salvar/submeter.
     const audioUrl = currentAudio(criterionId);
     createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment, audioUrl: audioUrl ?? undefined } });
+  }
+
+  // Rascunho meu de um critério que a área já fechou: some da tela (e das contas).
+  const discardDraft = useDeleteEvaluationDraft({
+    mutation: {
+      onSuccess: async () => {
+        await qc.invalidateQueries({ queryKey: evalsQKey });
+        await invalidateMyArea(qc);
+        toast({ title: "Rascunho descartado" });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível descartar o rascunho", description: e?.message, variant: "destructive" }),
+    },
+  });
+  function handleDiscardDraft(evaluationId: number, criterionId: number) {
+    discardDraft.mutate({ id: evaluationId });
+    setScores(s => { const n = { ...s }; delete n[criterionId]; return n; });
+    setComments(s => { const n = { ...s }; delete n[criterionId]; return n; });
   }
 
   function handleScoreClick(criterionId: number, score: number) {
@@ -287,7 +418,7 @@ export default function EvaluationsPage() {
     let sentCount = 0;
     let failingCriterionName: string | null = null;
     try {
-      for (const c of myCriteria) {
+      for (const c of launchCriteria) {
         const ev = getEval(c.criterionId);
         if (ev?.status === "submitted") continue;
         const score = currentScore(c.criterionId);
@@ -295,27 +426,41 @@ export default function EvaluationsPage() {
         failingCriterionName = displayCriterionName(c.criterionName) || `critério #${c.criterionId}`;
         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
         const audioUrl = currentAudio(c.criterionId);
-        const created = await createEvaluation({
+        // withServerMessage: o motivo do servidor (ex.: "Já respondido por
+        // Fulano em 05/10 14:30") chega limpo ao aviso, sem "HTTP 409 …".
+        const created = await withServerMessage(createEvaluation({
           eventId: selectedEventId,
           criterionId: c.criterionId,
           score,
           comments: comment || undefined,
           audioUrl: audioUrl ?? undefined,
-        });
-        await submitEvaluation(created.id);
+        }));
+        await withServerMessage(submitEvaluation(created.id));
         sentCount += 1;
         failingCriterionName = null;
       }
       await qc.invalidateQueries({ queryKey: evalsQKey });
-      toast({ title: "Avaliação lançada com sucesso", description: "Você não tem pendências para este evento." });
+      await invalidateMyArea(qc);
       setConfirmLaunchOpen(false);
-      setSelectedEventId(null);
       setScores({}); setComments({}); setAudioOverrides({});
+      if (extraConformityItemsCompleted < extraConformityItemsTotal) {
+        // Os critérios foram, mas a matriz deste evento ainda está em aberto:
+        // o evento continua na tela para o avaliador terminar.
+        toast({
+          title: "Critérios lançados — falta a Matriz de Conformidade",
+          description: "Responda a Matriz de Conformidade abaixo para concluir este evento.",
+        });
+        return;
+      }
+      toast({ title: "Avaliação lançada com sucesso", description: "Você não tem pendências para este evento." });
+      setSelectedEventId(null);
     } catch (e) {
       // A criterion may already be submitted (e.g. a retry after a partial
-      // failure). Refetch so getEval() reflects the real server state and the
-      // next attempt skips what's already done instead of erroring again.
+      // failure) ou a área respondeu antes (409). Recarrega para a tela mostrar
+      // o estado real e a próxima tentativa pular o que já foi.
       await qc.invalidateQueries({ queryKey: evalsQKey });
+      await invalidateMyArea(qc);
+      setConfirmLaunchOpen(false);
       const reason = (e as { message?: string })?.message?.trim();
       const sentMsg = sentCount === 0
         ? "Nenhum critério foi enviado antes da falha."
@@ -323,7 +468,8 @@ export default function EvaluationsPage() {
           ? "1 critério foi enviado antes da falha."
           : `${sentCount} critérios foram enviados antes da falha.`;
       toast({
-        title: failingCriterionName ? `Erro ao lançar "${failingCriterionName}"` : "Erro ao lançar avaliação",
+        title: apiErrorCode(e) === EVENT_NEXT_CYCLE ? "Evento do próximo ciclo: avaliação ainda não abriu"
+          : failingCriterionName ? `Erro ao lançar "${failingCriterionName}"` : "Erro ao lançar avaliação",
         description: `${sentMsg}${reason ? ` Motivo: ${reason}.` : ""} Confira o que ficou pendente e tente novamente.`,
         variant: "destructive",
       });
@@ -332,31 +478,54 @@ export default function EvaluationsPage() {
     }
   }
 
-  const allEvaled = myCriteria.length > 0 && myCriteria.every(c => {
-    const ev = getEval(c.criterionId);
-    return ev && ev.status === "submitted";
-  });
-  // Ready to launch when every criterion is filled in-screen (or already done),
-  // and there is at least one not-yet-submitted criterion to send.
-  const allReady = myCriteria.length > 0 && myCriteria.every(c => criterionReady(c.criterionId));
-  const pendingToFill = myCriteria.filter(c => !criterionReady(c.criterionId)).length;
-  const toSubmitCount = myCriteria.filter(c => getEval(c.criterionId)?.status !== "submitted").length;
+  // Respondido = enviado por mim OU fechado pela área (outra pessoa respondeu).
+  const isDone = (criterionId: number) => getEval(criterionId)?.status === "submitted" || isClosed(criterionId);
+  const allEvaled = myCriteria.length > 0 && myCriteria.every(c => isDone(c.criterionId));
+  // Ready to launch when every criterion I can still send is filled in-screen
+  // (or already done), and there is at least one not-yet-submitted to send.
+  const allReady = launchCriteria.length > 0 && launchCriteria.every(c => criterionReady(c.criterionId));
+  const pendingToFill = launchCriteria.filter(c => !criterionReady(c.criterionId)).length;
+  const toSubmitCount = launchCriteria.filter(c => getEval(c.criterionId)?.status !== "submitted").length;
 
-  // Só "submitted" conta como concluído — mesma régua do card do evento
-  // (EvaluatorEventCard); rascunho é trabalho em andamento, não entregue.
-  const completedCount = myCriteria.filter(c => getEval(c.criterionId)?.status === "submitted").length;
+  // Só "submitted" (ou fechado pela área) conta como concluído; rascunho é
+  // trabalho em andamento, não entregue.
+  const completedCount = myCriteria.filter(c => isDone(c.criterionId)).length;
 
+  // Link combinado (critérios + matriz): só quem responde pela matriz neste
+  // evento, e só enquanto ela não tem resposta — o servidor confere igual.
+  const cenografiaAnswered = !!myConformityData && (
+    [myConformityData.epi, myConformityData.estaiamentos, myConformityData.conduta, myConformityData.standoutResponse].some(v => v != null)
+    || !!myConformityData.absencesReport?.trim()
+  );
+  const canIncludeConformity = isConformityEvaluatorForEvent && !cenografiaAnswered;
+  // Quem respondeu a matriz foi OUTRA pessoa (link combinado, link de
+  // conformidade, outro avaliador da área ou o RH)? Então a tela só mostra a
+  // resposta. O nome gravado no envio decide; sem ele (dado antigo), quem criou.
+  const cenografiaAnsweredByOther = (() => {
+    if (!cenografiaAnswered || !myConformityData) return null;
+    const byName = myConformityData.cenografiaSubmittedByName?.trim() || null;
+    const mine = byName
+      ? byName.localeCompare((user?.name ?? "").trim(), "pt-BR", { sensitivity: "base" }) === 0
+      : myConformityData.createdByUserId === user?.id;
+    if (mine) return null;
+    return { name: byName ?? myConformityData.createdByUserName ?? null, at: myConformityData.updatedAt ?? myConformityData.createdAt ?? null };
+  })();
   // Beyond the scored criteria, avaliadores da Matriz de Conformidade also
   // answer extra Sim/Não questions (Ferramentas e Case / Cenografia). Those
   // must count toward "Resumo da Avaliação" too, or the sidebar undercounts
   // this evaluator's real workload for the event.
+  // Cenografia: as perguntas Sim/Não do evento (sem "Conduta" no ciclo novo
+  // → 4 itens no total) + Destaque + Faltas/Atrasos.
   const extraConformityItemsTotal =
     (isFerramentasEvaluatorForEvent ? 1 : 0) +
-    (isConformityEvaluatorForEvent ? 5 : 0);
+    (isConformityEvaluatorForEvent ? cenografiaItemCount(withoutConduta) : 0);
   const extraConformityItemsCompleted =
     (isFerramentasEvaluatorForEvent && conformityEvalForm.guardaEquipamentos !== null ? 1 : 0) +
-    (isConformityEvaluatorForEvent
-      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.standoutResponse]
+    (isConformityEvaluatorForEvent && cenografiaAnsweredByOther
+      // Respondida por outra pessoa: não é pendência minha.
+      ? cenografiaItemCount(withoutConduta)
+      : isConformityEvaluatorForEvent
+      ? [...cenografiaItemsFor(withoutConduta).map(i => conformityEvalForm[i.key]), conformityEvalForm.standoutResponse]
           .filter(v => v !== null).length
         + (conformityEvalForm.absencesReport.trim() ? 1 : 0)
       : 0);
@@ -367,8 +536,8 @@ export default function EvaluationsPage() {
   const progressPct = totalItems ? (totalCompleted / totalItems) * 100 : 0;
 
   // ── Handlers repassados aos componentes (mesma sequência de setState de antes) ──
-  function selectEvaluatorEvent(tab: EvalTab, eventId: number) {
-    setActiveEvalTab(tab); setSelectedEventId(eventId); setScores({}); setComments({}); setAudioOverrides({});
+  function selectEvaluatorEvent(eventId: number) {
+    setSelectedEventId(eventId);
   }
 
   function takeCriterion(criterionId: number) {
@@ -412,7 +581,7 @@ export default function EvaluationsPage() {
   }
 
   function openPublicLinkDialog(g: AreaGroup, areaEligible: number[]) {
-    const isCeno = g.areaId === CENOGRAFIA_AREA_ID; setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(isCeno); setPublicLinkForceConformity(isCeno); refetchTokenHistory();
+    const isCeno = g.areaId === CENOGRAFIA_AREA_ID && canIncludeConformity; setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(isCeno); setPublicLinkForceConformity(isCeno); refetchTokenHistory();
   }
 
   function closePublicLinkDialog() {
@@ -427,7 +596,7 @@ export default function EvaluationsPage() {
 
   function generatePublicLink(linkCriterionIds: number[]) {
     createPublicToken.mutate(
-      { recipientName: publicLinkRecipientName.trim(), criterionIds: linkCriterionIds, includeConformity: publicLinkIncludeConformity || undefined },
+      { recipientName: publicLinkRecipientName.trim(), criterionIds: linkCriterionIds, includeConformity: (canIncludeConformity && publicLinkIncludeConformity) || undefined },
       {
         onSuccess: ({ tokenId }) => {
           const base = publicEvalBaseUrl();
@@ -504,35 +673,41 @@ export default function EvaluationsPage() {
         </div>
       </div>
 
-      {/* ── Body: sidebar + main (no celular empilha: lista em cima, avaliação embaixo) ── */}
+      {/* ── Body: lista + avaliação (no celular, uma OU outra) ── */}
       <div className="flex flex-col md:flex-row flex-1 min-h-0">
 
-        {/* ── Sidebar ── */}
+        {/* ── Lista de eventos (recolhível no desktop com um evento aberto) ── */}
         <EvaluatorSidebar
-          isEvaluator={isEvaluator}
+          data={areaList.data}
+          isLoading={areaList.isLoading}
+          isFetching={areaList.isFetching}
+          error={areaList.error}
+          onRetry={() => { void areaList.refetch(); }}
           selectedEventId={selectedEventId}
-          evaluatorEventStats={evaluatorEventStats}
-          todoEvents={todoEvents}
-          publishedNotDoneEvents={publishedNotDoneEvents}
-          doneEvents={doneEvents}
-          configuredEventsCount={configuredEvents.length}
-          relevantEventsCount={relevantEvaluatorEvents.length}
           onSelectEvent={selectEvaluatorEvent}
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          status={statusFilter}
+          onStatusChange={setStatusFilter}
+          period={periodFilter}
+          onPeriodChange={setPeriodFilter}
+          hiddenOnMobile={selectedEventId != null}
+          collapsed={listCollapsed && selectedEventId != null}
+          onToggleCollapsed={toggleList}
         />
 
-        {/* ── Main content ── */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <div className="flex-1 overflow-auto p-5 space-y-5">
+        {/* ── Avaliação (no celular, só aparece com um evento aberto) ── */}
+        <div className={`flex-1 flex-col min-w-0 ${selectedEventId != null ? "flex" : "hidden md:flex"}`}>
+          <div className={`@container flex-1 min-w-0 p-4 md:p-5 space-y-5 ${selectedEventId != null ? "pb-28 md:pb-5" : ""}`}>
 
-        {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (
-          <PrincipalAreaCriteriaSection
-            myPrincipalAreas={myPrincipalAreas}
-            criterionAssignments={criterionAssignments}
-            activeCriteria={activeCriteria}
-            userId={user?.id}
-            onTakeCriterion={takeCriterion}
-            onAssignCriterion={setAreaAssignTarget}
-          />
+        {selectedEventId != null && (
+          <button
+            type="button"
+            onClick={() => setSelectedEventId(null)}
+            className="md:hidden inline-flex items-center gap-1.5 text-xs font-bold uppercase text-muted-foreground hover:text-foreground -mt-1 min-h-8"
+          >
+            <ArrowLeft size={14} /> Eventos
+          </button>
         )}
 
         <AreaAssignDialog
@@ -544,75 +719,145 @@ export default function EvaluationsPage() {
         />
 
         {!selectedEventId ? (
-          <NoEventSelected />
+          <NoEventSelected pendingCount={areaList.data && !searchTerm && periodFilter === "cycle" ? areaList.data.totals.pending : null} upcoming={areaList.data?.upcoming ?? []} />
+        ) : eventUnavailable ? (
+          <div data-testid="notice-event-unavailable" className="max-w-lg mx-auto mt-10 text-center bg-card border border-border rounded-xl px-6 py-10">
+            <div className="w-14 h-14 border border-border rounded-lg bg-secondary text-muted-foreground flex items-center justify-center mx-auto mb-4">
+              <SearchX size={24} />
+            </div>
+            <h2 className="text-2xl uppercase font-black tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>
+              {unavailableOpens ? "Avaliação ainda não abriu" : "Evento indisponível para você"}
+            </h2>
+            {unavailableOpens && (
+              <p data-testid="notice-event-opens" className="inline-block my-2 rounded-full px-3 py-1 text-[12px] font-bold uppercase" style={{ fontFamily: CONDENSED, backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
+                {unavailableOpens}
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {unavailableNextCycle
+                ? NEXT_CYCLE_NOTICE
+                : unavailableOpens
+                  ? `A avaliação de ${unavailableEvent?.name ?? "este evento"} abre sozinha no dia seguinte ao fim do evento. Volte a partir dessa data.`
+                  : "Este evento não tem nada para você avaliar, ou a avaliação dele ainda não abriu — ela abre sozinha no dia seguinte à realização do evento."}
+            </p>
+            <button type="button" onClick={() => setSelectedEventId(null)} className="mt-5 border border-border rounded-lg bg-card px-4 py-2 font-bold text-xs uppercase tracking-wider hover:bg-secondary">
+              Ver meus eventos
+            </button>
+          </div>
+        ) : areaEvent.isError ? (
+          <div role="alert" className="max-w-lg mx-auto mt-10 text-center bg-card border border-border rounded-xl px-6 py-10 space-y-3">
+            <p className="text-sm font-bold text-destructive">Não foi possível abrir este evento.</p>
+            <p className="text-xs text-muted-foreground">{areaEvent.error?.message}</p>
+            <button type="button" onClick={() => { void areaEvent.refetch(); }} className="border border-border rounded-lg bg-card px-4 py-2 font-bold text-xs uppercase tracking-wider hover:bg-secondary">
+              Tentar de novo
+            </button>
+          </div>
+        ) : !selectedInfo ? (
+          <div className="space-y-4" role="status" aria-live="polite">
+            <span className="sr-only">Carregando evento…</span>
+            <div className="h-16 rounded-xl bg-secondary animate-pulse" />
+            <div className="h-72 rounded-xl bg-secondary animate-pulse" />
+          </div>
         ) : (
           <div className="space-y-5">
             {/* Header strip compacto */}
-            {currentEvent && <EventHeaderStrip currentEvent={currentEvent} />}
+            {/* Evento do próximo ciclo (começa depois do fim do ciclo atual): a
+                API recusa a avaliação (409 EVENT_NEXT_CYCLE) até o ciclo novo existir.
+                Um selo só ("Próximo ciclo") na faixa + a frase única abaixo. */}
+            {currentEvent && <EventHeaderStrip currentEvent={currentEvent} nextCycle={selectedIsNextCycle} />}
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+            {selectedIsNextCycle && (
+              <div role="status" data-testid="notice-event-next-cycle" className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
+                {NEXT_CYCLE_NOTICE}
+              </div>
+            )}
 
-              {/* Criteria Column / Evaluation Form */}
-              <CriteriaColumn
-                criteriaLocked={criteriaLocked}
-                myCriteria={myCriteria}
-                myAreaGroups={myAreaGroups}
-                publicLinkEligibleCriteria={publicLinkEligibleCriteria}
+            {/* Avaliador principal (fluxo antigo): atribuir/tomar os quesitos da
+                área. No ciclo com avaliação por área não há o que atribuir —
+                qualquer avaliador da área responde. */}
+            {isEvaluator && selectedInfo.pending && !areaMode && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (
+              <PrincipalAreaCriteriaSection
+                myPrincipalAreas={myPrincipalAreas}
                 criterionAssignments={criterionAssignments}
-                sharedCriterionIds={sharedCriterionIds}
-                comments={comments}
-                getEval={getEval}
-                currentScore={currentScore}
-                currentAudio={currentAudio}
-                isSaving={createMutation.isPending}
-                progressPct={progressPct}
-                onRedirectArea={openRedirectDialog}
-                onOpenPublicLink={openPublicLinkDialog}
-                onScoreClick={handleScoreClick}
-                onCommentChange={handleCommentChange}
-                onAudioChange={handleAudioChange}
-                onSaveDraft={handleSaveDraft}
+                userId={user?.id}
+                onTakeCriterion={takeCriterion}
+                onAssignCriterion={setAreaAssignTarget}
               />
+            )}
 
-              {/* ─── GRUPO 1: Ferramentas e Case (Cenografia) ─── */}
-              {isFerramentasEvaluatorForEvent && (
-                <FerramentasConformitySection
-                  conformityEvalForm={conformityEvalForm}
-                  setConformityEvalForm={setConformityEvalForm}
-                  myConformityData={myConformityData}
-                  ferramentasPublicTokenHistory={ferramentasPublicTokenHistory}
-                  ferramentasUsers={ferramentasUsers}
-                  redirectOpen={redirectFerramentasOpen}
-                  onRedirectOpenChange={setRedirectFerramentasOpen}
-                  redirectTargetId={redirectFerramentasTargetId}
-                  onRedirectSelect={(userId) => { setRedirectFerramentasTargetId(userId); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
-                  onOpenLinkDialog={() => openConformityLinkDialog("ferramentas")}
-                  saveConformity={saveConformity}
-                  isSaving={conformityEvalMutation.isPending}
-                  toast={toast}
+            {/* Duas colunas (formulário + resumo) só quando a área de conteúdo
+                tem largura para isso; abaixo disso, o resumo vem depois. */}
+            <div className="grid grid-cols-1 @4xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+
+              <div className="space-y-8 min-w-0">
+                {/* Critérios */}
+                <CriteriaColumn
+                  myCriteria={myCriteria}
+                  myAreaGroups={myAreaGroups}
+                  areaMode={areaMode}
+                  publicLinkEligibleCriteria={publicLinkEligibleCriteria}
+                  criterionAssignments={criterionAssignments}
+                  sharedCriterionIds={sharedCriterionIds}
+                  comments={comments}
+                  getEval={getEval}
+                  currentScore={currentScore}
+                  currentAudio={currentAudio}
+                  isSaving={createMutation.isPending}
+                  progressPct={progressPct}
+                  criterionInfo={criterionInfo}
+                  closingEval={closingEval}
+                  onRedirectArea={openRedirectDialog}
+                  onOpenPublicLink={openPublicLinkDialog}
+                  onScoreClick={handleScoreClick}
+                  onCommentChange={handleCommentChange}
+                  onAudioChange={handleAudioChange}
+                  onSaveDraft={handleSaveDraft}
+                  onDiscardDraft={handleDiscardDraft}
+                  isDiscarding={discardDraft.isPending}
                 />
-              )}
 
-              {/* ─── GRUPO 2: Cenografia ─── */}
-              {isConformityEvaluatorForEvent && (
-                <CenografiaConformitySection
-                  conformityEvalForm={conformityEvalForm}
-                  setConformityEvalForm={setConformityEvalForm}
-                  myConformityData={myConformityData}
-                  conformityPublicTokenHistory={conformityPublicTokenHistory}
-                  cenografiaUsers={cenografiaUsers}
-                  redirectOpen={redirectConformityOpen}
-                  onRedirectOpenChange={setRedirectConformityOpen}
-                  redirectTargetId={redirectConformityTargetId}
-                  onRedirectSelect={(userId) => { setRedirectConformityTargetId(userId); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
-                  onOpenLinkDialog={() => openConformityLinkDialog("cenografia")}
-                  saveConformity={saveConformity}
-                  isSaving={conformityEvalMutation.isPending}
-                  toast={toast}
-                />
-              )}
+                {/* ─── GRUPO 1: Ferramentas e Case (Cenografia) ─── */}
+                {isFerramentasEvaluatorForEvent && (
+                  <FerramentasConformitySection
+                    conformityEvalForm={conformityEvalForm}
+                    setConformityEvalForm={setConformityEvalForm}
+                    myConformityData={myConformityData}
+                    ferramentasPublicTokenHistory={ferramentasPublicTokenHistory}
+                    ferramentasUsers={ferramentasUsers}
+                    redirectOpen={redirectFerramentasOpen}
+                    onRedirectOpenChange={setRedirectFerramentasOpen}
+                    redirectTargetId={redirectFerramentasTargetId}
+                    onRedirectSelect={(userId) => { setRedirectFerramentasTargetId(userId); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                    onOpenLinkDialog={() => openConformityLinkDialog("ferramentas")}
+                    saveConformity={saveConformity}
+                    isSaving={conformityEvalMutation.isPending}
+                    toast={toast}
+                  />
+                )}
 
-              {/* Right Sticky Panel */}
+                {/* ─── GRUPO 2: Cenografia ─── */}
+                {isConformityEvaluatorForEvent && (
+                  <CenografiaConformitySection
+                    conformityEvalForm={conformityEvalForm}
+                    setConformityEvalForm={setConformityEvalForm}
+                    myConformityData={myConformityData}
+                    conformityPublicTokenHistory={conformityPublicTokenHistory}
+                    cenografiaUsers={cenografiaUsers}
+                    redirectOpen={redirectConformityOpen}
+                    onRedirectOpenChange={setRedirectConformityOpen}
+                    redirectTargetId={redirectConformityTargetId}
+                    onRedirectSelect={(userId) => { setRedirectConformityTargetId(userId); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                    onOpenLinkDialog={() => openConformityLinkDialog("cenografia")}
+                    saveConformity={saveConformity}
+                    isSaving={conformityEvalMutation.isPending}
+                    toast={toast}
+                    withoutConduta={withoutConduta}
+                    answeredByOther={cenografiaAnsweredByOther}
+                  />
+                )}
+              </div>
+
+              {/* Resumo (lado direito quando cabe; senão, depois do formulário) */}
               <EvaluationSummaryPanel
                 isEvaluator={isEvaluator}
                 myCriteria={myCriteria}
@@ -637,8 +882,34 @@ export default function EvaluationsPage() {
                 toSubmitCount={toSubmitCount}
                 eventName={currentEvent?.name}
                 onLaunch={handleLaunchAll}
+                closedNames={closedNames}
+                launchCriteria={launchCriteria}
+                withoutConduta={withoutConduta}
+                cenografiaByOther={cenografiaAnsweredByOther ? (cenografiaAnsweredByOther.name ?? "outra pessoa") : null}
               />
             </div>
+
+            {/* Celular: o botão de lançar fica fixo no rodapé (o resumo vem
+                depois do formulário). */}
+            {isEvaluator && myCriteria.length > 0 && !allEvaled && (
+              <div className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+                {allReady ? (
+                  <button
+                    type="button"
+                    data-testid="button-submit-eval-mobile"
+                    onClick={() => setConfirmLaunchOpen(true)}
+                    disabled={launching}
+                    className="w-full min-h-12 bg-primary text-primary-foreground border border-primary rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Rocket size={16} /> Lançar Avaliação
+                  </button>
+                ) : (
+                  <button type="button" disabled className="w-full min-h-12 bg-secondary border border-border rounded-lg font-bold text-sm uppercase tracking-wider opacity-70 cursor-not-allowed">
+                    {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
           </div>
@@ -663,6 +934,8 @@ export default function EvaluationsPage() {
         includeConformity={publicLinkIncludeConformity}
         setIncludeConformity={setPublicLinkIncludeConformity}
         forceConformity={publicLinkForceConformity}
+        canIncludeConformity={canIncludeConformity}
+        withoutConduta={withoutConduta}
         generatedUrl={generatedPublicUrl}
         linkCopied={linkCopied}
         setLinkCopied={setLinkCopied}
@@ -690,6 +963,7 @@ export default function EvaluationsPage() {
         onGenerate={generateConformityLink}
         onClose={closeConformityLinkDialog}
         toast={toast}
+        withoutConduta={withoutConduta}
       />
 
     </div>

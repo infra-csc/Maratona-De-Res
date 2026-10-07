@@ -1,4 +1,4 @@
-import type { AreaConformityRoutingListItem } from "@workspace/api-client-react";
+import { useGetCurrentCycle, type AreaConformityRoutingListItem } from "@workspace/api-client-react";
 import { Building2 } from "lucide-react";
 import { CONDENSED, PremiumCard } from "@/lib/premium-theme";
 import { conformityAreasOf } from "./helpers";
@@ -13,7 +13,9 @@ export function ConformityRoutingCard({
   conformityRoutings: AreaConformityRoutingListItem[] | undefined;
   evaluators: EvaluatorOption[];
 }) {
-  const conformityAreas = conformityAreasOf(areas ?? []);
+  // Ciclo atual sem "Conduta" na matriz: a contagem de quesitos segue o ciclo.
+  const { data: cycle } = useGetCurrentCycle();
+  const conformityAreas = conformityAreasOf(areas ?? [], { withoutConduta: !!cycle?.conformityWithoutConduta });
   return (
     <PremiumCard className="overflow-hidden">
       <div className="px-5 py-4" style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>

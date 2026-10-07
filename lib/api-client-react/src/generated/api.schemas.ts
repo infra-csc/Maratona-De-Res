@@ -35,6 +35,74 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+/**
+ * 403 com o motivo (mensagem pronta para a tela em `error`). `code`, quando presente:
+ * - EVALUATOR_SCOPE: o papel AVALIADOR só acessa as rotas da tela de avaliação (lista fechada em
+ *   lib/evaluator-scope.ts); qualquer outra rota — inclusive um caminho com maiúsculas ou
+ *   codificado (%33) — é recusada. Mensagem: "Acesso negado: o perfil avaliador só acessa a
+ *   tela de avaliação."
+ * - AREA_MODE_EVALUATOR_ONLY: evento de ciclo com avaliação por área — admin e RH não lançam
+ *   nem enviam avaliação de critério. Mensagem: "No ciclo por área, só o avaliador da área
+ *   responde. Ajustes de nota são feitos na Calibração."
+ * Sem `code`: outras recusas (papel sem acesso, critério que não é da pessoa…).
+ */
+export interface ForbiddenError {
+  error: string;
+  /** EVALUATOR_SCOPE | AREA_MODE_EVALUATOR_ONLY */
+  code?: string;
+}
+
+/**
+ * conformity = a parte da Matriz de Conformidade do link combinado (criterionId 0): a matriz já tinha resposta e foi mantida.
+ */
+export type PublicEvalSubmitRejectedKind = typeof PublicEvalSubmitRejectedKind[keyof typeof PublicEvalSubmitRejectedKind];
+
+
+export const PublicEvalSubmitRejectedKind = {
+  criterion: 'criterion',
+  conformity: 'conformity',
+} as const;
+
+export interface PublicEvalSubmitRejected {
+  criterionId: number;
+  criterionName: string;
+  reason: string;
+  /** conformity = a parte da Matriz de Conformidade do link combinado (criterionId 0): a matriz já tinha resposta e foi mantida. */
+  kind?: PublicEvalSubmitRejectedKind;
+}
+
+/**
+ * 409 com o motivo (mensagem pronta para a tela em `error`). `code` diz o porquê:
+ * - CLOSED_CYCLE: ciclo fechado só consulta (`cycleClosed: true`). Nada foi
+ *   gravado; no link público o link continua sem uso.
+ * - AREA_ALREADY_ANSWERED: critério(s) já respondido(s) — `rejected` traz o motivo de cada parte.
+ * - CONFORMITY_ALREADY_ANSWERED: a Matriz de Conformidade já foi respondida
+ *   (por quem, em `rejected[].reason`); o link continua sem uso.
+ * - EVENT_NEXT_CYCLE: o evento é do PRÓXIMO ciclo (data de início depois do fim do ciclo em
+ *   que está): não aceita avaliação, matriz nem link público até ser movido para o ciclo novo
+ *   (`nextCycle: true`). Mensagem: "Este evento é do próximo ciclo: abre para avaliação quando o
+ *   ciclo novo for criado." Preparação (equipe, critérios, dados) continua liberada.
+ * - AREA_MODE_OTHER_AREA: ciclo com avaliação por área — o critério só pode ser repassado (e o
+ *   avaliador só pode ser designado no evento) para alguém da área dele.
+ * - CYCLE_HAS_EVALUATIONS: o ciclo já tem avaliação enviada — a avaliação por área não pode mais
+ *   ser ligada/desligada.
+ * - CRITERIA_INACTIVE: link público cujos critérios foram todos desativados no evento — nada
+ *   gravado, o link continua sem uso.
+ * Sem `code`: outros conflitos (ex.: link já utilizado).
+ */
+export interface ConflictError {
+  error: string;
+  /** CLOSED_CYCLE | EVENT_NEXT_CYCLE | AREA_ALREADY_ANSWERED | CONFORMITY_ALREADY_ANSWERED | AREA_MODE_OTHER_AREA | CYCLE_HAS_EVALUATIONS | CRITERIA_INACTIVE */
+  code?: string;
+  /** true quando a recusa é de ciclo fechado (code = CLOSED_CYCLE) */
+  cycleClosed?: boolean;
+  /** true quando a recusa é de evento do próximo ciclo (code = EVENT_NEXT_CYCLE) */
+  nextCycle?: boolean;
+  rejected?: PublicEvalSubmitRejected[];
+  /** Junção de colaboradores — os dados de ciclo fechado que impediram a junção (por exemplo, 3 participações em eventos) */
+  closedCycleData?: string[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -331,6 +399,20 @@ export interface EmployeeUpdate {
   eligibilityReason?: string;
 }
 
+/**
+ * Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,
+ * eventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em
+ * stats.eventsAfterEnd, não em eventsTotal). Só em GET /events.
+ */
+export type EventPeriodPosition = typeof EventPeriodPosition[keyof typeof EventPeriodPosition];
+
+
+export const EventPeriodPosition = {
+  before: 'before',
+  inside: 'inside',
+  after: 'after',
+} as const;
+
 export interface Event {
   id: number;
   /** @nullable */
@@ -411,6 +493,22 @@ export interface Event {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  /**
+     * Posição do evento no período do ciclo em que está guardado, pela DATA DE INÍCIO (critério único,
+     * eventPeriodPosition). "after" = fora do período = evento do PRÓXIMO ciclo (conta em
+     * stats.eventsAfterEnd, não em eventsTotal). Só em GET /events.
+     */
+  periodPosition?: EventPeriodPosition;
+  /**
+     * Evento do PRÓXIMO ciclo (periodPosition = "after"): não aceita avaliação, matriz nem link público
+     * (409 code EVENT_NEXT_CYCLE) até ser movido para o ciclo novo; a preparação continua livre. Só em GET /events.
+     */
+  nextCycle?: boolean;
+  /**
+     * ABERTO PARA AVALIAÇÃO — a regra única do app: não histórico, status "open", dentro do período do ciclo,
+     * ciclo não fechado e hoje (Brasília) já é o dia seguinte ao fim do evento. Só em GET /events.
+     */
+  openForEvaluation?: boolean;
   createdAt?: string;
 }
 
@@ -453,6 +551,19 @@ export interface EventResultsConfirmationResponse {
   createdAt?: string;
   warnings?: string[];
 }
+
+/**
+ * Resposta do repasse da Matriz de Conformidade. Para o avaliador, SÓ estes campos (A1: nada do
+ * detalhe do evento). Admin/RH recebem também o detalhe completo do evento (campos de EventDetail).
+ */
+export interface ConformityRedirectResult {
+  ok: boolean;
+  /** @nullable */
+  conformityEvaluatorUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasUserId?: number | null;
+  [key: string]: unknown;
+ }
 
 /**
  * @nullable
@@ -687,6 +798,8 @@ export interface EventDetail {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  /** O ciclo do evento tirou a "Conduta" da Matriz de Conformidade (a pergunta não aparece e não conta) */
+  conformityWithoutConduta?: boolean;
   conformity?: EventConformity | null;
 }
 
@@ -1187,6 +1300,9 @@ export type EventReportRowTeamItem = {
 
 export interface EventReportRow {
   id: number;
+  /** Ciclo do evento (útil no Total geral) */
+  cycleId?: number;
+  cycleName?: string;
   name: string;
   /** @nullable */
   clientName?: string | null;
@@ -1229,6 +1345,9 @@ export interface AnalyticsAdjustedPerson {
   types: string[];
 }
 
+/**
+ * Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo
+ */
 export type AnalyticsOverviewCycle = {
   id: number;
   name: string;
@@ -1238,6 +1357,26 @@ export type AnalyticsOverviewCycle = {
   endDate?: string | null;
 };
 
+export type AnalyticsOverviewScopeKind = typeof AnalyticsOverviewScopeKind[keyof typeof AnalyticsOverviewScopeKind];
+
+
+export const AnalyticsOverviewScopeKind = {
+  cycle: 'cycle',
+  all: 'all',
+} as const;
+
+export type AnalyticsOverviewScope = {
+  kind: AnalyticsOverviewScopeKind;
+  cyclesCount: number;
+  /** O ciclo consultado é o atual (false no Total geral) */
+  isCurrent: boolean;
+  /**
+     * Situação do ciclo consultado (open/closed); null no Total geral
+     * @nullable
+     */
+  status?: string | null;
+};
+
 export type AnalyticsOverviewKpis = {
   eventsTotal: number;
   eventsConfirmed: number;
@@ -1245,16 +1384,30 @@ export type AnalyticsOverviewKpis = {
   /** @nullable */
   avgEventScore?: number | null;
   /**
-     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
+     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados). No Total geral:
+     * o KPI único (TotalGeralSummary.avgFinalResult de GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
      * @nullable
      */
   avgFinalResult?: number | null;
+  /** Linhas de resultado; no Total geral, participações (uma pessoa conta uma vez por ciclo) */
   collaborators: number;
+  /** Pessoas diferentes (num ciclo, igual a collaborators) */
+  distinctCollaborators?: number;
+  /**
+     * Atingiram o mínimo de eventos. Elegível sempre conta (funil decrescente: mínimo ≥ elegíveis ≥ com bônus).
+     * Ciclo FECHADO: vale o resultado GRAVADO na apuração (quem foi recusado pelo mínimo não atingiu), não a regra de hoje.
+     */
   reachedMinEvents: number;
   eligible: number;
   withBonus: number;
+  /** bonusOfficial + bonusProjected */
   bonusTotal: number;
+  /** Bônus de ciclos FECHADOS (oficial) */
+  bonusOfficial?: number;
+  /** Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento) */
+  bonusProjected?: number;
   evaluationsSubmitted: number;
+  /** Rascunhos (sem os "órfãos" do modo por área — critério já fechado por outra pessoa) */
   evaluationsDraft: number;
   calibratedCriteria: number;
   /** @nullable */
@@ -1265,13 +1418,38 @@ export type AnalyticsOverviewKpis = {
 };
 
 /**
+ * A Conduta está na matriz dos eventos do recorte (all), em nenhum (none, ciclo sem Conduta) ou em parte (some, Total geral misturando ciclos)
+ */
+export type AnalyticsOverviewRuleSetCondutaInMatrix = typeof AnalyticsOverviewRuleSetCondutaInMatrix[keyof typeof AnalyticsOverviewRuleSetCondutaInMatrix];
+
+
+export const AnalyticsOverviewRuleSetCondutaInMatrix = {
+  all: 'all',
+  some: 'some',
+  none: 'none',
+} as const;
+
+export type AnalyticsOverviewRuleSetMinEventsByCycleItem = {
+  cycleId: number;
+  cycleName: string;
+  minEvents: number;
+};
+
+/**
  * Parâmetros das regras de negócio em vigor
  */
 export type AnalyticsOverviewRuleSet = {
+  /** Mínimo do ciclo (no Total geral, o do ciclo mais recente — use minEventsByCycle) */
   minEvents: number;
   conformityItemPoints: number;
   conformityPenaltyFactor: number;
   conformityPenaltyPerNo: number;
+  /** Itens que o avaliador responde na matriz (4; 3 quando a Conduta saiu da matriz) */
+  conformityItemsAsked: number;
+  /** A Conduta está na matriz dos eventos do recorte (all), em nenhum (none, ciclo sem Conduta) ou em parte (some, Total geral misturando ciclos) */
+  condutaInMatrix: AnalyticsOverviewRuleSetCondutaInMatrix;
+  /** Mínimo de eventos de cada ciclo do recorte */
+  minEventsByCycle: AnalyticsOverviewRuleSetMinEventsByCycleItem[];
 };
 
 export type AnalyticsOverviewScoreTrendItem = {
@@ -1375,7 +1553,9 @@ export type AnalyticsOverviewClientsItem = {
 };
 
 export interface AnalyticsOverview {
+  /** Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo */
   cycle: AnalyticsOverviewCycle;
+  scope?: AnalyticsOverviewScope;
   kpis: AnalyticsOverviewKpis;
   /** Parâmetros das regras de negócio em vigor */
   ruleSet: AnalyticsOverviewRuleSet;
@@ -1394,6 +1574,17 @@ export interface AnalyticsOverview {
   clients: AnalyticsOverviewClientsItem[];
 }
 
+/**
+ * cycle = um ciclo; all = Total geral (todos os ciclos)
+ */
+export type DashboardSummaryScope = typeof DashboardSummaryScope[keyof typeof DashboardSummaryScope];
+
+
+export const DashboardSummaryScope = {
+  cycle: 'cycle',
+  all: 'all',
+} as const;
+
 export interface EventPendency {
   eventId: number;
   eventName: string;
@@ -1408,17 +1599,43 @@ export interface AtRiskEmployee {
 }
 
 export interface DashboardSummary {
+  /** Ciclo dos números (0 = Total geral) */
   cycleId?: number;
   cycleName?: string;
+  /** cycle = um ciclo; all = Total geral (todos os ciclos) */
+  scope?: DashboardSummaryScope;
+  /**
+     * Ciclo das pendências operacionais (progresso de avaliações, eventos com pendência, zona de risco) — o escolhido ou, no Total geral, o atual
+     * @nullable
+     */
+  operationalCycleId?: number | null;
+  /** @nullable */
+  operationalCycleName?: string | null;
   totalEvents: number;
   totalEmployeesEvaluated: number;
+  /**
+     * Progresso de avaliações, em EVENTOS do ciclo operacional abertos para avaliação (não históricos,
+     * já no dia seguinte ao fim, com critério ativo): pendente = sem nota completa — inclusive evento sem
+     * nenhuma nota. Rascunho não conta (nem o "órfão" do modo por área).
+     */
   pendingEvaluations: number;
+  /** Eventos abertos para avaliação já avaliados (resultado confirmado ou todos os critérios ativos com nota). Progresso = submitted ÷ (submitted + pending). */
   submittedEvaluations: number;
   eventsInCalibration: number;
   eventsInCycle: number;
-  /** @nullable */
+  /**
+     * Um ciclo: média das notas finais de quem tem evento com nota, no MESMO recorte de Análises e do Ranking
+     * (rankingScope), 1 casa. No Total geral (scope all): o KPI único (TotalGeralSummary.avgFinalResult de
+     * GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
+     * @nullable
+     */
   quarterAverage: number | null;
+  /** bonusOfficial + bonusProjected (compatibilidade). Prefira mostrar os dois separados. */
   totalBonusPreview: number;
+  /** Bônus de ciclos FECHADOS (oficial). Um ciclo aberto → 0. Só gestores (senão 0). */
+  bonusOfficial?: number;
+  /** Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento). Só gestores (senão 0). */
+  bonusProjected?: number;
   totalAbsences: number;
   eventsWithPendencies: EventPendency[];
   atRiskEmployees: AtRiskEmployee[];
@@ -1602,6 +1819,13 @@ export interface QuarterCloseResult {
   warnings?: string[];
 }
 
+export type CycleMovedEventsItem = {
+  id: number;
+  name: string;
+  /** O evento veio para o ciclo novo mas está fora do período dele (confira a data ou o período) */
+  outsidePeriod?: boolean;
+};
+
 export interface Cycle {
   id: number;
   name: string;
@@ -1615,11 +1839,49 @@ export interface Cycle {
   closedAt?: string | null;
   /** @nullable */
   createdAt?: string | null;
+  /**
+     * Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+     * @nullable
+     */
+  minEvents?: number | null;
+  /**
+     * Data prevista do pagamento do bônus (AAAA-MM-DD)
+     * @nullable
+     */
+  paymentDate?: string | null;
+  /** Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta) */
+  conformityWithoutConduta?: boolean;
+  /** Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação) */
+  areaEvaluation?: boolean;
+  /** Mínimo que vale de fato (o do ciclo ou, se vazio, o global) */
+  effectiveMinEvents?: number;
+  /**
+     * Só na criação — TODOS os eventos do ciclo anterior que começam depois do fim dele, movidos para este ciclo
+     * (com as faltas/méritos ligados). Os que caem fora do período do ciclo novo vêm com outsidePeriod true e um aviso em warnings.
+     */
+  movedEvents?: CycleMovedEventsItem[];
+  /** Só na criação — faltas/méritos ligados aos eventos movidos (vão junto para este ciclo) */
+  movedAbsences?: number;
+  /** Só na criação — eventos movidos que ficaram fora do período do ciclo novo e avisos do recálculo (quando veio evento já confirmado) */
+  warnings?: string[];
 }
 
 export interface CycleStats {
+  /** Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo) */
   eventsTotal: number;
+  /** Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo) */
+  eventsAfterEnd?: number;
+  /**
+     * TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista
+     * (e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);
+     * "fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.
+     */
+  eventsStored?: number;
   eventsConfirmed: number;
+  /**
+     * Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,
+     * status "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.
+     */
   eventsOpen: number;
   /** @nullable */
   firstEventDate?: string | null;
@@ -1642,6 +1904,20 @@ export interface UpdateCycleInput {
   name?: string;
   startDate?: string;
   endDate?: string;
+  /**
+     * Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+     * @nullable
+     */
+  minEvents?: number | null;
+  /**
+     * Data prevista do pagamento do bônus (AAAA-MM-DD)
+     * @nullable
+     */
+  paymentDate?: string | null;
+  /** Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta) */
+  conformityWithoutConduta?: boolean;
+  /** Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação) */
+  areaEvaluation?: boolean;
 }
 
 export interface CycleHistoryEntry {
@@ -1693,6 +1969,124 @@ export interface CreateCycleInput {
   name: string;
   startDate: string;
   endDate: string;
+  /**
+     * Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+     * @nullable
+     */
+  minEvents?: number | null;
+  /**
+     * Data prevista do pagamento do bônus (AAAA-MM-DD)
+     * @nullable
+     */
+  paymentDate?: string | null;
+  /** Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta) */
+  conformityWithoutConduta?: boolean;
+  /** Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação) */
+  areaEvaluation?: boolean;
+}
+
+export type RankingTotalCyclesItem = {
+  id: number;
+  name: string;
+  status: string;
+  isCurrent: boolean;
+  /**
+     * Mínimo de eventos que vale neste ciclo (o do ciclo ou a regra geral)
+     * @nullable
+     */
+  minEvents: number | null;
+};
+
+export interface RankingTotalCycle {
+  cycleId: number;
+  cycleName: string;
+  cycleStatus: string;
+  isCurrent: boolean;
+  finalResult: number;
+  /** @nullable */
+  platoon: string | null;
+  /** @nullable */
+  platoonColor: string | null;
+  eventsCount: number;
+  participatedEventsCount: number;
+  eligible: boolean;
+  /** Bônus do ciclo (0 quando não elegível) */
+  bonusValue: number;
+  /** @nullable */
+  bonusStatus: string | null;
+  /** Ciclo fechado (bônus oficial); false = ciclo aberto (projeção) */
+  official: boolean;
+}
+
+/**
+ * Resultado do ciclo mais recente da pessoa (a faixa exibida no total)
+ */
+export type RankingTotalRowLatest = {
+  cycleId: number;
+  cycleName: string;
+  finalResult: number;
+  /** @nullable */
+  platoon: string | null;
+  /** @nullable */
+  platoonColor: string | null;
+};
+
+export interface RankingTotalRow {
+  position: number;
+  employeeId: number;
+  employeeName: string;
+  employeeActive: boolean;
+  /** Ciclos com resultado apurado */
+  cyclesCount: number;
+  /** Ciclos em que teve evento com nota */
+  cyclesWithScore: number;
+  /**
+     * Média ponderada pelos eventos com nota (Σ nota final × eventos ÷ Σ eventos), 1 casa
+     * @nullable
+     */
+  avgFinalResult: number | null;
+  /** Soma dos eventos com nota */
+  eventsCount: number;
+  participatedEventsCount: number;
+  totalAbsences: number;
+  eligibleCycles: number;
+  /** Bônus OFICIAL — ciclos fechados em que foi elegível */
+  bonusOfficial: number;
+  /** Bônus PROJETADO — ciclo ainda aberto (muda até o fechamento) */
+  bonusProjected: number;
+  /** bonusOfficial + bonusProjected */
+  bonusTotal: number;
+  /** Soma do bônus marcado como pago */
+  bonusPaid: number;
+  /** Resultado do ciclo mais recente da pessoa (a faixa exibida no total) */
+  latest: RankingTotalRowLatest;
+  /** Um item por ciclo, do mais recente ao mais antigo */
+  cycles: RankingTotalCycle[];
+}
+
+/**
+ * KPI do Total geral — o MESMO número em /ranking/total, Dashboard (cycleId=all) e Análises (cycleId=all),
+ * calculado pela mesma função (lib/total-geral.ts).
+ */
+export interface TotalGeralSummary {
+  /**
+     * Σ(nota final do ciclo × eventos com nota) ÷ Σ(eventos com nota), em todas as linhas pessoa × ciclo (1 casa).
+     * @nullable
+     */
+  avgFinalResult: number | null;
+  /** Σ eventos com nota (o peso da média). */
+  eventsWithScore: number;
+  people: number;
+  bonusOfficial: number;
+  bonusProjected: number;
+  bonusTotal: number;
+}
+
+export interface RankingTotal {
+  /** Ciclos somados (atual primeiro, depois do mais recente ao mais antigo) */
+  cycles: RankingTotalCyclesItem[];
+  rows: RankingTotalRow[];
+  summary?: TotalGeralSummary;
 }
 
 export interface RankingEntry {
@@ -2065,12 +2459,20 @@ export interface IntegrationStatus {
   logs: string[];
 }
 
+export type SyncResultSkippedClosedCycleItem = {
+  eventId?: number;
+  eventName?: string;
+  reason?: string;
+};
+
 export interface SyncResult {
   success: boolean;
   message: string;
   eventsSync?: number;
   employeesSync?: number;
   participantsSync?: number;
+  /** Eventos já existentes de ciclo FECHADO que a sincronização deixou como estão (só consulta) */
+  skippedClosedCycle?: SyncResultSkippedClosedCycleItem[];
 }
 
 export interface ResetDataInput {
@@ -2263,6 +2665,8 @@ export interface DedupeEvaluationsResult {
   groupsAffected: number;
   eventsAffected: number;
   duplicatesRemoved: number;
+  /** Duplicatas em evento de ciclo FECHADO deixadas como estão (só consulta) */
+  skippedClosedCycle?: number;
   warnings: string[];
 }
 
@@ -2438,6 +2842,8 @@ export interface EventCriterionAssignment {
 export interface EvaluationConsoleData {
   criteria: EventCriterion[];
   assignments: EventCriterionAssignment[];
+  /** Eventos de ciclo com avaliação por área — um critério conta "avaliado" com uma resposta enviada e qualquer avaliador da área responde (sem designação). */
+  areaModeEventIds?: number[];
 }
 
 export interface EventCriterionAssignmentRow {
@@ -2558,9 +2964,211 @@ export interface PublicEvalCriterion {
   criterionName: string;
   /** @nullable */
   criterionDescription: string | null;
+  /** Já respondido pela área (por outra pessoa ou outro link) — não é cobrado e, se enviado, é recusado. */
+  closed?: boolean;
+  /** @nullable */
+  closedByName?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
+}
+
+export interface PublicEvalSubmitResult {
+  ok: boolean;
+  saved?: number[];
+  /** O que já estava respondido e não foi gravado (critérios e, no link combinado, a parte da matriz). */
+  rejected?: PublicEvalSubmitRejected[];
+  /** Link combinado — a Matriz de Conformidade foi gravada neste envio. */
+  conformitySaved?: boolean;
+}
+
+/**
+ * area = pela área do cadastro (só no ciclo com avaliação por área); assigned = designado no evento.
+ */
+export type MyAreaCriterionAccess = typeof MyAreaCriterionAccess[keyof typeof MyAreaCriterionAccess];
+
+
+export const MyAreaCriterionAccess = {
+  area: 'area',
+  assigned: 'assigned',
+} as const;
+
+/**
+ * open = posso responder; answered = eu (ou link meu) respondi; closed = ciclo com avaliação por área e outra pessoa já respondeu (a primeira resposta fecha para todos, designados inclusive).
+ */
+export type MyAreaCriterionState = typeof MyAreaCriterionState[keyof typeof MyAreaCriterionState];
+
+
+export const MyAreaCriterionState = {
+  open: 'open',
+  answered: 'answered',
+  closed: 'closed',
+} as const;
+
+export interface MyAreaCriterion {
+  criterionId: number;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  /** Peso do critério no evento (congelado na liberação). */
+  weight: number;
+  /** O critério também é respondido por outra área neste evento (original + cópias por área). */
+  multiArea: boolean;
+  /** @nullable */
+  areaId: number | null;
+  /** @nullable */
+  areaName: string | null;
+  eventScoped: boolean;
+  /** @nullable */
+  sourceCriterionId: number | null;
+  /** area = pela área do cadastro (só no ciclo com avaliação por área); assigned = designado no evento. */
+  access: MyAreaCriterionAccess;
+  /** open = posso responder; answered = eu (ou link meu) respondi; closed = ciclo com avaliação por área e outra pessoa já respondeu (a primeira resposta fecha para todos, designados inclusive). */
+  state: MyAreaCriterionState;
+  /** @nullable */
+  answeredByName: string | null;
+  answeredByMe: boolean;
+  answeredViaLink: boolean;
+  /** @nullable */
+  answeredAt: string | null;
+  hasDraft: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type MyAreaEventPublished = typeof MyAreaEventPublished[keyof typeof MyAreaEventPublished] | null;
+
+
+export const MyAreaEventPublished = {
+  partial: 'partial',
+  final: 'final',
+} as const;
+
+export interface MyAreaEvent {
+  id: number;
+  name: string;
+  /** @nullable */
+  clientName: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  state: string | null;
+  /** @nullable */
+  location: string | null;
+  startDate: string;
+  endDate: string;
+  status: string;
+  /** @nullable */
+  cycleName: string | null;
+  /**
+     * Só quando a consulta é de um evento (eventId).
+     * @nullable
+     */
+  participantCount: number | null;
+  /** @nullable */
+  published: MyAreaEventPublished;
+  totalCriteria: number;
+  answeredCount: number;
+  openCount: number;
+  draftCount: number;
+  conformityCenografia: boolean;
+  conformityFerramentas: boolean;
+  conformityPending: boolean;
+  /** Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e conta só os outros itens. */
+  conformityWithoutConduta: boolean;
+  /** Ciclo com avaliação por área (qualquer avaliador da área responde; a primeira resposta enviada fecha o critério). */
+  areaMode: boolean;
+  /**
+     * Algo a responder E o evento ABERTO pela regra única (não histórico, status open, dentro do
+     * período, ciclo não fechado, já no dia seguinte ao fim). Ciclo fechado ou evento encerrado → false.
+     */
+  pending: boolean;
+  criteria: MyAreaCriterion[];
+}
+
+export interface MyAreaUpcomingEvent {
+  eventId: number;
+  eventName: string;
+  /** @nullable */
+  startDate: string | null;
+  /** @nullable */
+  endDate: string | null;
+  /**
+     * Dia em que a avaliação abre (YYYY-MM-DD) — o dia seguinte ao fim do evento, em Brasília.
+     * @nullable
+     */
+  opensOn: string | null;
+}
+
+export type MyAreaEvaluationsTotals = {
+  pending: number;
+  done: number;
+};
+
+/**
+ * Só com ?eventId=: o evento pedido é do usuário (critério da área,
+ * designado ou matriz), mas ainda não abriu para avaliação — a tela diz
+ * "Abre em DD/MM" (dia seguinte ao fim) ou "próximo ciclo". Ausente para
+ * evento de outra área.
+ */
+export type MyAreaEvaluationsUnavailable = {
+  eventId: number;
+  eventName: string;
+  /** @nullable */
+  startDate: string | null;
+  /** @nullable */
+  endDate: string | null;
+  nextCycle: boolean;
+};
+
+export interface MyAreaEvaluations {
+  /**
+     * Só para o papel AVALIADOR (admin/RH recebem []): eventos do ciclo ATUAL (aberto), dentro do
+     * período dele, com algo do avaliador (mesma regra de relevância da lista: critério da área do
+     * cadastro no ciclo por área, designado no fluxo antigo, ou a matriz) que AINDA NÃO ABRIRAM
+     * (hoje em Brasília < dia seguinte ao fim). Ordenados por opensOn, no máximo 30. Não depende
+     * dos filtros (search/status/from/to/eventId).
+     */
+  upcoming: MyAreaUpcomingEvent[];
+  /** @nullable */
+  areaId: number | null;
+  /** @nullable */
+  areaName: string | null;
+  totals: MyAreaEvaluationsTotals;
+  events: MyAreaEvent[];
+  /**
+     * Só com ?eventId=: o evento pedido é do usuário (critério da área,
+     * designado ou matriz), mas ainda não abriu para avaliação — a tela diz
+     * "Abre em DD/MM" (dia seguinte ao fim) ou "próximo ciclo". Ausente para
+     * evento de outra área.
+     */
+  unavailable?: MyAreaEvaluationsUnavailable;
 }
 
 export interface PublicEvalInfo {
+  /**
+     * Evento do PRÓXIMO ciclo (começa depois do fim do ciclo em que está): o link ainda não aceita envio
+     * (o POST responde 409 code EVENT_NEXT_CYCLE, nada gravado e o link continua sem uso). A tela deve avisar
+     * "abre para avaliação quando o ciclo novo for criado" em vez de mostrar o formulário.
+     */
+  nextCycle?: boolean;
+  /** O ciclo do evento está FECHADO (só consulta) — o link não aceita envio (o POST responde 409 code CLOSED_CYCLE). A tela deve avisar "ciclo fechado" em vez de mostrar o formulário. */
+  cycleClosed?: boolean;
+  /** Ciclo sem "Conduta" na Matriz de Conformidade — a tela esconde a pergunta e o servidor não a cobra. */
+  conformityWithoutConduta?: boolean;
+  /** Todos os critérios do link já foram respondidos (no link combinado, ainda pode faltar a matriz — ver conformityAnswered). */
+  allClosed?: boolean;
+  /**
+     * A Matriz de Conformidade (a parte que o link responde) já tem resposta; o link não a pede nem a sobrescreve.
+     * Link combinado: a parte de Cenografia. Links só de matriz: conformity_cenografia = Cenografia;
+     * conformity_ferramentas = Guarda de Equipamentos — nesses, o envio responde 409 code CONFORMITY_ALREADY_ANSWERED.
+     */
+  conformityAnswered?: boolean;
+  /**
+     * Quem respondeu a matriz (nome gravado no envio), quando se sabe.
+     * @nullable
+     */
+  conformityAnsweredByName?: string | null;
   tokenId: string;
   tokenType: PublicTokenType;
   isUsed: boolean;
@@ -2783,6 +3391,12 @@ export interface BulkDateSyncInput {
   confirm?: string;
 }
 
+export interface ClosedCycleSkip {
+  eventId: number;
+  eventName: string;
+  reason: string;
+}
+
 export interface BulkDateSyncResult {
   dryRun: boolean;
   /** Eventos gravados (0 no dryRun). */
@@ -2794,6 +3408,8 @@ export interface BulkDateSyncResult {
   notFound: number;
   notFoundIds: string[];
   changes: EventDateChange[];
+  /** Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda */
+  skippedClosedCycle?: ClosedCycleSkip[];
 }
 
 export interface NormalizeDatesInput {
@@ -2809,6 +3425,8 @@ export interface NormalizeDatesResult {
   fixedCount: number;
   normalizedCount: number;
   changes: EventDateChange[];
+  /** Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda */
+  skippedClosedCycle?: ClosedCycleSkip[];
 }
 
 export interface ConfirmResultsBulkInput {
@@ -3045,6 +3663,11 @@ active?: boolean;
 
 export type GetEventsParams = {
 status?: string;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
 };
 
 export type PublishCriterionFinalFeedback200 = {
@@ -3085,6 +3708,8 @@ export type ResyncAllEventsCriteria200EventsItem = {
 export type ResyncAllEventsCriteria200 = {
   processed?: number;
   skipped?: number;
+  /** Eventos de ciclo FECHADO pulados (só consulta; já contados em skipped) */
+  skippedClosedCycle?: number;
   totalAdded?: number;
   totalDeactivated?: number;
   events?: ResyncAllEventsCriteria200EventsItem[];
@@ -3101,6 +3726,8 @@ export type FixCalibrationCriteria200ResultsItem = {
 export type FixCalibrationCriteria200 = {
   totalUpdated?: number;
   results?: FixCalibrationCriteria200ResultsItem[];
+  /** Eventos de ciclo FECHADO (só consulta) cujas calibrações não foram remapeadas */
+  skippedClosedCycle?: ClosedCycleSkip[];
 };
 
 export type FixOrphanedEvaluations200CriteriaReactivatedItem = {
@@ -3109,6 +3736,8 @@ export type FixOrphanedEvaluations200CriteriaReactivatedItem = {
 };
 
 export type FixOrphanedEvaluations200 = {
+  /** Critérios de evento de ciclo FECHADO não reativados (só consulta) */
+  skippedClosedCycle?: number;
   fixed: number;
   eventsAffected: number;
   criteriaReactivated: FixOrphanedEvaluations200CriteriaReactivatedItem[];
@@ -3120,7 +3749,40 @@ export type MigrateCriteriaCatalog200 = {
   catalogActivated: number;
   catalogCreated: number;
   eventCriteriaFixed: number;
+  evaluationsRemapped?: number;
+  /** Eventos de ciclo FECHADO (só consulta) — critérios e avaliações deles não foram migrados */
+  skippedClosedCycle?: ClosedCycleSkip[];
 };
+
+export type GetMyAreaEvaluationsParams = {
+/**
+ * Busca por nome do evento, cliente ou cidade.
+ */
+search?: string;
+status?: GetMyAreaEvaluationsStatus;
+/**
+ * Data inicial (YYYY-MM-DD).
+ */
+from?: string;
+/**
+ * Data final (YYYY-MM-DD).
+ */
+to?: string;
+eventId?: number;
+/**
+ * Só admin/RH.
+ */
+areaId?: number;
+};
+
+export type GetMyAreaEvaluationsStatus = typeof GetMyAreaEvaluationsStatus[keyof typeof GetMyAreaEvaluationsStatus];
+
+
+export const GetMyAreaEvaluationsStatus = {
+  pending: 'pending',
+  done: 'done',
+  all: 'all',
+} as const;
 
 export type GetEvaluationsParams = {
 eventId?: number;
@@ -3140,13 +3802,54 @@ export type SeedDefaultPenaltyTypes200 = {
   message?: string;
 };
 
+export type GetDashboardSummaryParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
+};
+
 export type GetAnalyticsEventsReportParams = {
-cycleId?: number;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
+};
+
+export type GetAnalyticsOverviewParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
+};
+
+export type GetDashboardPlatoonDistributionParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
+};
+
+export type GetDashboardTopEmployeesParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta); "all" = Total geral (todos os ciclos)
+ * @pattern ^([1-9][0-9]*|all)$
+ */
+cycleId?: string;
 };
 
 export type GetQuarterlyResultsParams = {
 employeeId?: number;
 platoon?: string;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
 };
 
 export type GetCycleEligibilityParams = {
@@ -3155,10 +3858,20 @@ employeeId?: number;
 
 export type GetRankingParams = {
 search?: string;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
 };
 
 export type GetRankingDetailParams = {
 employeeId: number;
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
 };
 
 export type GetScoreTimelineParams = {
@@ -3190,6 +3903,38 @@ limit?: number;
 
 export type ExportEventResultsParams = {
 eventId: number;
+};
+
+export type ExportQuarterlyResultsParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
+};
+
+export type ExportRankingParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
+};
+
+export type ExportCajuBonusesParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
+};
+
+export type ExportAbsencesParams = {
+/**
+ * Ciclo consultado — vazio = ciclo atual; número = aquele ciclo (anterior = só consulta). "all" não é aceito aqui (400)
+ * @pattern ^[1-9][0-9]*$
+ */
+cycleId?: string;
 };
 
 export type GetCalibrationAuditParams = {

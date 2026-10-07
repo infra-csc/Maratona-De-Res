@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { User } from "@workspace/api-client-react";
 import { Users, Filter, X } from "lucide-react";
 import { CONDENSED, PremiumCard } from "@/lib/premium-theme";
@@ -61,7 +62,7 @@ export function UsersTable({
           )}
         </div>
         {userSearch && (
-          <p className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>{sortedUsers.length} resultado(s)</p>
+          <p className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>{plural(sortedUsers.length, "resultado")}</p>
         )}
       </div>
       <div className="overflow-x-auto">

@@ -31,12 +31,12 @@ export function LinkDialog(props: {
   } = props;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={`Link freelancer: ${linkDialog.criterionNames.join(", ")}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div role="dialog" aria-modal="true" aria-label={`Link para freela: ${linkDialog.criterionNames.join(", ")}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>
-              Link Freelancer{linkDialog.criterionIds.length > 1 ? ` · ${linkDialog.criterionIds.length} critérios` : ""}
+              Link para freela{linkDialog.criterionIds.length > 1 ? ` · ${linkDialog.criterionIds.length} critérios` : ""}
             </p>
             {linkDialog.criterionNames.length === 1 ? (
               <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{linkDialog.criterionNames[0]}</h3>
@@ -81,7 +81,7 @@ export function LinkDialog(props: {
                 aria-label="Para quem é o link"
                 onChange={e => setLinkRecipientName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleGenerateLink(); }}
-                placeholder="Nome do freelancer"
+                placeholder="Nome do freela"
                 className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
                 style={fieldStyle}
               />
@@ -194,10 +194,10 @@ export function ConformityLinkDialog(props: {
   } = props;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={`Link freelancer de conformidade: ${conformityLinkDialog.label}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div role="dialog" aria-modal="true" aria-label={`Link para freela da conformidade: ${conformityLinkDialog.label}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Link Freelancer · Conformidade</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Link para freela · Conformidade</p>
             <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{conformityLinkDialog.label}</h3>
             {conformityLinkDialog.evaluatorName && (
               <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{conformityLinkDialog.evaluatorName}</span></p>
@@ -227,7 +227,7 @@ export function ConformityLinkDialog(props: {
                   aria-label="Para quem é o link"
                   onChange={e => setConformityLinkRecipientName(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleGenerateConformityLink(); }}
-                  placeholder="Nome do freelancer"
+                  placeholder="Nome do freela"
                   className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
                   style={fieldStyle}
                 />

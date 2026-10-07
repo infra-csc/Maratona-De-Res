@@ -1,7 +1,7 @@
 // Histórico de calibrações de um critério (sempre visível quando há registros).
 import { History } from "lucide-react";
 import { GOOD, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
-import { formatDateTime } from "./helpers";
+import { fmtCalScore, formatDateTime } from "./helpers";
 import type { CalibrationAuditItem } from "./types";
 
 export type CalibrationAuditTrailProps = {
@@ -25,7 +25,7 @@ export function CalibrationAuditTrail({ criterionId, calAudit }: CalibrationAudi
                                       const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
                                       const isRecal = entry.action === "recalibrate_released";
                                       const scoreText = after?.score != null
-                                        ? (before?.score != null ? `${before.score} → ${after.score}` : `→ ${after.score}`)
+                                        ? (before?.score != null ? `${fmtCalScore(before.score)} → ${fmtCalScore(after.score)}` : `→ ${fmtCalScore(after.score)}`)
                                         : null;
                                       return (
                                         <div key={entry.id} className="flex items-center gap-1.5 flex-wrap px-1.5 py-1 rounded"

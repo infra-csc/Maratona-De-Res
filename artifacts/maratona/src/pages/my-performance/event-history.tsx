@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { Calendar, Clock, Search } from "lucide-react";
 import { EventCard } from "./event-card";
 import type { EventFilters } from "./use-event-filters";
@@ -56,7 +57,7 @@ export function EventHistory({ filters, events, cycleName }: {
             style={{ color: "var(--muted-foreground)" }}
           >
             <Clock size={12} className="shrink-0" aria-hidden="true" />
-            {pendingConfirmationCount} evento(s) aguardando confirmação do RH — ainda não aparecem na lista nem contam na nota.
+            {pendingConfirmationCount === 1 ? "1 evento aguardando confirmação do RH — ainda não aparece na lista nem conta na nota." : `${pendingConfirmationCount} eventos aguardando confirmação do RH — ainda não aparecem na lista nem contam na nota.`}
           </p>
         )}
       </div>
@@ -98,7 +99,7 @@ function EmptyHistory({ events, eventFilter, statusFilter, cycleName }: {
     icon = "✅";
   } else if (confirmedCount === 0 && totalCount > 0) {
     title = "Resultados ainda não confirmados";
-    detail = `Você tem ${totalCount} evento(s) no ciclo, mas nenhum resultado foi confirmado pelo RH ainda. As notas aparecerão aqui após a confirmação.`;
+    detail = `Você tem ${plural(totalCount, "evento")} no ciclo, mas nenhum resultado foi confirmado pelo RH ainda. As notas aparecerão aqui após a confirmação.`;
     icon = "🕐";
   } else if (totalCount === 0) {
     title = "Nenhum evento no ciclo";

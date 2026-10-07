@@ -9,11 +9,12 @@ import { CONDENSED, WARNING } from "@/lib/premium-theme";
 
 /** Botão pill Sim/Não reutilizado nos três formulários. "Não" usa uma cor de
  * alerta fixa (não faz parte do tema) porque sinaliza uma penalidade real. */
-export function YesNoToggle({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) {
+export function YesNoToggle({ value, onChange, labelledBy }: { value: boolean | null; onChange: (v: boolean) => void; labelledBy?: string }) {
   return (
-    <div className="flex gap-2 shrink-0">
+    <div className="flex gap-2 shrink-0" role="group" aria-labelledby={labelledBy}>
       <button
         type="button"
+        aria-pressed={value === true}
         onClick={() => onChange(true)}
         className="px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
         style={{
@@ -27,6 +28,7 @@ export function YesNoToggle({ value, onChange }: { value: boolean | null; onChan
       </button>
       <button
         type="button"
+        aria-pressed={value === false}
         onClick={() => onChange(false)}
         className="px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
         style={{

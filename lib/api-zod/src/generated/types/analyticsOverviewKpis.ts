@@ -13,16 +13,30 @@ export type AnalyticsOverviewKpis = {
   /** @nullable */
   avgEventScore?: number | null;
   /**
-     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
+     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados). No Total geral:
+     * o KPI único (TotalGeralSummary.avgFinalResult de GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
      * @nullable
      */
   avgFinalResult?: number | null;
+  /** Linhas de resultado; no Total geral, participações (uma pessoa conta uma vez por ciclo) */
   collaborators: number;
+  /** Pessoas diferentes (num ciclo, igual a collaborators) */
+  distinctCollaborators?: number;
+  /**
+     * Atingiram o mínimo de eventos. Elegível sempre conta (funil decrescente: mínimo ≥ elegíveis ≥ com bônus).
+     * Ciclo FECHADO: vale o resultado GRAVADO na apuração (quem foi recusado pelo mínimo não atingiu), não a regra de hoje.
+     */
   reachedMinEvents: number;
   eligible: number;
   withBonus: number;
+  /** bonusOfficial + bonusProjected */
   bonusTotal: number;
+  /** Bônus de ciclos FECHADOS (oficial) */
+  bonusOfficial?: number;
+  /** Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento) */
+  bonusProjected?: number;
   evaluationsSubmitted: number;
+  /** Rascunhos (sem os "órfãos" do modo por área — critério já fechado por outra pessoa) */
   evaluationsDraft: number;
   calibratedCriteria: number;
   /** @nullable */

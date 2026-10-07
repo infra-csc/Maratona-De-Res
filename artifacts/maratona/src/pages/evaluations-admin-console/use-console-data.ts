@@ -7,7 +7,8 @@ import {
   type Evaluation,
 } from "@workspace/api-client-react";
 import { getEventCriterionAssignments, eventCriterionAssignmentsKey } from "@/lib/routing-api";
-import { getCycleWeekends } from "@/lib/utils";
+import { getCycleWeekends, weekendsEnd, todayBR } from "@/lib/utils";
+import { isCriterionComplete, isNextCycleEvent, isNotOpenYet, isOpenEvent, opensLabelFor, queueTabFor } from "../events/rules";
 import { BACKGROUND_QUERY, indexEvaluations, readEventIdFromUrl } from "./helpers";
 import type { CritRow, CritState, EnrichedEvent } from "./types";
 
@@ -21,7 +22,7 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
   const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
   const { data: cycle } = useGetCurrentCycle();
-  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, weekendsEnd(cycle?.endDate, events));
 
   // Memoizado sobre `events`: antes era um `.filter()` novo a cada render, o
   // que invalidava o useMemo de `enrichedEvents` em TODO render.
@@ -30,10 +31,10 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
     [events],
   );
 
-  // Evento selecionado: estado explícito, inicializado quando a lista chega
-  // (e re-apontado para o primeiro se o evento atual sair da lista). Nada de
-  // cair silenciosamente em `enrichedEvents[0]`. Na primeira carga, `?eventId=`
-  // da URL (link "Avaliações" na tela de Eventos) tem prioridade sobre o primeiro.
+  // Evento selecionado: estado explícito. Na primeira carga, `?eventId=` da URL
+  // (link "Avaliações" da tela de Eventos) vale; sem ele, a Central escolhe o
+  // primeiro da aba (evaluations-admin-console.tsx). Se o evento sair da lista,
+  // a seleção é limpa — a Central re-aponta para o primeiro da aba.
   const urlEventIdApplied = useRef(false);
   useEffect(() => {
     if (configuredEvents.length === 0) return;
@@ -45,18 +46,24 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
         return;
       }
     }
-    if (selectedEventId == null || !configuredEvents.some(e => e.id === selectedEventId)) {
-      setSelectedEventId(configuredEvents[0].id);
+    if (selectedEventId != null && !configuredEvents.some(e => e.id === selectedEventId)) {
+      setSelectedEventId(null);
     }
   }, [configuredEvents, selectedEventId]);
 
   // Espelha a seleção na URL (replaceState: não empilha histórico a cada clique
   // na fila), para que recarregar/compartilhar a página abra o mesmo evento.
   useEffect(() => {
-    if (selectedEventId == null) return;
+    if (!urlEventIdApplied.current) return;
     const url = new URL(window.location.href);
-    if (url.searchParams.get("eventId") === String(selectedEventId)) return;
-    url.searchParams.set("eventId", String(selectedEventId));
+    const current = url.searchParams.get("eventId");
+    if (selectedEventId == null) {
+      if (current == null) return;
+      url.searchParams.delete("eventId");
+    } else {
+      if (current === String(selectedEventId)) return;
+      url.searchParams.set("eventId", String(selectedEventId));
+    }
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, [selectedEventId]);
 
@@ -148,8 +155,13 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
   // enviado), combinando roteamento (quem está designado) com o envio de
   // fato (evaluations). A tabela de atribuições NUNCA marca "submitted" —
   // isso só existe na avaliação em si.
+  // Eventos de ciclo com avaliação por área: uma resposta enviada basta e
+  // "sem avaliador" não trava (qualquer avaliador da área responde).
+  const areaModeIds = useMemo(() => new Set(consoleData?.areaModeEventIds ?? []), [consoleData]);
   const enrichedEvents: EnrichedEvent[] = useMemo(() => {
+    const today = todayBR();
     return configuredEvents.map(ev => {
+      const areaMode = areaModeIds.has(ev.id);
       const criteria = (criteriaByEvent.get(ev.id) ?? []).filter(c => c.active);
       const assignments = assignmentsByEvent.get(ev.id) ?? [];
       const assignByCrit = new Map(assignments.map(a => [a.criterionId, a]));
@@ -169,9 +181,12 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
         // default), a avaliação ainda existe mas o lookup acima não encontra.
         // Verificar se qualquer avaliação submetida existe para o critério.
         const anySubmitted = critEvals.some(e => e.status === "submitted");
+        // Regra única de "critério completo" (a mesma da lista de Eventos):
+        // avaliação enviada ou calibração publicada — calibração só salva não conta.
+        const complete = isCriterionComplete({ submitted: anySubmitted, published: c.partialPublishedAt != null || c.finalPublishedAt != null });
         let state: CritState;
-        if (assignedToId == null) state = "unassigned";
-        else if (anySubmitted || c.partialPublishedAt != null || c.finalPublishedAt != null) state = "done";
+        if (complete) state = "done";
+        else if (assignedToId == null && !areaMode) state = "unassigned";
         else if (evalRow?.status === "draft") state = "partial";
         else state = "pending";
         return {
@@ -181,6 +196,8 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
           areaName: c.responsibleAreaName ?? "Sem área",
           assignedToId, assignedToName,
           formSubmitterName: evalRow?.evaluatorName ?? null,
+          formSubmitterId: evalRow?.status === "submitted" ? evalRow.evaluatorUserId ?? null : null,
+          areaMode,
           state,
           submittedAt: evalRow?.submittedAt ?? null,
           score: evalRow?.score != null ? Number(evalRow.score) : null,
@@ -192,15 +209,29 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
       const done = rows.filter(r => r.state === "done").length;
       const unassigned = rows.filter(r => r.state === "unassigned").length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      const isDone = total > 0 && done === total;
+      const nextCycle = !ev.isHistorical && isNextCycleEvent(ev, cycle);
+      const notOpenYet = !isNextCycleEvent(ev, cycle) && isNotOpenYet(ev, today);
+      const isOpen = isOpenEvent(ev, cycle, today);
+      const finalCalibratedCriteria = ev.finalCalibratedCriteria ?? 0;
       return {
         id: ev.id, name: ev.name, clientName: ev.clientName ?? null, city: ev.city ?? null, state: ev.state ?? null,
         status: ev.status, startDate: ev.startDate ?? null, endDate: ev.endDate ?? null,
         criteria: rows, total, done, unassigned, pct,
         areaNames: [...new Set(rows.map(r => r.areaName))],
         evaluatorNames: [...new Set(rows.map(r => r.assignedToName).filter((n): n is string => !!n))],
-        isDone: total > 0 && done === total,
+        isDone,
+        areaMode,
+        isHistorical: !!ev.isHistorical,
+        // Mesmas regras da lista de Eventos (events/rules.ts): evento do
+        // próximo ciclo e evento que ainda não terminou não são "a fazer".
+        nextCycle,
+        notOpenYet,
+        opensLabel: ev.isHistorical ? null : opensLabelFor(ev, cycle, today),
+        isOpen,
+        queueTab: queueTabFor({ isOpen, isDone, nextCycle, notOpenYet, status: ev.status, isHistorical: ev.isHistorical, total, finalCalibratedCriteria }),
         partialPublishedCount: ev.partialPublishedCount ?? 0,
-        finalCalibratedCriteria: ev.finalCalibratedCriteria ?? 0,
+        finalCalibratedCriteria,
         conformityNeeded: !!ev.conformityNeeded,
         conformityComplete: !!ev.conformityComplete,
         conformityCenografiaDone: !!ev.conformityCenografiaDone,
@@ -211,7 +242,10 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
         conformityEvaluatorFerramentasName: ev.conformityEvaluatorFerramentasName ?? null,
       };
     });
-  }, [configuredEvents, criteriaByEvent, assignmentsByEvent, evalIndex]);
+  }, [configuredEvents, criteriaByEvent, assignmentsByEvent, evalIndex, areaModeIds, cycle]);
 
-  return { allUsers, cycleWeekends, evalIndex, enrichedEvents };
+  // Ciclo com avaliação por área: a Central acompanha (não atribui) — títulos,
+  // aba e indicadores mudam (console-header.tsx, evaluators-view.tsx).
+  const cycleAreaMode = !!cycle?.areaEvaluation;
+  return { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode };
 }

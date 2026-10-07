@@ -9,6 +9,31 @@ import { recomputeCycleResults } from "./results.js";
 import { PRESERVE_PAYMENT_STATUSES } from "../lib/cycle-compute.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 import { affectedRows } from "../lib/pg-num.js";
+import { closedCycleBody } from "../lib/closed-cycle-guard.js";
+
+/**
+ * Dados dos cadastros duplicados que pertencem a ciclo FECHADO (só consulta)
+ * e que a junção moveria para o canônico. Evento de ciclo fechado conta só se
+ * estiver dentro do período dele (o "fora do período" fica liberado, como em
+ * lib/closed-cycle-guard.ts). Devolve uma linha legível por tipo de dado.
+ */
+async function closedCycleDataToMove(dupIds: number[], canonicalHasUser: boolean): Promise<string[]> {
+  const ids = sql.join(dupIds.map(id => sql`${id}`), sql`, `);
+  const lockedEvent = (alias: string) => sql.raw(`EXISTS (SELECT 1 FROM events le JOIN cycles lc ON lc.id = le.cycle_id
+    WHERE le.id = ${alias}.event_id AND lc.status = 'closed' AND NOT (lc.end_date IS NOT NULL AND le.start_date > lc.end_date))`);
+  const closedCycle = (alias: string) => sql.raw(`EXISTS (SELECT 1 FROM cycles cc WHERE cc.id = ${alias}.cycle_id AND cc.status = 'closed')`);
+  const rows = await db.execute<{ kind: string; n: number }>(sql`
+    SELECT 'participações em eventos' AS kind, count(*)::int AS n FROM event_participants x WHERE x.employee_id IN (${ids}) AND ${lockedEvent("x")}
+    UNION ALL SELECT 'notas por evento', count(*)::int FROM employee_event_results x WHERE x.employee_id IN (${ids}) AND ${lockedEvent("x")}
+    UNION ALL SELECT 'pedidos de revisão', count(*)::int FROM event_review_requests x WHERE x.employee_id IN (${ids}) AND ${lockedEvent("x")}
+    UNION ALL SELECT 'faltas/méritos', count(*)::int FROM absences x WHERE x.employee_id IN (${ids}) AND ${closedCycle("x")}
+    UNION ALL SELECT 'resultados do ciclo', count(*)::int FROM quarterly_results x WHERE x.employee_id IN (${ids}) AND ${closedCycle("x")}
+    UNION ALL SELECT 'elegibilidade/fora do ciclo', count(*)::int FROM employee_cycle_eligibility x WHERE x.employee_id IN (${ids}) AND ${closedCycle("x")}
+    UNION ALL SELECT 'linha do tempo das notas', count(*)::int FROM score_changes x WHERE x.employee_id IN (${ids}) AND ${closedCycle("x")}
+    UNION ALL SELECT 'avaliações feitas como avaliador', count(*)::int FROM evaluations x
+      WHERE ${canonicalHasUser ? sql`true` : sql`false`} AND x.evaluator_user_id IN (SELECT u.id FROM users u WHERE u.employee_id IN (${ids})) AND ${lockedEvent("x")}`);
+  return rows.rows.filter(r => Number(r.n) > 0).map(r => `${r.n} ${r.kind}`);
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -237,6 +262,19 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
 
   const dupIds = duplicateIds.filter(id => id !== canonicalId);
   if (dupIds.length === 0) { res.status(400).json({ error: "Nenhum duplicado válido" }); return; }
+  if (dupIds.some(id => !Number.isInteger(id) || id <= 0 || id > 2_147_483_647)) { res.status(400).json({ error: "duplicateIds inválido" }); return; }
+
+  // Ciclo fechado só consulta (M1): a junção moveria dados de ciclo fechado
+  // (participações, notas, faltas, resultados…) para outro cadastro — 409.
+  const [canonicalUserRow] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.employeeId, canonicalId)).limit(1);
+  const closedData = await closedCycleDataToMove(dupIds, !!canonicalUserRow);
+  if (closedData.length > 0) {
+    res.status(409).json(closedCycleBody(
+      `Não dá para juntar: o cadastro duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de colaborador.`,
+      { closedCycleData: closedData },
+    ));
+    return;
+  }
 
   let movedParticipations = 0, movedAbsences = 0, movedEvals = 0, movedReviews = 0, removedUsers = 0, movedEvaluatorEvals = 0;
 

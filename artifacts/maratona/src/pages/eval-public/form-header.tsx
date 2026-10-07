@@ -23,12 +23,14 @@ export function FormHeader({
       {/* Toggle de tema */}
       <div className="flex justify-end">
         <button
+          type="button"
           onClick={onToggleTheme}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
+          aria-label={isDark ? "Usar o tema claro" : "Usar o tema escuro"}
+          className="flex items-center gap-2 px-3 min-h-8 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
           style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)", background: "transparent" }}
         >
           {isDark ? <Sun size={13} strokeWidth={2} /> : <Moon size={13} strokeWidth={2} />}
-          {isDark ? "Light" : "Dark"}
+          {isDark ? "Claro" : "Escuro"}
         </button>
       </div>
 
@@ -52,7 +54,7 @@ export function FormHeader({
 
       {/* Nome */}
       <Card className="px-5 py-5 space-y-3">
-        <label className="block text-[11px] font-bold tracking-[0.15em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+        <label htmlFor="field-submitter-name" className="block text-[11px] font-bold tracking-[0.15em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
           Seu nome completo <span style={{ color: DANGER_TEXT }}>*</span>
         </label>
         <input

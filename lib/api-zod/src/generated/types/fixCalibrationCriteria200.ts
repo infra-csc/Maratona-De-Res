@@ -5,9 +5,12 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { ClosedCycleSkip } from './closedCycleSkip';
 import type { FixCalibrationCriteria200ResultsItem } from './fixCalibrationCriteria200ResultsItem';
 
 export type FixCalibrationCriteria200 = {
   totalUpdated?: number;
   results?: FixCalibrationCriteria200ResultsItem[];
+  /** Eventos de ciclo FECHADO (só consulta) cujas calibrações não foram remapeadas */
+  skippedClosedCycle?: ClosedCycleSkip[];
 };

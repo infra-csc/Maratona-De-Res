@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { ClosedCycleSkip } from './closedCycleSkip';
 import type { EventDateChange } from './eventDateChange';
 
 export interface BulkDateSyncResult {
@@ -18,4 +19,6 @@ export interface BulkDateSyncResult {
   notFound: number;
   notFoundIds: string[];
   changes: EventDateChange[];
+  /** Eventos de ciclo FECHADO (só consulta) deixados de fora — a data deles não muda */
+  skippedClosedCycle?: ClosedCycleSkip[];
 }

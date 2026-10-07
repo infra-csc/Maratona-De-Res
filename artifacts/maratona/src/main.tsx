@@ -29,12 +29,27 @@ async function init() {
     } catch {
       // falha silenciosa — app abre normalmente na tela de login
     }
+    // Só os parâmetros do SSO saem da URL: o caminho e os demais parâmetros
+    // (ex.: /evaluations?evento=123, o evento que o portal mandou abrir) ficam.
     params.delete("portal_sso");
     params.delete("portal_return");
     const newUrl =
       window.location.pathname +
-      (params.toString() ? "?" + params.toString() : "");
+      (params.toString() ? "?" + params.toString() : "") +
+      window.location.hash;
     window.history.replaceState({}, "", newUrl);
+  }
+
+  // Link do portal com evento (/evaluations?evento=ID): guarda o destino SEMPRE
+  // — sem sessão, ou com a sessão vencida (o token ainda está no navegador, a
+  // API responde 401 e o app manda para o login), a tela de login perderia o
+  // evento. A tela de Avaliações consome o destino ao abrir (pages/evaluations.tsx).
+  try {
+    if (/\/evaluations$/.test(window.location.pathname) && new URLSearchParams(window.location.search).get("evento")) {
+      sessionStorage.setItem("maratona_destino", window.location.pathname + window.location.search);
+    }
+  } catch {
+    // sem storage (modo privado restrito): segue sem retomar o destino
   }
 
   createRoot(document.getElementById("root")!).render(<App />);

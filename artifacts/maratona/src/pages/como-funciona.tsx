@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BookOpen, Calendar, Star, Trophy, Gift, Clock, AlertTriangle, HelpCircle, ShieldCheck, Minus, Search, X } from "lucide-react";
-import { useGetRules, useGetPlatoonRules, useGetPenaltyTypes } from "@workspace/api-client-react";
+import { useGetRules, useGetPlatoonRules, useGetPenaltyTypes, useGetCurrentCycle } from "@workspace/api-client-react";
 
 const SECTIONS = [
   { id: "ciclo", title: "O Ciclo de Avaliação", icon: Calendar },
@@ -73,12 +73,24 @@ export default function ComoFuncionaPage() {
   const { data: rules } = useGetRules();
   const { data: platoonRules } = useGetPlatoonRules();
   const { data: penaltyTypes } = useGetPenaltyTypes();
+  const { data: currentCycle } = useGetCurrentCycle();
 
+  // Mínimo do CICLO ATUAL (cada ciclo pode ter o seu, ex.: 7 no ciclo novo);
+  // sem o ciclo, a regra geral de Regras do Sistema.
   const minEvents = (() => {
+    if (currentCycle?.effectiveMinEvents != null) return currentCycle.effectiveMinEvents;
     const raw = rules?.find(r => r.key === "min_events_eligibility")?.value;
     const n = raw ? parseInt(raw, 10) : NaN;
     return Number.isFinite(n) ? n : null;
   })();
+  // Ciclo sem a Conduta na Matriz (avaliada no critério Proatividade/Conduta).
+  const withoutConduta = !!currentCycle?.conformityWithoutConduta;
+  const conformityItems = [
+    { item: "Uso de EPI", desc: "Equipamentos de Proteção Individual utilizados corretamente durante o evento." },
+    { item: "Estaiamento / Aterramento", desc: "Estruturas devidamente fixadas e aterradas conforme as normas de segurança." },
+    { item: "Guarda de Equipamentos / Ferramentas", desc: "Todas as ferramentas e cases retornam à base sem perdas, danos ou esquecimentos." },
+    ...(withoutConduta ? [] : [{ item: "Conduta e Comportamento", desc: "Comportamento profissional, uso correto de uniforme e cumprimento de horários durante o evento." }]),
+  ];
 
   const bonusTiers = (platoonRules ?? [])
     .filter(t => t.active && t.bonusValue > 0)
@@ -205,23 +217,23 @@ export default function ComoFuncionaPage() {
             </p>
             <div className="mt-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {[
-                  { item: "Uso de EPI", desc: "Equipamentos de Proteção Individual utilizados corretamente durante o evento." },
-                  { item: "Estaiamento / Aterramento", desc: "Estruturas devidamente fixadas e aterradas conforme as normas de segurança." },
-                  { item: "Guarda de Equipamentos / Ferramentas", desc: "Todas as ferramentas e cases retornam à base sem perdas, danos ou esquecimentos." },
-                  { item: "Conduta e Comportamento", desc: "Comportamento profissional, uso correto de uniforme e cumprimento de horários durante o evento." },
-                ].map(({ item, desc }) => (
+                {conformityItems.map(({ item, desc }) => (
                   <div key={item} className="p-4 rounded-lg" style={{ backgroundColor: "var(--muted)", border: "1px solid var(--border)" }}>
                     <p className="text-[11px] font-black uppercase text-foreground mb-1">{item}</p>
                     <p className="text-[12px] text-muted-foreground leading-snug">{desc}</p>
                   </div>
                 ))}
               </div>
+              {withoutConduta && (
+                <p className="mt-2 text-[12px] text-muted-foreground leading-snug">
+                  Neste ciclo a <strong className="text-foreground">Conduta saiu da Matriz</strong>: ela é avaliada no critério Proatividade/Conduta e, na matriz, conta como "Sim".
+                </p>
+              )}
             </div>
             <div className="mt-4 p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: "rgba(186,26,26,0.08)", border: "1px solid rgba(186,26,26,0.25)" }}>
               <AlertTriangle size={15} className="text-[var(--status-danger-text)] shrink-0 mt-0.5" />
               <p className="text-[12px] text-[var(--status-danger-text)] leading-relaxed">
-                Cada resposta <strong>"Não"</strong> na Matriz de Conformidade desconta <strong>10 pontos</strong> da nota daquele evento específico. Se todos os 4 itens forem "Não", o evento perde 40 pontos antes de entrar na sua média.
+                Cada resposta <strong>"Não"</strong> na Matriz de Conformidade desconta <strong>10 pontos</strong> da nota daquele evento específico. Se todos os {conformityItems.length} itens forem "Não", o evento perde {conformityItems.length * 10} pontos antes de entrar na sua média.
               </p>
             </div>
           </Section>
@@ -308,7 +320,7 @@ export default function ComoFuncionaPage() {
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="text-[11px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
-                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo pode gerar bônus adicional. O valor extra depende da nota daquele evento específico e da faixa correspondente.</span>
+                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo gera um bônus adicional. O valor de cada evento extra é o da faixa da sua nota média no ciclo (a mesma faixa do bônus base) — a nota de um evento sozinho não muda esse valor.</span>
               </div>
             </div>
             <p className="text-[11px] text-[rgba(204,255,0,0.6)] mt-3">

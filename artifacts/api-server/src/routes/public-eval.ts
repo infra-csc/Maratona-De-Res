@@ -8,16 +8,73 @@ import {
   criteriaTable,
   eventCriterionAssignmentsTable,
   eventConformitiesTable,
+  eventCriteriaTable,
 } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import {
+  tokenCriterionClosures, lockCriterionInEvent, areaModeForeignCriteria, AREA_MODE_LINK_REASON, closedMessage, type Closure,
+  cenografiaConformityAnswered, ferramentasConformityAnswered, conformityClosedMessage, tokenSubjectToDayLock, dayAfterLockMessage,
+  type ConformityAnswered, lockEventCycleShared,
+} from "../lib/area-evaluation.js";
+import { anyEventLockedByClosedCycle, closedCycleBody } from "../lib/closed-cycle-guard.js";
+import { isEventInNextCycle, nextCycleBody } from "../lib/next-cycle.js";
+import type { DbOrTx } from "../lib/db-tx.js";
 import { recomputeCycleResults } from "./results.js";
+import { eventsWithoutConduta } from "../lib/cycle-data.js";
 
 const router = Router();
 
 class TokenAlreadyUsedError extends Error {
   constructor() { super("Este link já foi utilizado"); }
 }
+
+interface Rejected { criterionId: number; criterionName: string; reason: string; kind: "criterion" | "conformity" }
+
+/** Tudo o que veio no envio já estava respondido (critérios e/ou matriz): nada gravado. */
+function nothingSavedMessage(rejected: Rejected[]): string {
+  return rejected.some(r => r.kind === "conformity")
+    ? "Tudo o que este link pedia já tinha sido respondido. Nada foi gravado."
+    : "Todos os critérios deste link já foram respondidos. Nada foi gravado.";
+}
+class NothingSavedError extends Error {
+  constructor(readonly rejected: Rejected[]) { super(nothingSavedMessage(rejected)); }
+}
+
+/** Nome exibido para a parte da matriz em `rejected`. */
+const CONFORMITY_PART = "Matriz de Conformidade (Cenografia)";
+const FERRAMENTAS_PART = "Matriz de Conformidade (Ferramentas)";
+
+/**
+ * B3 (4ª revisão): o link só grava em critério ATIVO no evento
+ * (event_criteria.active). Critério desativado depois que o link foi gerado
+ * sai da lista do GET (não é pedido) e, se vier no envio, é IGNORADO com
+ * aviso em `rejected` (o resto do envio segue). Escolhido em vez de 409 para
+ * o freela não perder as outras respostas por um critério que o RH tirou.
+ */
+const INACTIVE_CRITERION_REASON = "Este critério foi desativado neste evento depois que o link foi gerado: a resposta não foi gravada.";
+
+/** Dos critérios informados, os que estão ATIVOS no evento. */
+async function activeCriterionIds(exec: DbOrTx, eventId: number, criterionIds: number[]): Promise<Set<number>> {
+  if (criterionIds.length === 0) return new Set();
+  const rows = await exec.select({ criterionId: eventCriteriaTable.criterionId }).from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), inArray(eventCriteriaTable.criterionId, criterionIds), eq(eventCriteriaTable.active, true)));
+  return new Set(rows.map(r => r.criterionId));
+}
+
+/** Ciclo do evento fechado: o link não grava nada e continua sem uso (A1). */
+const CLOSED_CYCLE_LINK_ERROR = "Ciclo fechado: este evento não recebe mais respostas. Nada foi gravado e o link não foi usado.";
+
+/** A parte da matriz que este link de conformidade responde já tem resposta? */
+async function conformityLinkAnswered(eventId: number, tokenType: string, exec?: DbOrTx): Promise<ConformityAnswered> {
+  if (tokenType === "conformity_cenografia") return cenografiaConformityAnswered(eventId, exec);
+  if (tokenType === "conformity_ferramentas") return ferramentasConformityAnswered(eventId, exec);
+  return { answered: false, byName: null };
+}
+class ConformityAlreadyAnsweredError extends Error {
+  constructor(readonly rejected: Rejected[]) { super(rejected[0]?.reason ?? "A Matriz de Conformidade deste evento já foi respondida."); }
+}
+const CONFORMITY_FIELDS = ["epi", "estaiamentos", "conduta", "absencesReport", "standoutResponse"] as const;
 
 // Submissão por link público também muda a nota; se o evento já conta para o
 // ciclo, recalcula o snapshot oficial (autor = quem gerou o link).
@@ -60,8 +117,20 @@ router.get("/public-eval/:token", async (req, res) => {
     .from(eventsTable).where(eq(eventsTable.id, token.eventId)).limit(1);
 
   const tokenType = token.tokenType ?? "criteria";
+  // Ciclo novo: "Conduta" fora da Matriz de Conformidade — a tela esconde a pergunta.
+  const conformityWithoutConduta = (await eventsWithoutConduta([token.eventId])).has(token.eventId);
+  // Ciclo do evento fechado (só consulta): o link não aceita envio (A1).
+  const cycleClosed = await anyEventLockedByClosedCycle([token.eventId]);
+  // Evento do PRÓXIMO ciclo (fora do período): o link não aceita envio até o
+  // evento ser movido para o ciclo novo (o POST responde 409 EVENT_NEXT_CYCLE).
+  const nextCycle = await isEventInNextCycle(token.eventId);
 
-  if (tokenType === "conformity_cenografia") {
+  if (tokenType === "conformity_cenografia" || tokenType === "conformity_ferramentas") {
+    // Link só da matriz: se a parte dele já tem resposta (pelo responsável ou
+    // outro link), a tela avisa e não pede de novo (M6).
+    const answered = token.usedAt === null
+      ? await conformityLinkAnswered(token.eventId, tokenType)
+      : { answered: false, byName: null };
     res.json({
       tokenId: token.id,
       tokenType,
@@ -71,28 +140,18 @@ router.get("/public-eval/:token", async (req, res) => {
       submitterName: token.submitterName,
       eventName: event?.name ?? null,
       eventStatus: event?.status ?? null,
+      conformityWithoutConduta,
+      cycleClosed,
+      nextCycle,
       criteria: [],
-    });
-    return;
-  }
-
-  if (tokenType === "conformity_ferramentas") {
-    res.json({
-      tokenId: token.id,
-      tokenType,
-      isUsed: token.usedAt !== null,
-      usedAt: token.usedAt?.toISOString() ?? null,
-      recipientName: token.recipientName,
-      submitterName: token.submitterName,
-      eventName: event?.name ?? null,
-      eventStatus: event?.status ?? null,
-      criteria: [],
+      conformityAnswered: answered.answered,
+      conformityAnsweredByName: answered.byName,
     });
     return;
   }
 
   // criteria ou criteria_with_conformity — retorna lista de critérios
-  const tokenCriteria = await db.select({
+  const allTokenCriteria = await db.select({
     criterionId: publicEvalTokenCriteriaTable.criterionId,
     criterionName: criteriaTable.name,
     criterionDescription: criteriaTable.description,
@@ -100,6 +159,30 @@ router.get("/public-eval/:token", async (req, res) => {
     .from(publicEvalTokenCriteriaTable)
     .innerJoin(criteriaTable, eq(publicEvalTokenCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(publicEvalTokenCriteriaTable.tokenId, tokenId));
+  // B3: critério desativado no evento não é pedido (link ainda sem uso).
+  const activeNow = await activeCriterionIds(db, token.eventId, allTokenCriteria.map(c => c.criterionId));
+  const tokenCriteria = token.usedAt === null ? allTokenCriteria.filter(c => activeNow.has(c.criterionId)) : allTokenCriteria;
+
+  // Critérios que a área já respondeu (por outra pessoa ou outro link) ficam
+  // fechados: a tela mostra "já respondido pela área" e não os cobra.
+  const closures = token.usedAt === null && token.createdByUserId != null
+    ? await tokenCriterionClosures(db, token.eventId, token.createdByUserId, tokenCriteria.map(c => c.criterionId))
+    : new Map<number, Closure>();
+  const criteria = tokenCriteria.map(c => {
+    const closure = closures.get(c.criterionId);
+    return {
+      ...c,
+      closed: !!closure,
+      closedByName: closure?.name ?? null,
+      closedAt: closure?.submittedAt?.toISOString() ?? null,
+    };
+  });
+
+  // Link combinado: a matriz já respondida (pelo responsável ou outro link)
+  // não é pedida de novo — a tela mostra só o que falta.
+  const conformity = tokenType === "criteria_with_conformity" && token.usedAt === null
+    ? await cenografiaConformityAnswered(token.eventId)
+    : { answered: false, byName: null };
 
   res.json({
     tokenId: token.id,
@@ -110,7 +193,13 @@ router.get("/public-eval/:token", async (req, res) => {
     submitterName: token.submitterName,
     eventName: event?.name ?? null,
     eventStatus: event?.status ?? null,
-    criteria: tokenCriteria,
+    conformityWithoutConduta,
+    cycleClosed,
+    nextCycle,
+    criteria,
+    allClosed: criteria.length > 0 && criteria.every(c => c.closed),
+    conformityAnswered: conformity.answered,
+    conformityAnsweredByName: conformity.byName,
   });
 });
 
@@ -127,7 +216,7 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     res.status(400).json({ error: "Nome é obrigatório" });
     return;
   }
-  if (!Array.isArray(evaluations) || evaluations.length === 0) {
+  if (!Array.isArray(evaluations)) {
     res.status(400).json({ error: "Nenhuma avaliação enviada" });
     return;
   }
@@ -164,30 +253,98 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     res.status(400).json({ error: "Token inválido: sem avaliador vinculado" });
     return;
   }
-
-  const tokenCriteria = await db.select({ criterionId: publicEvalTokenCriteriaTable.criterionId })
-    .from(publicEvalTokenCriteriaTable)
-    .where(eq(publicEvalTokenCriteriaTable.tokenId, tokenId));
-  const tokenCriterionIds = new Set(tokenCriteria.map(c => c.criterionId));
-
-  if (parsedEvaluations.some(e => !tokenCriterionIds.has(e.criterionId))) {
-    res.status(400).json({ error: "Avaliação inclui um critério fora do questionário deste link" });
-    return;
-  }
-  if (parsedEvaluations.length !== tokenCriterionIds.size) {
-    res.status(400).json({ error: "É necessário avaliar todos os critérios do questionário" });
-    return;
-  }
-
   const submitTokenType = token.tokenType ?? "criteria";
   if (submitTokenType !== "criteria" && submitTokenType !== "criteria_with_conformity") {
     res.status(400).json({ error: "Este link não é para critérios" });
     return;
   }
+  const isCombined = submitTokenType === "criteria_with_conformity";
 
-  if (submitTokenType === "criteria_with_conformity") {
-    if (conformityData.epi === undefined || conformityData.estaiamentos === undefined || conformityData.conduta === undefined) {
-      res.status(400).json({ error: "EPI, Estaiamentos e Conduta são obrigatórios" });
+  // Ciclo fechado só consulta — também pelo link (A1). Nada é gravado e o
+  // link continua sem uso.
+  if (await anyEventLockedByClosedCycle([token.eventId])) {
+    res.status(409).json(closedCycleBody(CLOSED_CYCLE_LINK_ERROR));
+    return;
+  }
+  // Evento do próximo ciclo: nada é gravado e o link continua sem uso (D1).
+  if (await isEventInNextCycle(token.eventId)) {
+    res.status(409).json(nextCycleBody());
+    return;
+  }
+
+  // Link gerado por avaliador só vale a partir do dia seguinte ao evento
+  // (admin/RH, ou link gerado por eles, podem sempre).
+  if (await tokenSubjectToDayLock(token)) {
+    const lock = await dayAfterLockMessage(token.eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
+
+  const tokenCriteria = await db.select({ criterionId: publicEvalTokenCriteriaTable.criterionId, criterionName: criteriaTable.name })
+    .from(publicEvalTokenCriteriaTable)
+    .innerJoin(criteriaTable, eq(publicEvalTokenCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(publicEvalTokenCriteriaTable.tokenId, tokenId));
+  const tokenCriterionIds = new Set(tokenCriteria.map(c => c.criterionId));
+  const criterionNameOf = new Map(tokenCriteria.map(c => [c.criterionId, c.criterionName]));
+
+  if (parsedEvaluations.some(e => !tokenCriterionIds.has(e.criterionId))) {
+    res.status(400).json({ error: "Avaliação inclui um critério fora do questionário deste link" });
+    return;
+  }
+  if (new Set(parsedEvaluations.map(e => e.criterionId)).size !== parsedEvaluations.length) {
+    res.status(400).json({ error: "Critério repetido no envio" });
+    return;
+  }
+  // B3: critério desativado no evento não é cobrado e, se vier, é ignorado
+  // com aviso em `rejected` (nunca gravado).
+  const activeIds = await activeCriterionIds(db, token.eventId, [...tokenCriterionIds]);
+  const inactiveRejected: Rejected[] = parsedEvaluations.filter(e => !activeIds.has(e.criterionId))
+    .map(e => ({ criterionId: e.criterionId, criterionName: criterionNameOf.get(e.criterionId) ?? "", reason: INACTIVE_CRITERION_REASON, kind: "criterion" as const }));
+  for (let i = parsedEvaluations.length - 1; i >= 0; i--) if (!activeIds.has(parsedEvaluations[i].criterionId)) parsedEvaluations.splice(i, 1);
+  // Critérios já respondidos não são cobrados (e, se vierem, são recusados um
+  // a um com o motivo — nunca descartados em silêncio). Os ainda abertos
+  // precisam estar todos respondidos.
+  const closedNow = await tokenCriterionClosures(db, token.eventId, token.createdByUserId, [...activeIds]);
+  const answeredIds = new Set(parsedEvaluations.map(e => e.criterionId));
+  if ([...activeIds].some(id => !closedNow.has(id) && !answeredIds.has(id))) {
+    res.status(400).json({ error: "É necessário avaliar todos os critérios do questionário" });
+    return;
+  }
+
+  // Link combinado: a matriz só é gravada se ninguém a respondeu ainda. Se já
+  // tem resposta, a parte da matriz é recusada com o motivo (a resposta que
+  // está lá fica) — o link nunca sobrescreve a Matriz de Conformidade.
+  const sentConformity = isCombined && CONFORMITY_FIELDS.some(k => conformityData[k] !== undefined && conformityData[k] !== null && conformityData[k] !== "");
+  const conformityBefore = isCombined ? await cenografiaConformityAnswered(token.eventId) : { answered: true, byName: null };
+  const wantsConformity = isCombined && !conformityBefore.answered;
+  const conformityRejection = (c: { answered: boolean; byName: string | null }): Rejected =>
+    ({ criterionId: 0, criterionName: CONFORMITY_PART, reason: conformityClosedMessage(c), kind: "conformity" });
+
+  const criteriaRejected = (): Rejected[] => [...inactiveRejected, ...[...closedNow.entries()]
+    .map(([criterionId, c]) => ({ criterionId, criterionName: criterionNameOf.get(criterionId) ?? "", reason: closedMessage(c), kind: "criterion" as const }))];
+  if (activeIds.size === 0 && !wantsConformity) {
+    // Todos os critérios do link foram desativados no evento: nada a gravar.
+    const rejected = criteriaRejected();
+    if (isCombined && sentConformity) rejected.push(conformityRejection(conformityBefore));
+    res.status(409).json({ error: "Os critérios deste link foram desativados neste evento. Nada foi gravado e o link não foi usado.", code: "CRITERIA_INACTIVE", rejected });
+    return;
+  }
+  if (closedNow.size === activeIds.size && !wantsConformity) {
+    const rejected = criteriaRejected();
+    if (isCombined && sentConformity) rejected.push(conformityRejection(conformityBefore));
+    res.status(409).json({ error: nothingSavedMessage(rejected), code: "AREA_ALREADY_ANSWERED", rejected });
+    return;
+  }
+  if (parsedEvaluations.length === 0 && !wantsConformity) {
+    res.status(400).json({ error: "Nenhuma avaliação enviada" });
+    return;
+  }
+
+  if (wantsConformity) {
+    // Ciclo sem "Conduta" na matriz: não é cobrada e é gravada vazia (null).
+    const noConduta = (await eventsWithoutConduta([token.eventId])).has(token.eventId);
+    if (noConduta) { conformityData.conduta = null; conformityData.condutaComment = null; }
+    if (conformityData.epi === undefined || conformityData.estaiamentos === undefined || (!noConduta && conformityData.conduta === undefined)) {
+      res.status(400).json({ error: noConduta ? "EPI e Estaiamentos são obrigatórios" : "EPI, Estaiamentos e Conduta são obrigatórios" });
       return;
     }
     const naoSemComentario = (
@@ -219,10 +376,39 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     return;
   }
 
-  const criterionIds = [...tokenCriterionIds];
+  const saved: number[] = [];
+  const rejected: Rejected[] = [...inactiveRejected];
+  let conformitySaved = false;
 
   await db.transaction(async (tx) => {
+    // B2: a troca da avaliação por área no ciclo espera este envio (e vice-versa).
+    await lockEventCycleShared(tx, token.eventId);
+    // Mesma trava do envio pela tela: dois envios do mesmo critério (link e
+    // tela, ou dois links) ficam em fila e só o primeiro grava.
+    await lockCriterionInEvent(tx, token.eventId, parsedEvaluations.map(e => e.criterionId));
+    const closed = await tokenCriterionClosures(tx, token.eventId, token.createdByUserId!, parsedEvaluations.map(e => e.criterionId));
+    // B3: confere de novo, com as linhas travadas, que o critério segue ativo.
+    const stillActive = await activeCriterionIds(tx, token.eventId, parsedEvaluations.map(e => e.criterionId));
+    // Ciclo por área: o link responde em nome de quem o gerou — critério de
+    // outra área não grava (vale também para link criado antes da marca).
+    const foreign = await areaModeForeignCriteria(tx, token.eventId, token.createdByUserId!, parsedEvaluations.map(e => e.criterionId));
+    // Um instante só para o envio e para o "usado em" do link: é o que liga a
+    // nota a quem preencheu (nome do freela em "Respondido por").
+    const now = new Date();
     for (const item of parsedEvaluations) {
+      if (!stillActive.has(item.criterionId)) {
+        rejected.push({ criterionId: item.criterionId, criterionName: criterionNameOf.get(item.criterionId) ?? "", reason: INACTIVE_CRITERION_REASON, kind: "criterion" });
+        continue;
+      }
+      if (foreign.has(item.criterionId)) {
+        rejected.push({ criterionId: item.criterionId, criterionName: criterionNameOf.get(item.criterionId) ?? "", reason: AREA_MODE_LINK_REASON, kind: "criterion" });
+        continue;
+      }
+      const closure = closed.get(item.criterionId);
+      if (closure) {
+        rejected.push({ criterionId: item.criterionId, criterionName: criterionNameOf.get(item.criterionId) ?? "", reason: closedMessage(closure), kind: "criterion" });
+        continue;
+      }
       const [existing] = await tx.select().from(evaluationsTable)
         .where(and(
           eq(evaluationsTable.eventId, token.eventId),
@@ -230,89 +416,101 @@ router.post("/public-eval/:token/submit", async (req, res) => {
           eq(evaluationsTable.evaluatorUserId, token.createdByUserId!),
         )).limit(1);
       if (existing) {
-        if (existing.status === "submitted") continue;
+        // Rascunho de quem gerou o link vira a resposta do freela.
         await tx.update(evaluationsTable).set({
           score: item.score.toFixed(2),
           comments: item.comments,
           status: "submitted",
-          submittedAt: new Date(),
-        }).where(eq(evaluationsTable.id, existing.id));
-        continue;
+          submittedAt: now,
+          publicTokenId: tokenId,
+        }).where(and(eq(evaluationsTable.id, existing.id), eq(evaluationsTable.status, "draft")));
+      } else {
+        await tx.insert(evaluationsTable).values({
+          eventId: token.eventId,
+          criterionId: item.criterionId,
+          evaluatorUserId: token.createdByUserId!,
+          score: item.score.toFixed(2),
+          comments: item.comments,
+          audioUrl: null,
+          commentVisibility: "internal",
+          status: "submitted",
+          submittedAt: now,
+          // Vínculo explícito com o link (B5): "Respondido por" = quem preencheu.
+          publicTokenId: tokenId,
+        });
       }
-      await tx.insert(evaluationsTable).values({
-        eventId: token.eventId,
-        criterionId: item.criterionId,
-        evaluatorUserId: token.createdByUserId!,
-        score: item.score.toFixed(2),
-        comments: item.comments,
-        audioUrl: null,
-        commentVisibility: "internal",
-        status: "submitted",
-        submittedAt: new Date(),
-      });
+      saved.push(item.criterionId);
     }
+
+    // Link combinado: confere de novo a matriz já com o evento travado (dois
+    // links, ou o link e a tela do responsável, ao mesmo tempo).
+    if (isCombined) {
+      await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, token.eventId)).for("update");
+      const conformityNow = await cenografiaConformityAnswered(token.eventId, tx);
+      if (wantsConformity && !conformityNow.answered) {
+        const values = {
+          epi: conformityData.epi as boolean,
+          estaiamentos: conformityData.estaiamentos as boolean,
+          conduta: conformityData.conduta as boolean,
+          epiComment: (conformityData.epiComment as string) || null,
+          estaiamentosComment: (conformityData.estaiamentosComment as string) || null,
+          condutaComment: (conformityData.condutaComment as string) || null,
+          absencesResponse: true,
+          absencesReport: (conformityData.absencesReport as string) || null,
+          standoutResponse: conformityData.standoutResponse as boolean,
+          standoutJustification: (conformityData.standoutJustification as string) || null,
+          cenografiaSubmittedByName: submitterName.trim(),
+        };
+        const existingConf = await tx.select({ id: eventConformitiesTable.id })
+          .from(eventConformitiesTable)
+          .where(eq(eventConformitiesTable.eventId, token.eventId));
+        if (existingConf.length > 0) {
+          await tx.update(eventConformitiesTable).set({ ...values, updatedAt: new Date() })
+            .where(eq(eventConformitiesTable.eventId, token.eventId));
+        } else {
+          await tx.insert(eventConformitiesTable).values({
+            eventId: token.eventId,
+            ...values,
+            guardaEquipamentos: null,
+            guardaEquipamentosComment: null,
+            createdByUserId: token.createdByUserId!,
+          });
+        }
+        conformitySaved = true;
+      } else if (sentConformity || wantsConformity) {
+        rejected.push(conformityRejection(conformityNow.answered ? conformityNow : conformityBefore));
+      }
+    }
+
+    // Nada gravado (tudo foi respondido entre abrir e enviar): o link
+    // continua sem uso e a pessoa vê o motivo de cada parte.
+    if (saved.length === 0 && !conformitySaved) throw new NothingSavedError(rejected);
 
     // Marca o link como usado de forma atômica: dois envios simultâneos
     // passavam a checagem inicial e o segundo sobrescrevia o primeiro.
     const claimed = await tx.update(publicEvalTokensTable).set({
-      usedAt: new Date(),
+      usedAt: now,
       submitterName: submitterName.trim(),
     }).where(and(eq(publicEvalTokensTable.id, tokenId), isNull(publicEvalTokensTable.usedAt)))
       .returning({ id: publicEvalTokensTable.id });
     if (claimed.length === 0) throw new TokenAlreadyUsedError();
 
-    await tx.update(eventCriterionAssignmentsTable).set({
-      status: "submitted",
-      updatedAt: new Date(),
-    }).where(and(
-      eq(eventCriterionAssignmentsTable.eventId, token.eventId),
-      inArray(eventCriterionAssignmentsTable.criterionId, criterionIds),
-    ));
-
-    // Para criteria_with_conformity, salva também os dados de conformidade (cenografia)
-    if (submitTokenType === "criteria_with_conformity") {
-      const existingConf = await tx.select({ id: eventConformitiesTable.id })
-        .from(eventConformitiesTable)
-        .where(eq(eventConformitiesTable.eventId, token.eventId));
-
-      if (existingConf.length > 0) {
-        await tx.update(eventConformitiesTable).set({
-          epi: conformityData.epi as boolean,
-          estaiamentos: conformityData.estaiamentos as boolean,
-          conduta: conformityData.conduta as boolean,
-          epiComment: (conformityData.epiComment as string) || null,
-          estaiamentosComment: (conformityData.estaiamentosComment as string) || null,
-          condutaComment: (conformityData.condutaComment as string) || null,
-          absencesResponse: true,
-          absencesReport: (conformityData.absencesReport as string) || null,
-          standoutResponse: conformityData.standoutResponse as boolean,
-          standoutJustification: (conformityData.standoutJustification as string) || null,
-          updatedAt: new Date(),
-        }).where(eq(eventConformitiesTable.eventId, token.eventId));
-      } else {
-        await tx.insert(eventConformitiesTable).values({
-          eventId: token.eventId,
-          epi: conformityData.epi as boolean,
-          estaiamentos: conformityData.estaiamentos as boolean,
-          conduta: conformityData.conduta as boolean,
-          epiComment: (conformityData.epiComment as string) || null,
-          estaiamentosComment: (conformityData.estaiamentosComment as string) || null,
-          condutaComment: (conformityData.condutaComment as string) || null,
-          guardaEquipamentos: null,
-          guardaEquipamentosComment: null,
-          absencesResponse: true,
-          absencesReport: (conformityData.absencesReport as string) || null,
-          standoutResponse: conformityData.standoutResponse as boolean,
-          standoutJustification: (conformityData.standoutJustification as string) || null,
-          createdByUserId: token.createdByUserId!,
-        });
-      }
+    if (saved.length > 0) {
+      await tx.update(eventCriterionAssignmentsTable).set({
+        status: "submitted",
+        updatedAt: now,
+      }).where(and(
+        eq(eventCriterionAssignmentsTable.eventId, token.eventId),
+        inArray(eventCriterionAssignmentsTable.criterionId, saved),
+      ));
     }
   });
 
   // As notas enviadas pelo link entram na nota oficial se o evento já conta.
   await recomputeIfEventCounts(token.eventId, token.createdByUserId ?? null);
-  res.json({ ok: true });
+  // `rejected`: o que já estava respondido (não gravado, com o motivo) —
+  // critérios e, no link combinado, a parte da matriz.
+  res.json({ ok: true, saved, rejected, conformitySaved });
 });
 
 // ---------------------------------------------------------------------------
@@ -356,6 +554,21 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
     res.status(400).json({ error: "Este link não é para conformidade" });
     return;
   }
+  // Ciclo fechado só consulta — também pelo link (A1).
+  if (await anyEventLockedByClosedCycle([token.eventId])) {
+    res.status(409).json(closedCycleBody(CLOSED_CYCLE_LINK_ERROR));
+    return;
+  }
+  // Evento do próximo ciclo: nada é gravado e o link continua sem uso (D1).
+  if (await isEventInNextCycle(token.eventId)) {
+    res.status(409).json(nextCycleBody());
+    return;
+  }
+  // Link gerado por avaliador só vale a partir do dia seguinte ao evento.
+  if (await tokenSubjectToDayLock(token)) {
+    const lock = await dayAfterLockMessage(token.eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
 
   const [event] = await db.select({ status: eventsTable.status })
     .from(eventsTable).where(eq(eventsTable.id, token.eventId)).limit(1);
@@ -367,11 +580,27 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
 
   const isCenografia = tokenType === "conformity_cenografia";
   const isFerramentas = tokenType === "conformity_ferramentas";
+  const partName = isCenografia ? CONFORMITY_PART : FERRAMENTAS_PART;
+  const conformityRejection = (c: ConformityAnswered): Rejected[] =>
+    [{ criterionId: 0, criterionName: partName, reason: conformityClosedMessage(c), kind: "conformity" }];
+
+  // Mesma proteção do link combinado (M6): a matriz já respondida (pelo
+  // responsável ou por outro link) nunca é sobrescrita. 409 com o motivo e o
+  // link continua sem uso.
+  const answeredBefore = await conformityLinkAnswered(token.eventId, tokenType);
+  if (answeredBefore.answered) {
+    const rejected = conformityRejection(answeredBefore);
+    res.status(409).json({ error: rejected[0].reason, code: "CONFORMITY_ALREADY_ANSWERED", rejected });
+    return;
+  }
 
   // Validate required fields per type
   if (isCenografia) {
-    if (answers.epi === undefined || answers.estaiamentos === undefined || answers.conduta === undefined) {
-      res.status(400).json({ error: "EPI, Estaiamentos e Conduta são obrigatórios" });
+    // Ciclo sem "Conduta" na matriz: não é cobrada e é gravada vazia (null).
+    const noConduta = (await eventsWithoutConduta([token.eventId])).has(token.eventId);
+    if (noConduta) { answers.conduta = null; answers.condutaComment = null; }
+    if (answers.epi === undefined || answers.estaiamentos === undefined || (!noConduta && answers.conduta === undefined)) {
+      res.status(400).json({ error: noConduta ? "EPI e Estaiamentos são obrigatórios" : "EPI, Estaiamentos e Conduta são obrigatórios" });
       return;
     }
     // Resposta "Não" precisa vir com o comentário explicando o que aconteceu.
@@ -395,6 +624,11 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
   }
 
   await db.transaction(async (tx) => {
+    // Trava a linha do evento (mesma trava do link combinado e da tela) e
+    // confere de novo: dois envios ao mesmo tempo → só o primeiro grava.
+    await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, token.eventId)).for("update");
+    const answeredNow = await conformityLinkAnswered(token.eventId, tokenType, tx);
+    if (answeredNow.answered) throw new ConformityAlreadyAnsweredError(conformityRejection(answeredNow));
     const existing = await tx.select({ id: eventConformitiesTable.id })
       .from(eventConformitiesTable)
       .where(eq(eventConformitiesTable.eventId, token.eventId));
@@ -502,6 +736,8 @@ router.delete("/public-eval-tokens/:tokenId", requireAuth, async (req, res) => {
 // Erros lançados dentro das transações de submissão (link já usado).
 router.use((err: unknown, _req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
   if (err instanceof TokenAlreadyUsedError) { res.status(409).json({ error: err.message }); return; }
+  if (err instanceof NothingSavedError) { res.status(409).json({ error: err.message, code: "AREA_ALREADY_ANSWERED", rejected: err.rejected }); return; }
+  if (err instanceof ConformityAlreadyAnsweredError) { res.status(409).json({ error: err.message, code: "CONFORMITY_ALREADY_ANSWERED", rejected: err.rejected }); return; }
   next(err);
 });
 

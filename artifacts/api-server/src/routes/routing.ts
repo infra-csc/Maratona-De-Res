@@ -5,7 +5,7 @@ import {
   criterionRoutingTable, criterionRedirectUsersTable,
   eventCriterionAssignmentsTable, criteriaTable, usersTable,
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
-  publicEvalTokenCriteriaTable, areaConformityRoutingTable, evaluationsTable,
+  publicEvalTokenCriteriaTable, areaConformityRoutingTable, evaluationsTable, eventAreaAssignmentsTable,
 } from "@workspace/db";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
@@ -13,6 +13,11 @@ import { audit } from "../lib/audit.js";
 import type { DbOrTx, Tx } from "../lib/db-tx.js";
 import { loadEventCriteria, loadCriterionAssignments } from "../lib/event-console-data.js";
 import { areaPrincipalEvaluators } from "../lib/area-copies.js";
+import {
+  areaLinkEligibleCriteria, eventAreaMode, loadClosures, isAdminOrRh, dayAfterLockMessage,
+  cenografiaConformityAnswered, conformityClosedMessage, areaModeForeignCriteria, getUserAreaId,
+} from "../lib/area-evaluation.js";
+import { areaModeEventIds } from "../lib/area-mode.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -172,11 +177,17 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
 
   const enriched = await loadCriterionAssignments([eventId]);
 
-  if (user.role === "avaliador") {
+  if (isRole(user.role, "avaliador")) {
     // Além das próprias, o avaliador principal de uma área vê TODAS as
     // atribuições dos critérios daquela área (visibilidade completa),
     // podendo depois atribuir/tomar/mover entre colegas via ação "assign".
-    const principalAreaIds = await getPrincipalAreaIds(user.userId);
+    // M5 (4ª revisão): no ciclo por área ser "principal" não conta (como em
+    // lib/evaluator-visibility.ts) — só a área do cadastro dá acesso.
+    const areaMode = Number.isInteger(eventId) && await eventAreaMode(eventId);
+    const principalAreaIds = areaMode ? [] : await getPrincipalAreaIds(user.userId);
+    // Ciclo por área: designação para critério de OUTRA área não dá
+    // visibilidade (nem o nome do critério) — só a área do cadastro.
+    const myAreaId = areaMode ? await getUserAreaId(user.userId) : null;
     let result: Array<(typeof enriched)[number] | {
       id: number | null;
       eventId: number;
@@ -192,7 +203,7 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
       createdAt: null;
       redirectedFromName: null;
     }> = enriched.filter(a =>
-      a.assignedToId === user.userId ||
+      (a.assignedToId === user.userId && (!areaMode || (myAreaId != null && a.criterionAreaId === myAreaId))) ||
       (a.criterionAreaId != null && principalAreaIds.includes(a.criterionAreaId))
     );
 
@@ -263,8 +274,11 @@ router.get("/evaluation-console", requireRole("admin", "rh", "diretoria", "opera
   const eventIds = [...new Set(raw.split(",").map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n > 0))];
   if (raw !== "" && eventIds.length === 0) { res.status(400).json({ error: "eventIds inválido: use números separados por vírgula" }); return; }
   if (eventIds.length > CONSOLE_MAX_EVENTS) { res.status(400).json({ error: `No máximo ${CONSOLE_MAX_EVENTS} eventos por consulta` }); return; }
-  const [criteria, assignments] = await Promise.all([loadEventCriteria(eventIds), loadCriterionAssignments(eventIds)]);
-  res.json({ criteria, assignments });
+  const [criteria, assignments, areaMode] = await Promise.all([loadEventCriteria(eventIds), loadCriterionAssignments(eventIds), areaModeEventIds(eventIds)]);
+  // areaModeEventIds: eventos de ciclo com avaliação por área — lá um critério
+  // está "avaliado" com UMA resposta enviada e "sem avaliador" não trava ninguém
+  // (qualquer avaliador da área responde).
+  res.json({ criteria, assignments, areaModeEventIds: [...areaMode] });
 });
 
 // ---------------------------------------------------------------------------
@@ -398,14 +412,69 @@ router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "
 // Body: { assignedToId?, action?: 'confirm' | 'redirect' }
 // ---------------------------------------------------------------------------
 router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) => {
-  const eventId = parseInt(req.params.id as string);
-  const criterionId = parseInt(req.params.criterionId as string);
+  const eventId = Number(req.params.id);
+  const criterionId = Number(req.params.criterionId);
   const user = req.user!;
-  const { assignedToId, action } = req.body;
+  const { assignedToId, action } = req.body ?? {};
+
+  // B5: evento e critério precisam existir, e o critério estar ATIVO no
+  // evento — antes a inserção da linha batia na chave estrangeira (500).
+  const validId = (n: number) => Number.isInteger(n) && n > 0 && n <= 2_147_483_647;
+  if (!validId(eventId) || !validId(criterionId)) { res.status(400).json({ error: "Evento ou critério inválido" }); return; }
+  if (assignedToId != null && !validId(Number(assignedToId))) { res.status(400).json({ error: "Usuário destino inválido" }); return; }
+  const [eventRow] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!eventRow) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  const [criterionRow] = await db.select({ id: criteriaTable.id, areaId: criteriaTable.responsibleAreaId }).from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
+  if (!criterionRow) { res.status(404).json({ error: "Critério não encontrado" }); return; }
+  const [inEvent] = await db.select({ id: eventCriteriaTable.id }).from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true))).limit(1);
+  if (!inEvent) { res.status(400).json({ error: "Este critério não está ativo neste evento" }); return; }
+  if (assignedToId != null) {
+    const [target] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, Number(assignedToId))).limit(1);
+    if (!target) { res.status(404).json({ error: "Usuário destino não encontrado" }); return; }
+  }
 
   let [assignment] = await db.select().from(eventCriterionAssignmentsTable)
     .where(and(eq(eventCriterionAssignmentsTable.eventId, eventId), eq(eventCriterionAssignmentsTable.criterionId, criterionId)))
     .limit(1);
+  const [routingDefault] = assignment ? [] : await db.select().from(criterionRoutingTable)
+    .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
+  // Quem está com o critério: a linha gravada ou, sem ela, o padrão do roteamento.
+  const currentAssigneeId = assignment ? assignment.assignedToId : (routingDefault?.defaultEvaluatorId ?? null);
+  const areaMode = await eventAreaMode(eventId);
+
+  // B1 (4ª revisão): a PERMISSÃO é conferida ANTES de gravar qualquer coisa —
+  // antes, a linha de designação era criada mesmo para quem recebia 403.
+  const isManager = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
+  let isAreaPrincipal = false;
+  if (action === "redirect") {
+    if (currentAssigneeId !== user.userId && !isManager) {
+      res.status(403).json({ error: "Sem permissão para redirecionar esta avaliação" });
+      return;
+    }
+  } else if (action === "assign") {
+    // M5 (4ª revisão): no ciclo por área ser "principal" da área não dá poder
+    // de atribuir (como em lib/evaluator-visibility.ts).
+    const principalAreaIds = isManager || areaMode ? [] : await getPrincipalAreaIds(user.userId);
+    isAreaPrincipal = !isManager && criterionRow.areaId != null && principalAreaIds.includes(criterionRow.areaId);
+    if (!isManager && !isAreaPrincipal) {
+      res.status(403).json({ error: "Sem permissão para atribuir este critério" });
+      return;
+    }
+  } else if (!isRole(user.role, "admin") && !isRole(user.role, "rh")) {
+    res.status(403).json({ error: "Sem permissão" });
+    return;
+  }
+
+  // D2: no modo por área só quem é da área do critério responde — repassar
+  // (redirecionar/atribuir) para alguém de outra área não lhe daria acesso.
+  if ((action === "redirect" || action === "assign") && assignedToId != null && areaMode) {
+    const [target] = await db.select({ areaId: usersTable.areaId }).from(usersTable).where(eq(usersTable.id, Number(assignedToId))).limit(1);
+    if (target?.areaId == null || target.areaId !== criterionRow.areaId) {
+      res.status(409).json({ error: "Neste ciclo a avaliação é por área: só dá para repassar este critério para alguém da área dele. Quem é de outra área não consegue responder.", code: "AREA_MODE_OTHER_AREA" });
+      return;
+    }
+  }
 
   // A linha de atribuição só existe depois que alguém rodou o endpoint de
   // geração de atribuições para o evento. Se o critério ainda não tem linha
@@ -413,24 +482,22 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // o routing padrão do critério, em vez de falhar com 404 — evita o erro
   // "Atribuição não encontrada" ao confirmar um redirecionamento.
   if (!assignment) {
-    const [routingDefault] = await db.select().from(criterionRoutingTable)
-      .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
     [assignment] = await db.insert(eventCriterionAssignmentsTable).values({
       eventId,
       criterionId,
       assignedToId: routingDefault?.defaultEvaluatorId ?? null,
       status: routingDefault?.defaultEvaluatorId ? "suggested" : "pending",
-    }).returning();
+    }).onConflictDoNothing().returning();
+    // Corrida: outra requisição criou a linha entre a leitura e a inserção.
+    if (!assignment) {
+      [assignment] = await db.select().from(eventCriterionAssignmentsTable)
+        .where(and(eq(eventCriterionAssignmentsTable.eventId, eventId), eq(eventCriterionAssignmentsTable.criterionId, criterionId)))
+        .limit(1);
+    }
   }
 
   // --- REDIRECIONAMENTO (avaliador atual passa para outro) ---
   if (action === "redirect") {
-    const isCurrentAssignee = assignment.assignedToId === user.userId;
-    const isManager = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
-    if (!isCurrentAssignee && !isManager) {
-      res.status(403).json({ error: "Sem permissão para redirecionar esta avaliação" });
-      return;
-    }
     if (assignment.status === "submitted") {
       res.status(400).json({ error: "Avaliação já submetida, não pode ser redirecionada" });
       return;
@@ -488,16 +555,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // precisar de papel admin/rh. Diferente do redirect: não passa pelas
   // regras de redirectMode (é o "chefe" da área decidindo, não um repasse).
   if (action === "assign") {
-    const isManager = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
-    const [criterion] = await db.select({ areaId: criteriaTable.responsibleAreaId })
-      .from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
-    const principalAreaIds = isManager ? [] : await getPrincipalAreaIds(user.userId);
-    const isAreaPrincipal = !isManager && criterion?.areaId != null && principalAreaIds.includes(criterion.areaId);
-
-    if (!isManager && !isAreaPrincipal) {
-      res.status(403).json({ error: "Sem permissão para atribuir este critério" });
-      return;
-    }
+    // Permissão (gestor ou principal da área) já conferida acima (B1/M5).
     if (assignment.status === "submitted") {
       res.status(400).json({ error: "Avaliação já submetida, não pode ser reatribuída" });
       return;
@@ -509,7 +567,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
     if (isAreaPrincipal) {
       const [targetUser] = await db.select({ areaId: usersTable.areaId })
         .from(usersTable).where(eq(usersTable.id, assignedToId)).limit(1);
-      if (!targetUser || targetUser.areaId !== criterion!.areaId) {
+      if (!targetUser || targetUser.areaId !== criterionRow.areaId) {
         res.status(400).json({ error: "Usuário não pertence à sua área" });
         return;
       }
@@ -530,11 +588,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
     return;
   }
 
-  // --- CONFIRMAÇÃO / REATRIBUIÇÃO (admin / rh) ---
-  if (!["admin", "rh"].includes(user.role)) {
-    res.status(403).json({ error: "Sem permissão" });
-    return;
-  }
+  // --- CONFIRMAÇÃO / REATRIBUIÇÃO (admin / rh; permissão conferida acima) ---
 
   const [updated] = await db.update(eventCriterionAssignmentsTable).set({
     ...(assignedToId !== undefined && { assignedToId }),
@@ -554,7 +608,13 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
 // Lista usuários avaliadores de uma área (para popular dropdowns de redirect).
 // ---------------------------------------------------------------------------
 router.get("/users/by-area/:areaId", async (req, res) => {
-  const areaId = parseInt(req.params.areaId as string);
+  const areaId = Number(req.params.areaId);
+  if (!Number.isInteger(areaId) || areaId <= 0 || areaId > 2_147_483_647) { res.status(400).json({ error: "Área inválida" }); return; }
+  // B1: o avaliador só lista as áreas que ele usa na tela de avaliação.
+  if (isRole(req.user!.role, "avaliador") && !(await evaluatorUsableAreaIds(req.user!.userId)).has(areaId)) {
+    res.status(403).json({ error: "Acesso negado: você não usa esta área na avaliação." });
+    return;
+  }
   const users = await db.select({ id: usersTable.id, name: usersTable.name, role: usersTable.role })
     .from(usersTable)
     .where(and(eq(usersTable.areaId, areaId), eq(usersTable.active, true)))
@@ -562,12 +622,58 @@ router.get("/users/by-area/:areaId", async (req, res) => {
   res.json(users);
 });
 
+/**
+ * Áreas cujos usuários o AVALIADOR pode listar (B1): a área do cadastro (repassar
+ * para colega), as áreas em que é avaliador principal (atribuir na área),
+ * Cenografia/Ferramentas quando responde a Matriz de Conformidade de algum
+ * evento (repassar a matriz — a área vem do roteamento da matriz) e a área de
+ * redirecionamento dos critérios dele (designados a ele ou da área dele).
+ */
+export async function evaluatorUsableAreaIds(userId: number): Promise<Set<number>> {
+  const out = new Set<number>();
+  const [me] = await db.select({ areaId: usersTable.areaId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (me?.areaId != null) out.add(me.areaId);
+  for (const a of await getPrincipalAreaIds(userId)) out.add(a);
+  const [ceno] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.conformityEvaluatorUserId, userId)).limit(1);
+  const [ferr] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.conformityEvaluatorFerramentasUserId, userId)).limit(1);
+  if (ceno) out.add(CENOGRAFIA_AREA_ID);
+  if (ferr) out.add(FERRAMENTAS_AREA_ID);
+  const redirectAreas = await db.execute<{ area_id: number }>(sql`
+    SELECT DISTINCT r.redirect_area_id AS area_id
+      FROM criterion_routing r
+      JOIN criteria c ON c.id = r.criterion_id
+     WHERE r.redirect_area_id IS NOT NULL
+       AND (${me?.areaId != null ? sql`c.responsible_area_id = ${me.areaId}` : sql`false`}
+            OR EXISTS (SELECT 1 FROM event_criterion_assignments eca WHERE eca.criterion_id = c.id AND eca.assigned_to_id = ${userId}))`);
+  for (const r of redirectAreas.rows) out.add(Number(r.area_id));
+  return out;
+}
+
+// Áreas da Matriz de Conformidade: Cenografia (13) e Ferramentas e Case (16) —
+// as mesmas fixas do repasse da matriz (PATCH /events/:id/conformity-evaluator*).
+const CENOGRAFIA_AREA_ID = 13;
+const FERRAMENTAS_AREA_ID = 16;
+
 // ---------------------------------------------------------------------------
 // GET /events/:id/criterion-assignments/redirect-options/:criterionId
 // Retorna os usuários possíveis para redirecionar, de acordo com as regras do routing.
 // ---------------------------------------------------------------------------
 router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", async (req, res) => {
-  const criterionId = parseInt(req.params.criterionId as string);
+  const eventId = Number(req.params.id);
+  const criterionId = Number(req.params.criterionId);
+  if (!Number.isInteger(eventId) || eventId <= 0 || !Number.isInteger(criterionId) || criterionId <= 0) {
+    res.status(400).json({ error: "Evento ou critério inválido" });
+    return;
+  }
+  const [criterion] = await db.select({ areaId: criteriaTable.responsibleAreaId }).from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
+  if (!criterion) { res.status(404).json({ error: "Critério não encontrado" }); return; }
+
+  // A1: o avaliador só consulta as opções de um critério que é dele (designado
+  // a ele neste evento, da área do cadastro ou da área em que é principal).
+  if (isRole(req.user!.role, "avaliador") && !(await evaluatorCanActOnCriterion(req.user!.userId, eventId, criterionId, criterion.areaId))) {
+    res.status(403).json({ error: "Acesso negado: este critério não é seu neste evento." });
+    return;
+  }
 
   const [routing] = await db.select().from(criterionRoutingTable)
     .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
@@ -577,11 +683,15 @@ router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", as
     return;
   }
 
+  // D2: no modo por área só faz sentido repassar para alguém da área do critério.
+  const sameAreaOnly = await eventAreaMode(eventId);
+  const areaFilter = sameAreaOnly ? (criterion.areaId != null ? eq(usersTable.areaId, criterion.areaId) : sql`false`) : undefined;
+
   if (routing.redirectMode === "specific") {
     const users = await db.select({ id: usersTable.id, name: usersTable.name })
       .from(criterionRedirectUsersTable)
       .innerJoin(usersTable, eq(criterionRedirectUsersTable.userId, usersTable.id))
-      .where(and(eq(criterionRedirectUsersTable.criterionId, criterionId), eq(usersTable.active, true)))
+      .where(and(eq(criterionRedirectUsersTable.criterionId, criterionId), eq(usersTable.active, true), areaFilter))
       .orderBy(usersTable.name);
     res.json(users);
     return;
@@ -590,7 +700,7 @@ router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", as
   if (routing.redirectMode === "area" && routing.redirectAreaId) {
     const users = await db.select({ id: usersTable.id, name: usersTable.name })
       .from(usersTable)
-      .where(and(eq(usersTable.areaId, routing.redirectAreaId), eq(usersTable.active, true)))
+      .where(and(eq(usersTable.areaId, routing.redirectAreaId), eq(usersTable.active, true), areaFilter))
       .orderBy(usersTable.name);
     res.json(users);
     return;
@@ -599,18 +709,50 @@ router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", as
   res.json([]);
 });
 
+/**
+ * O avaliador pode agir sobre este critério neste evento? Designado a ele (por
+ * critério), da área do cadastro, da área em que foi designado no evento ou
+ * da área em que é avaliador principal.
+ */
+async function evaluatorCanActOnCriterion(userId: number, eventId: number, criterionId: number, criterionAreaId: number | null): Promise<boolean> {
+  const [me] = await db.select({ areaId: usersTable.areaId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (criterionAreaId != null && me?.areaId === criterionAreaId) return true;
+  // Ciclo por área: só a área do cadastro conta (designação/principal não — M5).
+  if (await eventAreaMode(eventId)) return false;
+  const [assigned] = await db.select({ id: eventCriterionAssignmentsTable.id }).from(eventCriterionAssignmentsTable)
+    .where(and(eq(eventCriterionAssignmentsTable.eventId, eventId), eq(eventCriterionAssignmentsTable.criterionId, criterionId), eq(eventCriterionAssignmentsTable.assignedToId, userId))).limit(1);
+  if (assigned) return true;
+  if (criterionAreaId == null) return false;
+  const [areaAssigned] = await db.select({ id: eventAreaAssignmentsTable.id }).from(eventAreaAssignmentsTable)
+    .where(and(eq(eventAreaAssignmentsTable.eventId, eventId), eq(eventAreaAssignmentsTable.areaId, criterionAreaId), eq(eventAreaAssignmentsTable.evaluatorUserId, userId))).limit(1);
+  if (areaAssigned) return true;
+  return (await getPrincipalAreaIds(userId)).includes(criterionAreaId);
+}
+
 // ---------------------------------------------------------------------------
 // GET /events/:id/public-link-eligible-criteria
-// Retorna os critérios do QUESTIONÁRIO deste avaliador neste evento que
-// podem ser incluídos num link público (allowPublicLink=true no routing
-// global do critério, atribuído a este usuário, e ainda não submetido).
-// Usado pela UI para decidir se mostra o botão "Link Freelancer" e o que
-// o link vai cobrir.
+// Critérios que o usuário logado pode mandar num link de freela neste evento:
+// os designados a ele (fluxo antigo) + os ABERTOS da área do cadastro
+// (avaliação por área). Ver publicLinkEligible abaixo. Usado pela UI para
+// decidir se mostra "Enviar link para freela" e o que o link vai cobrir.
 // ---------------------------------------------------------------------------
 router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const user = req.user!;
+  res.json(await publicLinkEligible(eventId, req.user!));
+});
 
+/**
+ * Critérios que o usuário logado pode mandar num link de freela neste evento:
+ * os DESIGNADOS a ele (fluxo antigo: allowPublicLink no roteamento do próprio
+ * critério e ainda não enviado) + os da ÁREA DO CADASTRO ainda abertos
+ * (ninguém enviou; allowPublicLink do critério de origem — a cópia por área
+ * usa o roteamento do original). Sem repetição, na ordem em que aparecem.
+ */
+async function publicLinkEligible(eventId: number, user: { userId: number; role: string }) {
+  // D2: no modo por área a designação não dá acesso — o avaliador manda link
+  // só dos critérios ABERTOS da área do cadastro (areaLinkEligibleCriteria).
+  // Admin/RH (link em nome próprio) seguem pela designação, como antes.
+  if (isRole(user.role, "avaliador") && await eventAreaMode(eventId)) return areaLinkEligibleCriteria(eventId, user);
   const assignments = await db.select({
     criterionId: eventCriterionAssignmentsTable.criterionId,
     criterionName: criteriaTable.name,
@@ -625,12 +767,39 @@ router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
       eq(eventCriterionAssignmentsTable.assignedToId, user.userId),
     ));
 
-  const eligible = assignments
+  let eligible = assignments
     .filter(a => a.allowPublicLink && a.status !== "submitted")
     .map(a => ({ criterionId: a.criterionId, criterionName: a.criterionName }));
+  // Modo por área: a primeira resposta (de qualquer um) fecha o critério —
+  // inclusive para o designado, então ele não manda link do que já fechou.
+  if (eligible.length > 0 && await eventAreaMode(eventId)) {
+    const closed = await loadClosures(db, [eventId], eligible.map(e => e.criterionId));
+    eligible = eligible.filter(e => !closed.has(`${eventId}:${e.criterionId}`));
+  }
+  const seen = new Set(eligible.map(e => e.criterionId));
+  for (const c of await areaLinkEligibleCriteria(eventId, user)) {
+    if (!seen.has(c.criterionId)) { eligible.push(c); seen.add(c.criterionId); }
+  }
+  return eligible;
+}
 
-  res.json(eligible);
-});
+/**
+ * Link com a Matriz de Conformidade (Cenografia) junto: só quem responde pela
+ * matriz NESTE evento (events.conformity_evaluator_user_id) ou admin/RH — um
+ * avaliador qualquer da área não pode sobrescrever a matriz pelo link. E
+ * nunca quando a matriz já tem resposta.
+ */
+async function combinedConformityError(eventId: number, user: { userId: number; role: string }): Promise<{ status: number; error: string } | null> {
+  if (!isAdminOrRh(user.role)) {
+    const [ev] = await db.select({ ceno: eventsTable.conformityEvaluatorUserId }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (!ev || ev.ceno !== user.userId) {
+      return { status: 403, error: "Só o responsável pela Matriz de Conformidade deste evento pode incluir a matriz no link. Gere o link só dos critérios." };
+    }
+  }
+  const answered = await cenografiaConformityAnswered(eventId);
+  if (answered.answered) return { status: 409, error: `${conformityClosedMessage(answered)} Gere o link só dos critérios.` };
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // POST /events/:id/public-token
@@ -648,22 +817,22 @@ router.post("/events/:id/public-token", async (req, res) => {
     res.status(400).json({ error: "Nome do destinatário é obrigatório" });
     return;
   }
+  // Só admin/RH mandam link antes do dia seguinte ao evento (mesma regra da tela).
+  if (!isAdminOrRh(user.role)) {
+    const lock = await dayAfterLockMessage(eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
+  // Link combinado (critérios + Matriz de Conformidade de Cenografia): só o
+  // responsável pela matriz NESTE evento (ou admin/RH) pode incluir a matriz,
+  // e nunca por cima de uma matriz já respondida.
+  if (includeConformity) {
+    const conformityError = await combinedConformityError(eventId, user);
+    if (conformityError) { res.status(conformityError.status).json({ error: conformityError.error }); return; }
+  }
 
-  const assignments = await db.select({
-    criterionId: eventCriterionAssignmentsTable.criterionId,
-    status: eventCriterionAssignmentsTable.status,
-    allowPublicLink: criterionRoutingTable.allowPublicLink,
-  })
-    .from(eventCriterionAssignmentsTable)
-    .leftJoin(criterionRoutingTable, eq(criterionRoutingTable.criterionId, eventCriterionAssignmentsTable.criterionId))
-    .where(and(
-      eq(eventCriterionAssignmentsTable.eventId, eventId),
-      eq(eventCriterionAssignmentsTable.assignedToId, user.userId),
-    ));
-
-  let eligibleCriterionIds = assignments
-    .filter(a => a.allowPublicLink && a.status !== "submitted")
-    .map(a => a.criterionId);
+  // Designados a quem gera + critérios ABERTOS da área do cadastro (qualquer
+  // avaliador da área pode mandar o link; a resposta do freela é a da área).
+  let eligibleCriterionIds = (await publicLinkEligible(eventId, user)).map(c => c.criterionId);
 
   // Se o front passou uma lista de critérios (token de área/formulário), filtra
   // para a interseção — o token só cobre os critérios elegíveis daquela área.
@@ -714,6 +883,15 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
     res.status(400).json({ error: "assignedToUserId e criterionIds são obrigatórios" });
     return;
   }
+  // Admin/RH podem sempre; os demais papéis, só a partir do dia seguinte ao evento.
+  if (!isAdminOrRh(req.user!.role)) {
+    const lock = await dayAfterLockMessage(eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
+  if (includeConformity) {
+    const conformityError = await combinedConformityError(eventId, req.user!);
+    if (conformityError) { res.status(conformityError.status).json({ error: conformityError.error }); return; }
+  }
 
   // Admin bypass: valida apenas que os critérios estão ativos no evento e que
   // o avaliador ainda não os submeteu. Não exige atribuição via criterion-level
@@ -738,7 +916,19 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
   ]);
   const activeIds = new Set(activeCriteriaInEvent.map(c => c.criterionId));
   const submittedIds = new Set(alreadySubmitted.map(e => e.criterionId));
+  // Modo por área: critério com qualquer resposta enviada já está fechado.
+  if (await eventAreaMode(eventId)) {
+    const closed = await loadClosures(db, [eventId], (criterionIds as number[]).filter(id => activeIds.has(id)));
+    for (const k of closed.keys()) submittedIds.add(Number(k.split(":")[1]));
+  }
   const validCriterionIds = (criterionIds as number[]).filter(id => activeIds.has(id) && !submittedIds.has(id));
+  // Ciclo por área: o link responde em nome de assignedToUserId — ele precisa
+  // ser avaliador ativo da área de cada critério (designação não dá direito).
+  const foreign = await areaModeForeignCriteria(db, eventId, Number(assignedToUserId), validCriterionIds);
+  if (foreign.size > 0) {
+    res.status(409).json({ error: "No ciclo por área, o link só pode ser gerado em nome de um avaliador da área do critério.", code: "AREA_MODE_OTHER_AREA" });
+    return;
+  }
 
   if (validCriterionIds.length === 0) {
     res.status(400).json({ error: "Nenhum critério válido encontrado — verifique se os critérios estão ativos no evento ou se todos já foram submetidos por este avaliador" });
@@ -856,6 +1046,10 @@ router.post("/events/:id/public-token/conformity", async (req, res) => {
   if (!isAdminRh && ev.conformityEvaluatorUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Cenografia deste evento" }); return;
   }
+  if (!isAdminOrRh(user.role)) {
+    const lock = await dayAfterLockMessage(eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
 
   // O formulário de conformidade é um só por evento — só pode existir UM link.
   // Se já há um pendente, devolve o mesmo (reenvia se o freelancer perdeu);
@@ -920,6 +1114,10 @@ router.post("/events/:id/public-token/conformity-ferramentas", async (req, res) 
   const isAdminRh = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
   if (!isAdminRh && ev.conformityEvaluatorFerramentasUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Ferramentas deste evento" }); return;
+  }
+  if (!isAdminOrRh(user.role)) {
+    const lock = await dayAfterLockMessage(eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
   }
 
   // Um link só por evento — mesmo comportamento do formulário de Cenografia.

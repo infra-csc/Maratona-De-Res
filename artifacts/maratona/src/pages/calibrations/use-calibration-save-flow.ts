@@ -1,6 +1,7 @@
 // Fluxo salvar → publicar da página de Calibrações. Código movido literalmente
 // do componente da página: mesmas mutations (na mesma ordem de hooks), mesmas
 // query keys, invalidações e toasts. O estado continua no componente pai.
+import { plural } from "@/lib/utils";
 import { useState } from "react";
 import type React from "react";
 import {
@@ -185,7 +186,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       if (okPartial > 0) parts.push(`${okPartial} Parcial`);
       toast({ title: `Publicado — ${parts.join(", ")}` });
     } else {
-      toast({ title: `${okFinal + okPartial} publicado(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
+      toast({ title: `${plural(okFinal + okPartial, "publicado", "publicados")}, ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
     }
   }
 
@@ -281,7 +282,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
         variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
       });
     } else {
-      toast({ title: `${ok} preenchida(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
+      toast({ title: `${plural(ok, "preenchida", "preenchidas")}, ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
     }
   }
 
@@ -395,7 +396,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
       toast({ title: `Salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : (okCal > 0 ? "Ainda não publicado: o colaborador e a nota oficial só mudam quando você clicar em Publicar." : undefined), variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
     } else {
       const failedIds = Array.from(new Set([...failedCal, ...failedWeight, ...failedPublish]));
-      toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: failedDescription(failedIds, firstError), variant: "destructive" });
+      toast({ title: `${plural(totalOk, "salvo", "salvos")}, ${totalFailed} com erro`, description: failedDescription(failedIds, firstError), variant: "destructive" });
     }
   }
 

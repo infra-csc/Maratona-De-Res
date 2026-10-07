@@ -10,4 +10,18 @@ export interface UpdateCycleInput {
   name?: string;
   startDate?: string;
   endDate?: string;
+  /**
+     * Mínimo de eventos participados para o bônus neste ciclo (vazio = regra global)
+     * @nullable
+     */
+  minEvents?: number | null;
+  /**
+     * Data prevista do pagamento do bônus (AAAA-MM-DD)
+     * @nullable
+     */
+  paymentDate?: string | null;
+  /** Conduta fora da Matriz de Conformidade neste ciclo (avaliada no critério Proatividade/Conduta) */
+  conformityWithoutConduta?: boolean;
+  /** Avaliação por área — qualquer avaliador da área responde e a primeira resposta da área fecha o critério (false = fluxo antigo por designação) */
+  areaEvaluation?: boolean;
 }

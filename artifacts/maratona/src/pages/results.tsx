@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CycleBadge } from "@/components/cycle-badge";
+import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wallet, Table2, ListOrdered } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
@@ -7,6 +7,7 @@ import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { RankingTab } from "./results/ranking-tab";
 import { ConsolidationTab } from "./results/consolidation-tab";
 import { PaymentsTab } from "./results/payments-tab";
+import { TotalTab } from "./results/total-tab";
 
 // Partes da página ficam em ./results/: abas (ranking-tab, consolidation-tab, payments-tab),
 // pódio, modal de detalhe do colaborador (com a composição do bônus), painel de faixas,
@@ -21,6 +22,9 @@ export default function ResultsPage() {
   // Um só flag: quem gerencia resultados (exporta consolidação, fecha/recalcula ciclo, edita pagamentos).
   const isManager = ["admin", "rh", "diretoria"].some(r => hasRole(user, r));
   const [tab, setTab] = useState("ranking");
+  // Seletor de ciclo: atual (padrão), anterior (só consulta) ou Total geral.
+  const scope = useCycleScope();
+  const { cycleId, readOnly } = scope;
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
@@ -30,10 +34,20 @@ export default function ResultsPage() {
             <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
               Resultados &amp; Ranking
             </h1>
-            <p className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Classificação geral do ciclo</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>{scope.isAll ? "Todos os ciclos somados" : "Classificação geral do ciclo"}</p>
           </div>
-          <CycleBadge />
+          <CycleSelect scope={scope} />
         </section>
+
+        <CycleScopeNotice
+          scope={scope}
+          paymentNote
+          allHelp={<>Uma linha por pessoa somando todos os ciclos: <strong>média final ponderada pelos eventos com nota</strong> (um ciclo com mais eventos pesa mais), eventos com nota, <strong>bônus oficial</strong> (ciclos fechados) separado do <strong>bônus projetado</strong> (ciclo ainda aberto) e bônus pago. Não existe faixa do total: a coluna mostra a faixa do ciclo mais recente de cada pessoa.</>}
+        />
+
+        {scope.isAll ? (
+          <TotalTab onOpenCycle={(id, isCurrent) => scope.select(isCurrent ? "atual" : id)} />
+        ) : (
 
         <Tabs value={tab} onValueChange={setTab} className="space-y-6">
           <TabsList className="rounded-lg p-1 h-auto flex-wrap gap-1 w-fit" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
@@ -66,17 +80,18 @@ export default function ResultsPage() {
           </TabsList>
 
           <TabsContent value="ranking" className="mt-0">
-            <RankingTab canViewDetail={true} />
+            <RankingTab canViewDetail={true} cycleId={cycleId} readOnly={readOnly} minEvents={scope.cycle?.effectiveMinEvents ?? null} cycleClosed={scope.cycle?.status === "closed"} />
           </TabsContent>
           <TabsContent value="consolidacao" className="mt-0">
-            <ConsolidationTab isManager={isManager} />
+            <ConsolidationTab isManager={isManager} cycleId={cycleId} readOnly={readOnly} cycleClosed={scope.cycle?.status === "closed"} />
           </TabsContent>
           {isManager && (
             <TabsContent value="bonus" className="mt-0">
-              <PaymentsTab canManage={isManager} />
+              <PaymentsTab canManage={isManager} cycleId={cycleId} readOnly={readOnly} cycleClosed={scope.cycle?.status === "closed"} />
             </TabsContent>
           )}
         </Tabs>
+        )}
       </div>
     </div>
   );

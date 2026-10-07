@@ -10,7 +10,7 @@ export function ScoreButton({ score, current, onClick, disabled, label }: { scor
       onClick={onClick}
       title={label}
       className={cn(
-        "border border-border rounded-lg py-3 flex items-center justify-center transition-all w-full",
+        "border border-border rounded-lg py-3 min-h-11 min-w-11 flex items-center justify-center transition-all w-full",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 active:translate-y-0",
         isSelected
           ? "bg-primary text-primary-foreground border-primary"

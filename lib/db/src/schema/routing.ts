@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, boolean, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, boolean, text, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { timestamptz } from "./columns";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -106,7 +106,11 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   createdAt: timestamptz("created_at").notNull().default(sql`now()`),
   /** 'criteria' | 'conformity_cenografia' | 'conformity_ferramentas' */
   tokenType: text("token_type").notNull().default("criteria"),
-});
+}, (t) => ({
+  // "Quem respondeu pelo link" e os links de cada avaliador no evento
+  // consultam por (evento, quem gerou) — migração 0011.
+  eventCreatorIdx: index("public_eval_tokens_event_creator_idx").on(t.eventId, t.createdByUserId),
+}));
 
 /**
  * Critérios cobertos por um token de avaliação pública (relação N:N —

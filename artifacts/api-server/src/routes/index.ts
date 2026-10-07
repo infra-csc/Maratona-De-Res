@@ -7,6 +7,7 @@ import employeesRouter from "./employees.js";
 import eventsRouter from "./events.js";
 import criteriaRouter from "./criteria.js";
 import evaluationsRouter from "./evaluations.js";
+import areaEvaluationsRouter from "./area-evaluations.js";
 import calibrationsRouter from "./calibrations.js";
 import absencesRouter from "./absences.js";
 import penaltyTypesRouter from "./penalty-types.js";
@@ -26,11 +27,22 @@ import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
 import publicEvalRouter from "./public-eval.js";
 import scoreTimelineRouter from "./score-timeline.js";
+import { evaluatorScope } from "../lib/evaluator-scope.js";
+import { closedCycleWriteGuard } from "../lib/closed-cycle-guard.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+// Papel avaliador: só as rotas da tela de avaliação (lib/evaluator-scope.ts).
+router.use(evaluatorScope);
+// Ciclo FECHADO só consulta: montada antes de TODOS os roteadores de escrita
+// (designações e links de routing.ts vinham antes de events.ts e escapavam).
+// Nas rotas cobertas ela autentica ANTES de consultar o ciclo: anônimo
+// recebe 401, nunca 409. O link público (sem login) confere o ciclo fechado
+// no próprio roteador (public-eval.ts). A mesma trava recusa avaliação,
+// matriz e link em evento do PRÓXIMO ciclo (409 EVENT_NEXT_CYCLE, lib/next-cycle.ts).
+router.use(closedCycleWriteGuard);
 // storageRouter is mounted early, BEFORE any router with a blanket
 // requireRole (audit, integration use requireRole("admin","rh")). Those guards
 // run for every fall-through request and would otherwise 403 audio
@@ -50,6 +62,7 @@ router.use(areasRouter);
 router.use(employeesRouter);
 router.use(eventsRouter);
 router.use(criteriaRouter);
+router.use(areaEvaluationsRouter);
 router.use(evaluationsRouter);
 router.use(calibrationsRouter);
 router.use(absencesRouter);

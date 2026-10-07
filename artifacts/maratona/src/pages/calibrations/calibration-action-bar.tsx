@@ -1,4 +1,5 @@
 // Barra de ações compacta: Liberar Sem Cal., progresso, filtros, log de publicação, Salvar e Publicar.
+import { plural } from "@/lib/utils";
 import type React from "react";
 import { Check, Save, Send, Filter, ShieldCheck } from "lucide-react";
 import { GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
@@ -109,7 +110,7 @@ export function CalibrationActionBar({
                       type="button"
                       disabled={savingAll || totalDirtyCount === 0}
                       onClick={handleSaveAll}
-                      title={totalDirtyCount === 0 ? "Nenhuma alteração para salvar" : `Salvar ${totalDirtyCount} alteração(ões) — salva a calibração, não publica`}
+                      title={totalDirtyCount === 0 ? "Nenhuma alteração para salvar" : `Salvar ${plural(totalDirtyCount, "alteração", "alterações")} — salva a calibração, não publica`}
                       className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
                       style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >

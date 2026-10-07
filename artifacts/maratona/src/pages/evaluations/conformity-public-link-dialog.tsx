@@ -5,6 +5,7 @@ import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import type { PublicToken } from "@/lib/routing-api";
 import { CONDENSED } from "@/lib/premium-theme";
 import { fmtDT, publicEvalBaseUrl } from "./helpers";
+import { cenografiaItemsLabel } from "./constants";
 import type { ConformityLinkType, ToastFn } from "./types";
 
 interface ConformityPublicLinkDialogProps {
@@ -21,12 +22,14 @@ interface ConformityPublicLinkDialogProps {
   onGenerate: (base: string) => void;
   onClose: () => void;
   toast: ToastFn;
+  /** Ciclo sem "Conduta" na matriz: o texto lista só os itens que existem. */
+  withoutConduta: boolean;
 }
 
 // ── Dialog: Link Público de Conformidade (Cenografia / Ferramentas) ──
 export function ConformityPublicLinkDialog({
   linkType, recipientName, setRecipientName, generatedUrl, linkCopied, setLinkCopied,
-  conformityHistory, ferramentasHistory, isGenerating, onGenerate, onClose, toast,
+  conformityHistory, ferramentasHistory, isGenerating, onGenerate, onClose, toast, withoutConduta,
 }: ConformityPublicLinkDialogProps) {
   return (
     <Dialog open={linkType !== null} onOpenChange={o => { if (!o) { onClose(); } }}>
@@ -34,7 +37,7 @@ export function ConformityPublicLinkDialog({
         <DialogHeader>
           <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
             <Link2 size={18} />
-            {linkType === "cenografia" ? "Link Freelancer — Cenografia" : "Link Freelancer — Ferramentas"}
+            {linkType === "cenografia" ? "Link para freela — Cenografia" : "Link para freela — Ferramentas"}
           </DialogTitle>
         </DialogHeader>
 
@@ -56,7 +59,7 @@ export function ConformityPublicLinkDialog({
                   <div className="border border-accent rounded-lg bg-accent/10 p-3 flex items-start gap-2">
                     <CheckCircle size={16} className="text-accent-text shrink-0 mt-0.5" />
                     <p className="text-xs font-bold text-accent-text">
-                      Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freelancer"}</span>
+                      Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freela"}</span>
                       {answered.usedAt ? ` em ${fmtDT(answered.usedAt)}` : ""}. Não é possível gerar outro link.
                     </p>
                   </div>
@@ -65,7 +68,7 @@ export function ConformityPublicLinkDialog({
                     <p className="text-sm text-muted-foreground">
                       {pending && !generatedUrl
                         ? <>Já existe um link enviado para <strong>{pending.recipientName ?? "—"}</strong> aguardando resposta. Se a pessoa perdeu, copie e reenvie o mesmo link.</>
-                        : "Link gerado com sucesso! Copie e envie ao freelancer."}
+                        : "Link gerado com sucesso! Copie e envie ao freela."}
                     </p>
                     <div className="border border-border rounded-lg bg-secondary px-3 py-2 flex items-center gap-2 min-w-0">
                       <span className="text-xs font-bold text-muted-foreground truncate flex-1">{shownUrl}</span>
@@ -77,15 +80,15 @@ export function ConformityPublicLinkDialog({
                       </button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Este link é de uso único e expira após o freelancer submeter o formulário.
+                      Este link é de uso único e expira depois que o freela envia o formulário.
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">
                       {linkType === "cenografia"
-                        ? "Gere um link único para um freelancer preencher o formulário de conformidade de Cenografia (EPI, Estaiamentos, Conduta, Ausências e Destaque). Só pode existir um link por evento."
-                        : "Gere um link único para um freelancer preencher o formulário de Guarda de Equipamentos. Só pode existir um link por evento."}
+                        ? `Gere um link único para um freela preencher o formulário de conformidade de Cenografia (${cenografiaItemsLabel(withoutConduta)}). Só pode existir um link por evento.`
+                        : "Gere um link único para um freela preencher o formulário de Guarda de Equipamentos. Só pode existir um link por evento."}
                     </p>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase">Nome do destinatário</Label>

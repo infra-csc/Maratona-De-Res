@@ -1,12 +1,17 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
-import { eq, and, or, inArray, sql } from "drizzle-orm";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
+import { autoReleaseSafely, isOpenForEvaluation, opensLabel } from "../lib/evaluation-release.js";
+import { evaluatorVisibleEvaluationsSql } from "../lib/evaluator-visibility.js";
 import { audit } from "../lib/audit.js";
 import type { DbOrTx } from "../lib/db-tx.js";
-import { getPrincipalAreaIds } from "./routing.js";
 import { recomputeCycleResults } from "./results.js";
 import { pgNum } from "../lib/pg-num.js";
+import {
+  evaluationAccess, findClosure, closedMessage, lockCriterionInEvent, AreaClosedError, noAccessBody, lockEventCycleShared,
+  dayAfterLockMessage, tokenSubmitterNameSql, type EvaluationAccess,
+} from "../lib/area-evaluation.js";
 
 // Submissão/reabertura muda a média do critério; se o evento já conta para o
 // ciclo (resultsConfirmed ou fechado), o snapshot oficial precisa acompanhar.
@@ -19,12 +24,9 @@ async function recomputeIfEventCounts(eventId: number, userId: number): Promise<
 const router = Router();
 router.use(requireAuth);
 
-/**
- * Per-event assignment check: is `userId` the RH-designated evaluator for the
- * area that owns `criterionId`, in this specific event? This REPLACES the old
- * "criterion area == user's fixed profile area" rule. Multiple users can belong
- * to an area, but only the one RH assigned for the event may score it.
- */
+// Quem pode avaliar (designado no evento OU avaliador da área do critério) e a
+// regra "a primeira resposta da área fecha" vivem em lib/area-evaluation.ts.
+
 // Audio justification paths must point at an uploaded object entity
 // (/objects/uploads/<id>). This prevents bypassing the "áudio obrigatório"
 // rule by saving an arbitrary non-empty string as the audioUrl.
@@ -33,46 +35,12 @@ function isValidAudioPath(value: unknown): value is string {
   return typeof value === "string" && AUDIO_PATH_RE.test(value.trim());
 }
 
-async function isAssignedForCriterion(eventId: number, criterionId: number, userId: number): Promise<boolean> {
-  // 1. Se já existe um registro de roteamento por critério (novo sistema),
-  // ele é a autoridade — só quem está atualmente designado (assignedToId)
-  // pode avaliar. Isso é o que faz um redirecionamento realmente tirar o
-  // acesso de quem redirecionou: depois de A redirecionar para B, só B (ou
-  // o avaliador padrão, se reatribuir a si mesmo) pode enviar a avaliação;
-  // sem este corte, o fallback por área abaixo continuaria autorizando A.
-  const [criterionAssignment] = await db
-    .select({ assignedToId: eventCriterionAssignmentsTable.assignedToId })
-    .from(eventCriterionAssignmentsTable)
-    .where(and(
-      eq(eventCriterionAssignmentsTable.eventId, eventId),
-      eq(eventCriterionAssignmentsTable.criterionId, criterionId),
-    ))
-    .limit(1);
-  // Uma linha "pending" sem ninguém designado (criada pela geração automática
-  // quando o critério não tem avaliador padrão no routing) NÃO pode bloquear
-  // o fallback por área — senão nenhum avaliador consegue enviar. Só uma
-  // designação real (assignedToId preenchido, ex.: após redirecionamento)
-  // tem autoridade para cortar o acesso dos demais.
-  if (criterionAssignment?.assignedToId != null) return criterionAssignment.assignedToId === userId;
-
-  // 2. Sem registro de roteamento por critério ainda (evento legado ou nunca
-  // atribuído individualmente): cai no sistema antigo evento→área→avaliador.
-  const [crit] = await db
-    .select({ areaId: criteriaTable.responsibleAreaId })
-    .from(criteriaTable)
-    .where(eq(criteriaTable.id, criterionId))
-    .limit(1);
-  if (!crit || crit.areaId == null) return false;
-  const [areaAssignment] = await db
-    .select({ id: eventAreaAssignmentsTable.id })
-    .from(eventAreaAssignmentsTable)
-    .where(and(
-      eq(eventAreaAssignmentsTable.eventId, eventId),
-      eq(eventAreaAssignmentsTable.areaId, crit.areaId),
-      eq(eventAreaAssignmentsTable.evaluatorUserId, userId),
-    ))
-    .limit(1);
-  return !!areaAssignment;
+class AlreadySubmittedError extends Error {
+  constructor() { super("Avaliação já submetida e bloqueada para edição"); }
+}
+/** Permissão conferida de novo dentro da transação do envio (B2) e negada. */
+class NoAccessError extends Error {
+  constructor(readonly access: EvaluationAccess) { super("Sem acesso ao critério"); }
 }
 
 /**
@@ -102,7 +70,11 @@ export async function freezeEventCriteriaWeights(eventId: number, exec: DbOrTx =
  *
  * GET /evaluations
  * - admin/rh/diretoria: veem tudo
- * - avaliador: as próprias e as das áreas designadas/principais
+ * - avaliador: as próprias (rascunho inclusive) e, de OUTRAS pessoas, só as
+ *   ENVIADAS (B1: rascunho de colega — nota, comentário, áudio — não aparece)
+ *   da ÁREA DO CADASTRO, da área em que foi designado no evento e, no ciclo
+ *   SEM avaliação por área (fluxo antigo), das áreas em que é avaliador
+ *   principal (getPrincipalAreaIds, como sempre foi)
  * - operador: vê só o status (nota, comentário e áudio redigidos)
  * - visualizador: lista vazia (o colaborador usa GET /my-performance)
  */
@@ -128,13 +100,9 @@ router.get("/evaluations", async (req, res) => {
     criterionName: criteriaTable.name,
     evaluatorUserId: evaluationsTable.evaluatorUserId,
     evaluatorName: usersTable.name,
-    tokenSubmitterName: sql<string | null>`(
-      SELECT submitter_name FROM public_eval_tokens
-      WHERE event_id = ${evaluationsTable.eventId}
-        AND created_by_user_id = ${evaluationsTable.evaluatorUserId}
-        AND used_at IS NOT NULL
-      LIMIT 1
-    )`,
+    // Freela que respondeu pelo link: vínculo gravado no envio
+    // (public_token_id) ou, antes da 0011, a ligação exata do envio.
+    tokenSubmitterName: tokenSubmitterNameSql(),
     score: evaluationsTable.score,
     comments: evaluationsTable.comments,
     audioUrl: evaluationsTable.audioUrl,
@@ -152,22 +120,15 @@ router.get("/evaluations", async (req, res) => {
   if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
 
-  // Avaliador: enxerga as PRÓPRIAS avaliações, as das áreas em que foi
-  // designado neste evento (atribuição evento→área→avaliador) e as das áreas
-  // em que é avaliador PRINCIPAL — o principal precisa ver quem respondeu
-  // cada quesito da área dele (inclusive delegados) e quando.
+  // Avaliador (regra do dono: só vê o que foi avaliado da SUA área): as
+  // PRÓPRIAS avaliações (rascunho inclusive) e, de outras pessoas, só as
+  // ENVIADAS: da área do próprio cadastro — quem responde pela área precisa
+  // ver quem já respondeu cada critério e quando —, da área em que foi
+  // designado NAQUELE evento e, no fluxo antigo, das áreas em que é o
+  // avaliador principal. Nada de outras áreas.
+  // (Regra única em lib/evaluator-visibility.ts — o áudio em /storage usa a mesma.)
   if (isRole(user.role, "avaliador")) {
-    const [assignedAreas, principalAreaIds] = await Promise.all([
-      db.select({ areaId: eventAreaAssignmentsTable.areaId })
-        .from(eventAreaAssignmentsTable)
-        .where(eq(eventAreaAssignmentsTable.evaluatorUserId, user.userId)),
-      getPrincipalAreaIds(user.userId),
-    ]);
-    const visibleAreaIds = [...new Set([...assignedAreas.map(a => a.areaId), ...principalAreaIds])];
-    conditions.push(or(
-      eq(evaluationsTable.evaluatorUserId, user.userId),
-      visibleAreaIds.length > 0 ? inArray(criteriaTable.responsibleAreaId, visibleAreaIds) : sql`false`,
-    )!);
+    conditions.push(await evaluatorVisibleEvaluationsSql(user.userId));
   }
 
   if (conditions.length) query = query.where(and(...conditions));
@@ -194,10 +155,11 @@ router.get("/evaluations", async (req, res) => {
 
 /**
  * POST /evaluations
- * Cria/atualiza a nota do TIME para um critério do evento.
- * avaliador só pode avaliar critérios da sua área.
- * Escala oficial: 1 a 10 (nota 0 não é permitida). Comentário obrigatório no
- * submit (mesma exigência do formulário oficial do MS Forms); áudio é opcional.
+ * Cria/atualiza o RASCUNHO da nota do TIME para um critério do evento.
+ * Avaliador: só critérios para os quais foi designado no evento OU da área do
+ * seu cadastro; pela área, um critério já respondido por outra pessoa fica
+ * fechado (409). Escala oficial: 0 a 10. Comentário obrigatório no submit;
+ * áudio é opcional.
  */
 router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
   const { eventId, criterionId, score, comments, commentVisibility, audioUrl } = req.body;
@@ -215,13 +177,10 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     return;
   }
 
-  // Avaliador só pode avaliar áreas para as quais foi designado NESTE evento.
-  if (req.user!.role === "avaliador") {
-    const allowed = await isAssignedForCriterion(eventId, criterionId, req.user!.userId);
-    if (!allowed) {
-      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
-      return;
-    }
+  const access = await evaluationAccess(eventId, criterionId, req.user!);
+  if (!access.allowed) {
+    res.status(403).json(noAccessBody(access));
+    return;
   }
 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
@@ -229,9 +188,16 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     res.status(400).json({ error: "Evento fechado ou não encontrado" });
     return;
   }
-  if (req.user!.role === "avaliador" && !event.criteriaConfirmed) {
-    res.status(400).json({ error: "Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para avaliar." });
-    return;
+  if (isRole(req.user!.role, "avaliador")) {
+    // A avaliação abre no dia seguinte ao evento — sozinha, sem depender do RH.
+    if (!isOpenForEvaluation(event)) {
+      res.status(400).json({ error: `A avaliação deste evento abre ${opensLabel(event)} (dia seguinte ao evento).` });
+      return;
+    }
+    if (!event.criteriaConfirmed && (await autoReleaseSafely({ eventIds: [eventId] })).length === 0) {
+      res.status(400).json({ error: "Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para avaliar." });
+      return;
+    }
   }
 
   const [existing] = await db.select().from(evaluationsTable)
@@ -241,12 +207,22 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
       eq(evaluationsTable.evaluatorUserId, req.user!.userId),
     )).limit(1);
 
-  let evaluation;
-  if (existing) {
-    if (existing.status === "submitted") {
-      res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
+  if (existing?.status === "submitted") {
+    res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
+    return;
+  }
+  // Modo por área: critério já respondido por QUALQUER pessoa está fechado
+  // (designado inclusive). Fluxo antigo: designados somam na média.
+  if (access.firstAnswerCloses) {
+    const closure = await findClosure(db, eventId, criterionId, existing?.id);
+    if (closure) {
+      res.status(409).json({ error: closedMessage(closure), code: "AREA_ALREADY_ANSWERED" });
       return;
     }
+  }
+
+  let evaluation;
+  if (existing) {
     [evaluation] = await db.update(evaluationsTable).set({
       score: String(numScore),
       comments: comments ?? existing.comments,
@@ -280,7 +256,7 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
   res.status(201).json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
-router.patch("/evaluations/:id", async (req, res) => {
+router.patch("/evaluations/:id", requireRole("admin", "rh", "avaliador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { score, comments, commentVisibility, audioUrl } = req.body;
 
@@ -290,16 +266,25 @@ router.patch("/evaluations/:id", async (req, res) => {
     res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
     return;
   }
-  if (existing.evaluatorUserId !== req.user!.userId && !["admin", "rh"].includes(req.user!.role)) {
+  if (existing.evaluatorUserId !== req.user!.userId && !isRole(req.user!.role, "admin") && !isRole(req.user!.role, "rh")) {
     res.status(403).json({ error: "Sem permissão para editar esta avaliação" });
     return;
   }
 
-  // Avaliador só pode editar áreas para as quais foi designado NESTE evento.
-  if (req.user!.role === "avaliador") {
-    const allowed = await isAssignedForCriterion(existing.eventId, existing.criterionId, req.user!.userId);
-    if (!allowed) {
-      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
+  const access = await evaluationAccess(existing.eventId, existing.criterionId, req.user!);
+  if (!access.allowed) {
+    res.status(403).json(noAccessBody(access));
+    return;
+  }
+  // Mesma trava do POST: o avaliador só escreve a partir do dia seguinte ao evento.
+  if (isRole(req.user!.role, "avaliador")) {
+    const lock = await dayAfterLockMessage(existing.eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
+  }
+  if (access.firstAnswerCloses) {
+    const closure = await findClosure(db, existing.eventId, existing.criterionId, existing.id);
+    if (closure) {
+      res.status(409).json({ error: closedMessage(closure), code: "AREA_ALREADY_ANSWERED" });
       return;
     }
   }
@@ -323,21 +308,28 @@ router.patch("/evaluations/:id", async (req, res) => {
   res.json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
-router.post("/evaluations/:id/submit", async (req, res) => {
+router.post("/evaluations/:id/submit", requireRole("admin", "rh", "avaliador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
   if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
-  if (existing.evaluatorUserId !== req.user!.userId && !["admin", "rh"].includes(req.user!.role)) {
+  if (existing.evaluatorUserId !== req.user!.userId && !isRole(req.user!.role, "admin") && !isRole(req.user!.role, "rh")) {
     res.status(403).json({ error: "Sem permissão para submeter esta avaliação" });
     return;
   }
-  // Avaliador só pode submeter áreas para as quais foi designado NESTE evento.
-  if (req.user!.role === "avaliador") {
-    const allowed = await isAssignedForCriterion(existing.eventId, existing.criterionId, req.user!.userId);
-    if (!allowed) {
-      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
-      return;
-    }
+  const access = await evaluationAccess(existing.eventId, existing.criterionId, req.user!);
+  if (!access.allowed) {
+    res.status(403).json(noAccessBody(access));
+    return;
+  }
+  if (existing.status === "submitted") {
+    res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
+    return;
+  }
+  // Rascunho criado antes (ou por outro caminho) também só é enviado a partir
+  // do dia seguinte ao evento.
+  if (isRole(req.user!.role, "avaliador")) {
+    const lock = await dayAfterLockMessage(existing.eventId);
+    if (lock) { res.status(400).json({ error: lock }); return; }
   }
   // Comentário/justificativa é o único campo obrigatório além da nota, igual
   // ao formulário oficial do MS Forms. Áudio é opcional (complemento, não
@@ -346,10 +338,36 @@ router.post("/evaluations/:id/submit", async (req, res) => {
     res.status(400).json({ error: "Comentário obrigatório: preencha a justificativa antes de submeter." });
     return;
   }
-  const [evaluation] = await db.update(evaluationsTable).set({
-    status: "submitted",
-    submittedAt: new Date(),
-  }).where(eq(evaluationsTable.id, id)).returning();
+
+  let evaluation;
+  try {
+    evaluation = await db.transaction(async (tx) => {
+      // B2 (4ª revisão): trava compartilhada no ciclo — o PATCH /cycles que
+      // troca a avaliação por área espera este envio (ou este envio espera a
+      // troca e confere de novo, abaixo, com a regra já gravada).
+      await lockEventCycleShared(tx, existing.eventId);
+      const accessNow = await evaluationAccess(existing.eventId, existing.criterionId, req.user!, tx);
+      if (!accessNow.allowed) throw new NoAccessError(accessNow);
+      // Trava o critério no evento: envios simultâneos ficam em fila, e o
+      // segundo enxerga a resposta que acabou de ser gravada.
+      await lockCriterionInEvent(tx, existing.eventId, [existing.criterionId]);
+      if (accessNow.firstAnswerCloses) {
+        const closure = await findClosure(tx, existing.eventId, existing.criterionId, existing.id);
+        if (closure) throw new AreaClosedError(closure);
+      }
+      const [row] = await tx.update(evaluationsTable).set({
+        status: "submitted",
+        submittedAt: new Date(),
+      }).where(and(eq(evaluationsTable.id, id), eq(evaluationsTable.status, "draft"))).returning();
+      if (!row) throw new AlreadySubmittedError();
+      return row;
+    });
+  } catch (e) {
+    if (e instanceof NoAccessError) { res.status(403).json(noAccessBody(e.access)); return; }
+    if (e instanceof AreaClosedError) { res.status(409).json({ error: e.message, code: "AREA_ALREADY_ANSWERED" }); return; }
+    if (e instanceof AlreadySubmittedError) { res.status(400).json({ error: e.message }); return; }
+    throw e;
+  }
   await audit(req.user!.userId, "submit", "evaluations", id, existing, evaluation);
   await recomputeIfEventCounts(existing.eventId, req.user!.userId);
   res.json({ ...evaluation, score: pgNum(evaluation.score) });
@@ -362,10 +380,40 @@ router.post("/evaluations/:id/reopen", requireRole("admin", "rh"), async (req, r
   const [evaluation] = await db.update(evaluationsTable).set({
     status: "draft",
     submittedAt: null,
+    // Reaberta: o próximo envio é de quem enviar (tela ou outro link).
+    publicTokenId: null,
   }).where(eq(evaluationsTable.id, id)).returning();
   await audit(req.user!.userId, "reopen", "evaluations", id, existing, evaluation);
   await recomputeIfEventCounts(existing.eventId, req.user!.userId);
   res.json({ ...evaluation, score: pgNum(evaluation.score) });
+});
+
+/**
+ * DELETE /evaluations/:id — apaga um RASCUNHO. Só o dono do rascunho (ou
+ * admin/RH). Enviada não se apaga (409): reabrir é com admin/RH. Serve para
+ * limpar o rascunho que ficou "órfão" quando outra pessoa da área enviou
+ * primeiro (modo por área) — B2.
+ */
+router.delete("/evaluations/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "ID inválido" }); return; }
+  const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
+  const isOwner = existing.evaluatorUserId === req.user!.userId;
+  if (!isOwner && !isRole(req.user!.role, "admin") && !isRole(req.user!.role, "rh")) {
+    res.status(403).json({ error: "Só quem escreveu o rascunho pode apagá-lo" });
+    return;
+  }
+  if (existing.status !== "draft") {
+    res.status(409).json({ error: "Avaliação já enviada não pode ser apagada" });
+    return;
+  }
+  const [deleted] = await db.delete(evaluationsTable)
+    .where(and(eq(evaluationsTable.id, id), eq(evaluationsTable.status, "draft")))
+    .returning({ id: evaluationsTable.id });
+  if (!deleted) { res.status(409).json({ error: "Avaliação já enviada não pode ser apagada" }); return; }
+  await audit(req.user!.userId, "delete_draft", "evaluations", id, existing, null);
+  res.json({ ok: true });
 });
 
 export default router;

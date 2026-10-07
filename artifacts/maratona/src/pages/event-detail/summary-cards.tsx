@@ -1,7 +1,7 @@
 // Cards de indicadores do topo: nota do evento, participantes, critérios
 // avaliados e itens não conformes da Matriz.
 import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
-import { CONFORMITY_ITEMS, fmt } from "./helpers";
+import { conformityItemsFor, fmt } from "./helpers";
 import type { ConformityForm, EventDetail, EventTeamResult } from "./types";
 
 export type SummaryCardsProps = {
@@ -15,15 +15,19 @@ export function SummaryCards({ event, result, conformityForm, activeCriteriaCoun
   const displayScore = result && result.eventScore > 0
     ? (result.conformityScore != null ? result.conformityScore : result.eventScore) as number
     : null;
-  const nonConformCount = CONFORMITY_ITEMS.filter(i => conformityForm[i.key] === false).length;
-  const matrixAnswered = CONFORMITY_ITEMS.filter(i => conformityForm[i.key] !== null).length;
+  const items = conformityItemsFor(event);
+  const nonConformCount = items.filter(i => conformityForm[i.key] === false).length;
+  const matrixAnswered = items.filter(i => conformityForm[i.key] !== null).length;
   const evaluatedCount = result?.evaluatedCriteria ?? 0;
   const criteriaTotal = result?.totalCriteria ?? activeCriteriaCount;
-  const criteriaTooltip = `${evaluatedCount} de ${criteriaTotal} critérios com avaliação completa · Matriz ${matrixAnswered}/${CONFORMITY_ITEMS.length}`;
+  const criteriaTooltip = `${evaluatedCount} de ${criteriaTotal} critérios com avaliação completa · Matriz ${matrixAnswered}/${items.length}`;
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
       <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: displayScore != null ? "var(--accent)" : "var(--muted-foreground)" }}>{displayScore != null ? fmt(displayScore) : "—"}</div>
+        {/* Sem nota: texto discreto (o "—" na fonte condensada virava uma barra preta). */}
+        {displayScore != null
+          ? <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmt(displayScore)}</div>
+          : <div className="text-sm font-bold leading-6" style={{ color: "var(--muted-foreground)" }}>Sem nota</div>}
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Nota do Evento</div>
       </div>
       <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>

@@ -96,7 +96,7 @@ export function SurveyPreviewDialog({
             {surveyPreview.avaliadoresToCreate.length > 0 && (
               <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
                 <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
-                  <Users size={14} /> {surveyPreview.avaliadoresToCreate.length} avaliador(es) novo(s) serão cadastrados
+                  <Users size={14} /> {surveyPreview.avaliadoresToCreate.length === 1 ? "1 avaliador novo será cadastrado" : `${surveyPreview.avaliadoresToCreate.length} avaliadores novos serão cadastrados`}
                 </p>
                 <p className="text-[11px] text-[var(--info)] mb-2">Ao confirmar, cada um recebe um usuário com senha provisória (mostrada uma única vez logo após a importação).</p>
                 <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">

@@ -10,6 +10,7 @@ import { calculateEventResult, getPlatoonByScore, buildAssignedEvaluatorsByArea,
 import { audit } from "../lib/audit.js";
 import { recomputeCycleResults } from "./results.js";
 import { pgNum } from "../lib/pg-num.js";
+import { isAreaModeEvent, requiredAssignmentsFor } from "../lib/area-mode.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -45,7 +46,8 @@ async function buildEventFeedback(eventId: number) {
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
   const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
     .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
-  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
+  // Avaliação por área (ciclo com a marca): uma resposta enviada basta.
+  const assignedByArea = buildAssignedEvaluatorsByArea(requiredAssignmentsFor(areaAssignments, await isAreaModeEvent(eventId)));
 
   // Cópias por área (critério respondido por várias áreas) entram no original:
   // a nota do critério é a média das ÁREAS que avaliaram, como na nota oficial

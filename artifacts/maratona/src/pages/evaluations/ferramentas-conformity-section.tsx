@@ -60,11 +60,11 @@ export function FerramentasConformitySection({
               const pendingUrl = `${ferrBase}/eval/${pendingFerr.id}`;
               return (
                 <button type="button"
-                  onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
+                  onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freela"}` }); else toast(COPY_FAILED_TOAST); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors"
                   title="Copiar link já enviado — só existe um link por evento"
                 >
-                  <Copy size={12} /> Copiar link ({pendingFerr.recipientName ?? "freelancer"})
+                  <Copy size={12} /> Copiar link ({pendingFerr.recipientName ?? "freela"})
                 </button>
               );
             }
@@ -73,9 +73,9 @@ export function FerramentasConformitySection({
               <button type="button"
                 onClick={onOpenLinkDialog}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors"
-                title="Gerar link único para um freelancer responder o formulário de Ferramentas"
+                title="Gerar link único para um freela responder o formulário de Ferramentas"
               >
-                <Link2 size={12} /> Link Freelancer
+                <Link2 size={12} /> Link para freela
               </button>
             );
           })()}
@@ -84,7 +84,7 @@ export function FerramentasConformitySection({
       {hasSentLink ? (
         <>
           <p className="text-sm text-muted-foreground px-1 -mt-1">
-            Link enviado para um freelancer preencher este formulário. Acompanhe abaixo.
+            Link enviado para um freela preencher este formulário. Acompanhe abaixo.
           </p>
           <ConformityLinkHistory history={ferramentasPublicTokenHistory ?? []} />
         </>

@@ -215,8 +215,8 @@ function RoutingConfigDialog({
         <label className="flex items-start gap-2.5 cursor-pointer">
           <input type="checkbox" checked={allowPublicLink} onChange={e => setAllowPublicLink(e.target.checked)} className="h-4 w-4 mt-0.5" />
           <span>
-            <span className="block font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Permite Link Freelancer</span>
-            <span className="block text-[11px]" style={{ color: "var(--muted-foreground)" }}>Libera gerar um link público de avaliação (sem conta no sistema) para este critério — use só para áreas que recebem freelancers (ex.: Ativação, Produção, Cenografia). Logística e Atendimento são sempre time da casa, não precisam disso.</span>
+            <span className="block font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Permite link para freela</span>
+            <span className="block text-[11px]" style={{ color: "var(--muted-foreground)" }}>Libera gerar um link público de avaliação (sem conta no sistema) para este critério — use só para áreas que recebem freelas (ex.: Ativação, Produção, Cenografia). Logística e Atendimento são sempre time da casa, não precisam disso.</span>
           </span>
         </label>
       </div>

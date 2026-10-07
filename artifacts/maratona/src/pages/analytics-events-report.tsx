@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
+import { useCycleScope } from "@/components/cycle-select";
 import { useGetAnalyticsEventsReport, getGetAnalyticsEventsReportQueryKey, type EventsReport, type EventReportRow } from "@workspace/api-client-react";
 import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
 import { EmptyState, LoadingState } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { fmtNum } from "@/lib/utils";
+import { fmtNum, plural } from "@/lib/utils";
 
 /*
  * Relatório por evento (Análises → Exportar → Relatório por evento em PDF):
@@ -126,8 +127,10 @@ function EventCard({ e }: { e: EventReportRow }) {
 }
 
 export default function AnalyticsEventsReportPage() {
-  const { data, isLoading, isError, error } = useGetAnalyticsEventsReport(undefined, {
-    query: { queryKey: getGetAnalyticsEventsReportQueryKey(), staleTime: 60_000 },
+  // Mesmo ciclo escolhido nas Análises (?ciclo=): atual, anterior ou Total geral.
+  const scope = useCycleScope();
+  const { data, isLoading, isError, error } = useGetAnalyticsEventsReport(scope.params, {
+    query: { queryKey: getGetAnalyticsEventsReportQueryKey(scope.params), staleTime: 60_000 },
   });
   const printed = useRef(false);
   useEffect(() => {
@@ -135,7 +138,9 @@ export default function AnalyticsEventsReportPage() {
     if (!new URLSearchParams(window.location.search).has("imprimir")) return;
     const t = window.setTimeout(() => {
       printed.current = true;
-      window.history.replaceState(window.history.state, "", window.location.pathname);
+      // Tira só o ?imprimir da URL (o ?ciclo= fica): recarregar não abre a impressão de novo.
+      const qs = new URLSearchParams(window.location.search); qs.delete("imprimir");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs.toString() ? `?${qs}` : ""}`);
       window.print();
     }, 500);
     return () => window.clearTimeout(t);
@@ -146,19 +151,21 @@ export default function AnalyticsEventsReportPage() {
     return (
       <div className="px-6 py-10">
         <EmptyState icon={AlertTriangle} title="Não foi possível montar o relatório" description={(error as { message?: string } | null)?.message ?? "Tente novamente em instantes."}
-          action={<Button variant="outline" asChild><Link href="/analytics">Voltar para Análises</Link></Button>} />
+          action={<Button variant="outline" asChild><Link href={scope.withCycle("/analytics")}>Voltar para Análises</Link></Button>} />
       </div>
     );
   }
-  return <Report report={data} />;
+  return <Report report={data} backHref={scope.withCycle("/analytics")} />;
 }
 
-function Report({ report }: { report: EventsReport }) {
+function Report({ report, backHref }: { report: EventsReport; backHref: string }) {
   const { user } = useAuth();
   const events = useMemo(() => report.events
     .filter(e => e.resultsConfirmed && e.finalScore != null)
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "pt-BR")), [report]);
-  const pendingCount = report.events.length - events.length;
+  const pendingCount = report.events.filter(e => !e.resultsConfirmed).length;
+  // Confirmado, mas sem nota de critério no sistema (resultado gravado direto no ciclo).
+  const noScoreCount = report.events.filter(e => e.resultsConfirmed && e.finalScore == null).length;
   const scores = events.map(e => e.finalScore as number);
   const avgFinal = avg(scores);
   const byScore = [...events].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
@@ -189,7 +196,7 @@ function Report({ report }: { report: EventsReport }) {
   return (
     <div className="px-4 md:px-6 py-6" style={{ fontFamily: BODY }}>
       <div className="no-print max-w-[900px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/analytics" className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
           <ArrowLeft size={14} aria-hidden /> Voltar para Análises
         </Link>
         <div className="flex items-center gap-3">
@@ -203,9 +210,10 @@ function Report({ report }: { report: EventsReport }) {
           <p className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.12em", color: "var(--accent-text)" }}>Maratona de Resultados · Relatório por evento</p>
           <h1 className="text-[34px] font-black uppercase leading-none" style={{ fontFamily: CONDENSED }}>{report.cycle.name}</h1>
           <p className="text-[13px]" style={{ color: "var(--muted-foreground)" }}>
-            Nota final de cada evento já calibrada, com os critérios, a calibração e a equipe que trabalhou. {events.length} eventos com resultado confirmado
+            Nota final de cada evento já calibrada, com os critérios, a calibração e a equipe que trabalhou. {events.length === 1 ? "1 evento com resultado confirmado" : `${events.length} eventos com resultado confirmado`}
             {events.length ? `, de ${br(events[0].startDate)} a ${br(events[events.length - 1].startDate)}` : ""}
-            {pendingCount ? `; ${pendingCount} evento(s) ainda sem confirmação ficaram de fora` : ""}. Gerado em {generatedAt}{user?.name ? ` por ${user.name}` : ""}.
+            {pendingCount ? `; ${pendingCount === 1 ? "1 evento ainda sem confirmação ficou" : `${pendingCount} eventos ainda sem confirmação ficaram`} de fora` : ""}
+            {noScoreCount ? `; ${noScoreCount === 1 ? "1 evento confirmado não tem" : `${noScoreCount} eventos confirmados não têm`} nota por critério no sistema (resultado gravado direto no ciclo) e ${noScoreCount === 1 ? "não aparece" : "não aparecem"} aqui` : ""}. Gerado em {generatedAt}{user?.name ? ` por ${user.name}` : ""}.
           </p>
         </header>
 
@@ -233,8 +241,8 @@ function Report({ report }: { report: EventsReport }) {
             <ul className="list-disc pl-5 space-y-1 text-[13px]">
               <li>Maior nota: <strong>{byScore[0].name}</strong> ({br(byScore[0].startDate)}), <strong>{f1(byScore[0].finalScore)}</strong>.</li>
               {byScore.length > 1 && <li>Menor nota: <strong>{byScore[byScore.length - 1].name}</strong> ({br(byScore[byScore.length - 1].startDate)}), <strong>{f1(byScore[byScore.length - 1].finalScore)}</strong>.</li>}
-              {criteriaSummary[0] && <li>Critério mais fraco no ciclo: <strong>{criteriaSummary[0].name}</strong>{criteriaSummary[0].area ? ` (${criteriaSummary[0].area})` : ""}, média <strong>{f1(criteriaSummary[0].avg)}</strong> em {criteriaSummary[0].n} eventos.</li>}
-              {withPenalty.length > 0 && <li>{withPenalty.length} evento(s) perderam pontos na matriz de conformidade; o maior desconto foi de {f1(Math.max(...withPenalty.map(e => e.conformityPenalty)))} pontos.</li>}
+              {criteriaSummary[0] && <li>Critério mais fraco no ciclo: <strong>{criteriaSummary[0].name}</strong>{criteriaSummary[0].area ? ` (${criteriaSummary[0].area})` : ""}, média <strong>{f1(criteriaSummary[0].avg)}</strong> em {plural(criteriaSummary[0].n, "evento")}.</li>}
+              {withPenalty.length > 0 && <li>{withPenalty.length === 1 ? "1 evento perdeu" : `${withPenalty.length} eventos perderam`} pontos na matriz de conformidade; o maior desconto foi de {f1(Math.max(...withPenalty.map(e => e.conformityPenalty)))} pontos.</li>}
             </ul>
 
             <H2>Critérios no ciclo</H2>
@@ -299,7 +307,7 @@ function Report({ report }: { report: EventsReport }) {
             <ol className="list-decimal pl-5 space-y-1.5 text-[13px]">
               <li>Cada critério recebe nota de 0 a 10. Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério.</li>
               <li>A performance é a média ponderada pelos pesos dos critérios, convertida para 0 a 100. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) entra pela média das duas. Peso 0 não conta.</li>
-              <li>A matriz de conformidade tem quatro itens; cada "Não" tira 10 pontos da nota do evento, que fica entre 0 e 100.</li>
+              <li>A matriz de conformidade tem quatro itens (três nos ciclos que tiraram a Conduta, que então conta como "Sim"); cada "Não" tira 10 pontos da nota do evento, que fica entre 0 e 100.</li>
               <li>Só eventos com resultados confirmados entram na nota do ciclo e no bônus. A equipe que conta é a da casa; freela e função "Sup Ceno" são informativos.</li>
               <li>Eventos "importados" vieram com a nota pronta, sem avaliação por critério no app.</li>
             </ol>

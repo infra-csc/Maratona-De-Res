@@ -28,8 +28,12 @@ export function evaluatorsForArea<T extends { areaId?: number | null }>(evaluato
   return areaFiltered.length > 0 ? areaFiltered : evaluators;
 }
 
-/** Áreas da matriz de conformidade (Cenografia e Ferramentas e Case) com o resumo do que é perguntado. */
-export function conformityAreasOf(areas: { id: number; name: string }[]): ConformityArea[] {
+/**
+ * Áreas da matriz de conformidade (Cenografia e Ferramentas e Case) com o
+ * resumo do que é perguntado. A Conduta sai da matriz nos ciclos que a tiram
+ * (cycles.conformity_without_conduta): passe `withoutConduta` quando souber.
+ */
+export function conformityAreasOf(areas: { id: number; name: string }[], opts: { withoutConduta?: boolean } = {}): ConformityArea[] {
   return areas
     .filter(a => {
       const n = a.name.trim().toLowerCase();
@@ -39,6 +43,8 @@ export function conformityAreasOf(areas: { id: number; name: string }[]): Confor
       ...a,
       description: a.name.trim().toLowerCase().includes("ferramentas")
         ? "1 pergunta: Guarda de Equipamentos"
-        : "3 perguntas (EPI, Estaiamentos, Conduta) + faltas/atrasos e destaque",
+        : opts.withoutConduta
+          ? "2 perguntas (EPI, Estaiamentos) + faltas/atrasos e destaque — a Conduta saiu da matriz neste ciclo"
+          : "EPI, Estaiamentos e Conduta (a Conduta sai nos ciclos sem ela) + faltas/atrasos e destaque",
     }));
 }

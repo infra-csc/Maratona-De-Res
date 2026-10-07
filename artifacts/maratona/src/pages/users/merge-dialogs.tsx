@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { User } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -32,7 +33,7 @@ export function MergeActionBar({ merge, sortedUsers }: { merge: UserMergeState; 
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Confirmar Mescla?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2" style={{ color: "var(--muted-foreground)" }}>
-              <span className="block">O usuário canônico <strong style={{ color: "var(--foreground)" }}>{sortedUsers.find(u => u.id === canonicalId)?.name}</strong> receberá todas as avaliações e calibrações dos {selectedIds.size - 1} usuário(s) duplicado(s):</span>
+              <span className="block">O usuário canônico <strong style={{ color: "var(--foreground)" }}>{sortedUsers.find(u => u.id === canonicalId)?.name}</strong> receberá todas as avaliações e calibrações {selectedIds.size - 1 === 1 ? "do usuário duplicado" : `dos ${selectedIds.size - 1} usuários duplicados`}:</span>
               <ul className="list-disc pl-4 text-xs">
                 {[...selectedIds].filter(id => id !== canonicalId).map(id => (
                   <li key={id}>{sortedUsers.find(u => u.id === id)?.name ?? id}</li>
@@ -80,7 +81,7 @@ export function MergeResultDialog({ merge }: { merge: UserMergeState }) {
           <div className="pt-4 space-y-4">
             <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: `1px solid ${GOOD}` }}>
               <p className="text-sm font-bold">
-                {mergeResult.merged.length} usuário(s) mesclado(s) no canônico
+                {plural(mergeResult.merged.length, "usuário mesclado", "usuários mesclados")} no canônico
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-center">

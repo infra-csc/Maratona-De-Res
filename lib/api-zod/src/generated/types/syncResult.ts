@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { SyncResultSkippedClosedCycleItem } from './syncResultSkippedClosedCycleItem';
 
 export interface SyncResult {
   success: boolean;
@@ -12,4 +13,6 @@ export interface SyncResult {
   eventsSync?: number;
   employeesSync?: number;
   participantsSync?: number;
+  /** Eventos já existentes de ciclo FECHADO que a sincronização deixou como estão (só consulta) */
+  skippedClosedCycle?: SyncResultSkippedClosedCycleItem[];
 }

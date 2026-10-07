@@ -50,5 +50,5 @@ test("GET /evaluation-console: avaliador e colaborador não acessam; eventIds in
   assert.equal((await h.api("GET", "/evaluation-console?eventIds=abc", { role: "admin" })).status, 400);
   const empty = await h.api("GET", "/evaluation-console?eventIds=", { role: "admin" });
   assert.equal(empty.status, 200);
-  assert.deepEqual(empty.data, { criteria: [], assignments: [] });
+  assert.deepEqual(empty.data, { criteria: [], assignments: [], areaModeEventIds: [] });
 });

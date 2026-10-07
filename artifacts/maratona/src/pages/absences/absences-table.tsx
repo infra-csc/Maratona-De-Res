@@ -1,6 +1,7 @@
 import type { Absence } from "@workspace/api-client-react";
 import { UserMinus } from "lucide-react";
 import { CONDENSED } from "@/lib/premium-theme";
+import { plural } from "@/lib/utils";
 import { AbsenceRow } from "./absence-row";
 
 /** Grade "Registros de Penalidades e Méritos" (cabeçalho escuro + tabela). */
@@ -19,7 +20,7 @@ export function AbsencesTable({ rows, canEdit, typeLabel, onEdit, onDelete }: {
           Registros de Penalidades e Méritos
         </span>
         <span className="ml-auto text-[11px] font-bold" style={{ color: "rgba(212,255,0,0.55)" }}>
-          {rows.length} registro{rows.length !== 1 ? "s" : ""}
+          {plural(rows.length, "registro")}
         </span>
       </div>
       <div className="overflow-x-auto">
@@ -40,16 +41,15 @@ export function AbsencesTable({ rows, canEdit, typeLabel, onEdit, onDelete }: {
             {rows.map(a => (
               <AbsenceRow key={a.id} a={a} canEdit={canEdit} typeLabel={typeLabel} onEdit={onEdit} onDelete={onDelete} />
             ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={canEdit ? 8 : 7} className="text-center py-16 text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>
-                  Nenhum lançamento encontrado para os filtros selecionados.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
+      {/* Fora da área que rola de lado: no tablet/celular a frase cabe na tela (antes ficava cortada no meio da tabela larga). */}
+      {rows.length === 0 && (
+        <p data-testid="absences-empty" className="text-center py-14 px-6 text-sm font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+          Nenhum lançamento encontrado para os filtros selecionados.
+        </p>
+      )}
     </div>
   );
 }

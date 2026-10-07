@@ -1,7 +1,7 @@
 import type { QuarterlyResult } from "@workspace/api-client-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { BarChart3 } from "lucide-react";
-import { fmtNum } from "@/lib/utils";
+import { fmtNum, plural } from "@/lib/utils";
 import { CONDENSED } from "@/lib/premium-theme";
 import { fmtBRLShort } from "./helpers";
 import { FaixaBadge } from "./badges";
@@ -38,7 +38,8 @@ function buildPlatoonGroups(rows: QuarterlyResult[]): PlatoonGroup[] {
     .sort((a, b) => (b.minScore ?? -1) - (a.minScore ?? -1));
 }
 
-export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
+export function PlatoonDistributionPanel({ rows, cycleClosed = false }: { rows: QuarterlyResult[]; /** Ciclo fechado: bônus OFICIAL; aberto, PROJETADO. */ cycleClosed?: boolean }) {
+  const bonusHead = cycleClosed ? "Bônus oficial" : "Bônus projetado";
   const groups = buildPlatoonGroups(rows);
   if (groups.length === 0) return null;
 
@@ -53,7 +54,7 @@ export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) 
           Distribuição por Faixa
         </span>
         <span className="ml-auto text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-          {rows.length} colaborador{rows.length !== 1 ? "es" : ""}
+          {plural(rows.length, "colaborador", "colaboradores")}
         </span>
       </div>
 
@@ -66,7 +67,7 @@ export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) 
               <YAxis
                 type="category"
                 dataKey="name"
-                width={80}
+                width={128}
                 tick={{ fontSize: 11, fontWeight: 700, fill: "var(--foreground)", fontFamily: CONDENSED }}
                 axisLine={false}
                 tickLine={false}
@@ -79,7 +80,7 @@ export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) 
                   return (
                     <div className="rounded-lg px-3 py-2 text-xs font-bold shadow-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                       <span style={{ color: "var(--muted-foreground)" }}>{item.payload.name}: </span>
-                      <span style={{ fontFamily: CONDENSED, fontWeight: 900 }}>{item.value as number} colaborador{(item.value as number) !== 1 ? "es" : ""}</span>
+                      <span style={{ fontFamily: CONDENSED, fontWeight: 900 }}>{plural(item.value as number, "colaborador", "colaboradores")}</span>
                     </div>
                   );
                 }}
@@ -96,8 +97,8 @@ export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) 
         {/* Summary table */}
         <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
           <div className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
-            {(["Faixa", "Qtd", "Média", "Bônus Total"] as const).map(h => (
-              <div key={h} className="px-3 py-2.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
+            {(["Faixa", "Qtd", "Média", bonusHead] as const).map(h => (
+              <div key={h} data-testid={h === bonusHead ? "platoon-bonus-head" : undefined} title={h === bonusHead ? (cycleClosed ? "Soma do bônus oficial, apurado no fechamento do ciclo" : "Soma do bônus projetado: o ciclo está aberto e o valor muda até o fechamento") : undefined} className="px-3 py-2.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
             ))}
           </div>
           {groups.map((g, i) => (
@@ -112,7 +113,7 @@ export function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) 
                 <span className="font-black text-sm" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(g.avgScore, 1)}</span>
               </div>
               <div className="px-3 py-2.5 text-center">
-                <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: "var(--primary)" }}>{fmtBRLShort(g.totalBonus)}</span>
+                <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>{fmtBRLShort(g.totalBonus)}</span>
               </div>
             </div>
           ))}

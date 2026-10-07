@@ -6,6 +6,7 @@ import {
   getGetEventsQueryKey, getGetEventQueryKey,
 } from "@workspace/api-client-react";
 import { usePatchCriterionAssignment } from "@/lib/routing-api";
+import { serverErrorMessage } from "../events/form-bits";
 import type { useToast } from "@/hooks/use-toast";
 import type { ConformityKey } from "./types";
 
@@ -32,13 +33,13 @@ export function useSelectedEventDetail({ selectedEventId, qc, toast, setOpenConf
   const setConformityEvaluatorMutation = useSetConformityEvaluator({
     mutation: {
       onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); setOpenConformityPicker(null); toast({ title: "Avaliador de Cenografia atualizado" }); },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Erro ao atribuir avaliador", description: serverErrorMessage(e), variant: "destructive" }),
     },
   });
   const setConformityEvaluatorFerramentasMutation = useSetConformityEvaluatorFerramentas({
     mutation: {
       onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); setOpenConformityPicker(null); toast({ title: "Avaliador de Ferramentas atualizado" }); },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Erro ao atribuir avaliador", description: serverErrorMessage(e), variant: "destructive" }),
     },
   });
   return { selectedDetail, patchAssignment, setConformityEvaluatorMutation, setConformityEvaluatorFerramentasMutation };

@@ -12,12 +12,14 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, employeeCycleEligibilityTable, areasTable,
-  eventConformitiesTable, eventAreaAssignmentsTable,
+  eventConformitiesTable, eventAreaAssignmentsTable, cyclesTable,
   type EventConformity,
 } from "@workspace/db";
-import { eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { getMinEventsForEligibility } from "./cycle.js";
+import { isAfterCycleEnd } from "./cycle-rules.js";
+import { areaModeEventIds, requiredAssignmentsFor } from "./area-mode.js";
 import {
   employeeIdsNeededForRecompute,
   type CycleRecomputeInput, type EventTeamData, type PlatoonRuleMapped,
@@ -96,6 +98,20 @@ export async function effectiveCalibrations<T extends { eventId: number; criteri
   });
 }
 
+/** Eventos cujo ciclo tirou a "Conduta" da Matriz de Conformidade. */
+export async function eventsWithoutConduta(eventIds: number[]): Promise<Set<number>> {
+  if (eventIds.length === 0) return new Set();
+  const rows = await db.select({ id: eventsTable.id }).from(eventsTable)
+    .innerJoin(cyclesTable, eq(eventsTable.cycleId, cyclesTable.id))
+    .where(and(inArray(eventsTable.id, eventIds), eq(cyclesTable.conformityWithoutConduta, true)));
+  return new Set(rows.map(r => r.id));
+}
+
+/** A conduta deixa de contar: null = "sem resposta" = sem desconto. */
+export function withoutConduta<T extends { conduta: boolean | null }>(c: T | undefined, drop: boolean): T | undefined {
+  return c && drop ? { ...c, conduta: null } : c;
+}
+
 export async function loadEventTeamData(eventIds: number[]): Promise<Map<number, EventTeamData<EventConformity>>> {
   const ids = [...new Set(eventIds)];
   const out = new Map<number, EventTeamData<EventConformity>>();
@@ -129,6 +145,12 @@ export async function loadEventTeamData(eventIds: number[]): Promise<Map<number,
   const assignments = await db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
     .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, ids));
   const conformities = await db.select().from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, ids));
+  // Ciclo com "Conduta" fora da Matriz de Conformidade: a resposta não conta
+  // (vale como "sim"); os outros itens seguem com o mesmo peso.
+  const noConduta = await eventsWithoutConduta(ids);
+  // Avaliação POR ÁREA (ciclo novo): uma resposta enviada basta para o
+  // critério contar como "avaliado" — os designados não são exigidos.
+  const areaMode = await areaModeEventIds(ids);
 
   const critBy = groupBy(criteriaRows, r => r.eventId);
   const evalBy = groupBy(evaluations, r => r.eventId);
@@ -144,8 +166,8 @@ export async function loadEventTeamData(eventIds: number[]): Promise<Map<number,
       criteriaRows: critBy.get(id) ?? [],
       evaluations: evalBy.get(id) ?? [],
       calibrations: calBy.get(id) ?? [],
-      areaAssignments: asgBy.get(id) ?? [],
-      conformity: confBy.get(id),
+      areaAssignments: requiredAssignmentsFor(asgBy.get(id) ?? [], areaMode.has(id)),
+      conformity: withoutConduta(confBy.get(id), noConduta.has(id)),
     });
   }
   return out;
@@ -157,11 +179,21 @@ export async function loadEventTeamData(eventIds: number[]): Promise<Map<number,
  * sempre foi; a escrita atômica (com advisory lock) continua em results.ts.
  */
 export async function loadCycleRecomputeInput(cycleId: number, userId: number): Promise<CycleRecomputeInput<EventConformity> & { allCycleEventIds: number[] }> {
-  const cycleEvents = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycleId));
+  const [cycle] = await db.select({ startDate: cyclesTable.startDate, endDate: cyclesTable.endDate }).from(cyclesTable).where(eq(cyclesTable.id, cycleId)).limit(1);
+  const storedEvents = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycleId));
+  // Evento que começa DEPOIS do fim do ciclo ("fora do período", ex.: outubro
+  // com o ciclo de jun–set ainda atual) não conta neste ciclo — nem nota, nem
+  // participação, nem "Sup Ceno", nem as faltas ligadas a ele. Ele conta no
+  // ciclo novo, para onde vai quando o ciclo novo for criado.
+  const afterEndIds = new Set(storedEvents.filter(e => isAfterCycleEnd(e, cycle)).map(e => e.id));
+  const cycleEvents = storedEvents.filter(e => !afterEndIds.has(e.id));
   const confirmedIds = cycleEvents.filter(e => e.resultsConfirmed).map(e => e.id);
-  const allCycleEventIds = cycleEvents.map(e => e.id);
+  // Para LIMPAR employee_event_results: todos os eventos guardados no ciclo,
+  // inclusive os fora do período (não ficam linhas antigas "fantasma").
+  const allCycleEventIds = storedEvents.map(e => e.id);
+  const countedEventIds = cycleEvents.map(e => e.id);
   const platoonRules = await loadPlatoonRules();
-  const minEvents = await getMinEventsForEligibility();
+  const minEvents = await getMinEventsForEligibility(cycleId);
 
   // Snapshot do estado de pagamento atual para preservar decisões manuais.
   const existingRows = await db.select().from(quarterlyResultsTable)
@@ -186,7 +218,7 @@ export async function loadCycleRecomputeInput(cycleId: number, userId: number): 
         .where(inArray(eventParticipantsTable.eventId, confirmedIds))
     : [];
   // "Sup Ceno *" em QUALQUER evento do ciclo (confirmado ou não).
-  const supCenoCheckRows = allCycleEventIds.length > 0
+  const supCenoCheckRows = countedEventIds.length > 0
     ? await db.select({
         employeeId: eventParticipantsTable.employeeId,
         functionName: eventParticipantsTable.functionName,
@@ -194,7 +226,7 @@ export async function loadCycleRecomputeInput(cycleId: number, userId: number): 
       })
         .from(eventParticipantsTable)
         .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
-        .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
+        .where(inArray(eventParticipantsTable.eventId, countedEventIds))
     : [];
 
   const employeeIds = employeeIdsNeededForRecompute(participationRows, existingRows);
@@ -202,12 +234,16 @@ export async function loadCycleRecomputeInput(cycleId: number, userId: number): 
     ? await db.select().from(employeesTable).where(inArray(employeesTable.id, employeeIds))
     : [];
 
-  const absences = await db.select({
+  const absences = (await db.select({
     employeeId: absencesTable.employeeId,
+    eventId: absencesTable.eventId,
     kind: absencesTable.kind,
     points: absencesTable.points,
     quantity: absencesTable.quantity,
-  }).from(absencesTable).where(eq(absencesTable.cycleId, cycleId));
+  }).from(absencesTable).where(eq(absencesTable.cycleId, cycleId)))
+    // Falta ligada a evento fora do período vai junto com ele para o ciclo novo.
+    .filter(a => a.eventId == null || !afterEndIds.has(a.eventId))
+    .map(({ eventId: _eventId, ...a }) => a);
 
   const eligibilityRows = await db.select().from(employeeCycleEligibilityTable)
     .where(eq(employeeCycleEligibilityTable.cycleId, cycleId));

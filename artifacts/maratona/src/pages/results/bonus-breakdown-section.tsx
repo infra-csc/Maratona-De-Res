@@ -1,6 +1,6 @@
 import type { RankingDetailBonusBreakdown } from "@workspace/api-client-react";
 import { Wallet2 } from "lucide-react";
-import { cn, fmtDate, fmtNum } from "@/lib/utils";
+import { cn, fmtDate, fmtNum, plural, faixaEdge } from "@/lib/utils";
 import { CONDENSED, WARNING, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
 import { contrastingTextColor, fmtBRL, fmtBRLShort } from "./helpers";
 
@@ -16,12 +16,12 @@ const BONUS_STATUS_LABEL: Record<string, string> = {
 type BonusBreakdownData = RankingDetailBonusBreakdown;
 
 /** Conta completa do bônus no detalhamento: base + cada evento extra + total. */
-export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
+export function BonusBreakdownSection({ bd, readOnly = false }: { bd: BonusBreakdownData; readOnly?: boolean }) {
   const dateFull = { day: "2-digit", month: "2-digit", year: "numeric" } as const;
   const zeroMsg = bd.zeroReason === "not_eligible"
     ? "Não elegível ao bônus: " + (bd.eligibilityReason ?? "motivo não informado") + "."
     : bd.zeroReason === "no_bonus_platoon"
-    ? "Nota final " + (bd.baseScore != null ? fmtNum(bd.baseScore, 2) : "—") + " está na faixa “" + (bd.basePlatoon ?? "sem faixa") + "”, que não paga bônus. Nesse caso os eventos extras também não são pagos."
+    ? "Nota final " + (bd.baseScore != null ? fmtNum(bd.baseScore, 1) : "—") + " está na faixa “" + (bd.basePlatoon ?? "sem faixa") + "”, que não paga bônus. Nesse caso os eventos extras também não são pagos."
     : bd.zeroReason === "no_result"
     ? "Resultado do ciclo ainda não calculado para este colaborador (nenhum evento confirmado que conte para nota)."
     : null;
@@ -47,7 +47,7 @@ export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
             <p className="font-black uppercase text-[12px] leading-tight">Prêmio base da faixa</p>
             <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-bold" style={muted}>
               {bd.basePlatoon ? (
-                <span className="px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: bd.basePlatoonColor ?? "var(--secondary)", color: bd.basePlatoonColor ? contrastingTextColor(bd.basePlatoonColor) : "var(--muted-foreground)" }}>
+                <span className="px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: bd.basePlatoonColor ?? "var(--secondary)", color: bd.basePlatoonColor ? contrastingTextColor(bd.basePlatoonColor) : "var(--muted-foreground)", ...faixaEdge(bd.basePlatoonColor) }}>
                   {bd.basePlatoon}
                   {bd.basePlatoonMinScore != null && bd.basePlatoonMaxScore != null && (
                     <span className="opacity-60 ml-1">{bd.basePlatoonMinScore}–{bd.basePlatoonMaxScore}</span>
@@ -66,7 +66,7 @@ export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
             <div className="flex-1 min-w-0">
               <p className="font-black uppercase text-[12px] leading-tight">Bônus por evento extra</p>
               <p className="mt-1 text-[11px] font-bold" style={muted}>
-                {bd.scoredEventsCount} prova(s) pontuada(s) · mínimo {bd.minEvents} · {bd.extraEvents.length} extra(s) × {fmtBRL(bd.extraEvents[0]?.value ?? 0)}, o valor por evento adicional da faixa da média. Extras contados a partir da {bd.minEvents + 1}ª prova, em ordem de data.
+                {plural(bd.scoredEventsCount, "prova pontuada", "provas pontuadas")} · mínimo {bd.minEvents} · {plural(bd.extraEvents.length, "extra", "extras")} × {fmtBRL(bd.extraEvents[0]?.value ?? 0)}, o valor por evento adicional da faixa da média. Extras contados a partir da {bd.minEvents + 1}ª prova, em ordem de data.
               </p>
             </div>
             <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.extraValue)}</span>
@@ -91,7 +91,7 @@ export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
             </div>
           ) : (
             <p className="mt-2 text-[11px] font-semibold" style={muted}>
-              Nenhum evento extra: {bd.scoredEventsCount} prova(s) pontuada(s) para um mínimo de {bd.minEvents}.
+              Nenhum evento extra: {plural(bd.scoredEventsCount, "prova pontuada", "provas pontuadas")} para um mínimo de {bd.minEvents}.
             </p>
           )}
         </div>
@@ -119,7 +119,7 @@ export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
 
       {diverges && (
         <div className="px-3 py-2.5 text-[12px] font-semibold leading-snug" style={{ border: "2px solid " + WARNING, color: "var(--foreground)", backgroundColor: "rgba(229,72,77,0.08)" }}>
-          O valor gravado no ciclo é {fmtBRL(bd.storedTotal ?? 0)}, diferente da conta acima. Algum dado mudou depois do último cálculo: use "Recalcular Ciclo" na aba Bônus &amp; Pagamentos.
+          O valor gravado no ciclo é {fmtBRL(bd.storedTotal ?? 0)}, diferente da conta acima. {readOnly ? "Algum dado mudou depois do último cálculo deste ciclo; vale o valor gravado." : <>Algum dado mudou depois do último cálculo: use "Recalcular Ciclo" na aba Bônus &amp; Pagamentos.</>}
         </div>
       )}
     </section>

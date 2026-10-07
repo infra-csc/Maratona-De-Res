@@ -6,14 +6,17 @@ import {
   usersTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable, auditLogsTable,
   cyclesTable, areasTable, eventAreaAssignmentsTable, eventConformitiesTable, evaluationsTable,
 } from "@workspace/db";
-import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
+import { isNotNull, inArray, notInArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { applyAreaDefaults } from "../lib/area-copies.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
+import { eventsWithoutConduta } from "../lib/cycle-data.js";
 import { isSyncableFunction } from "../lib/participation.js";
 import { affectedRows } from "../lib/pg-num.js";
+import { eventsLockedByClosedCycle, closedCycleBody } from "../lib/closed-cycle-guard.js";
+import { plural } from "../lib/plural.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -189,6 +192,17 @@ router.post("/integration/reset", requireRole("admin"), async (req, res) => {
 });
 
 router.post("/integration/sync", async (req, res) => {
+  // A2: ciclo atual FECHADO só consulta — a sincronização gravaria eventos e
+  // participações nele (e recalcularia o resultado oficial). 409 antes de tudo.
+  const currentNow = await getCurrentCycle();
+  if (currentNow?.status === "closed") {
+    res.status(409).json({
+      ...closedCycleBody("Ciclo atual fechado: a sincronização não grava nada nele. Crie o próximo ciclo antes de sincronizar."),
+      success: false, message: "Ciclo atual fechado: a sincronização não grava nada nele. Crie o próximo ciclo antes de sincronizar.",
+      eventsSync: 0, employeesSync: 0, participantsSync: 0,
+    });
+    return;
+  }
   if (!isConfigured()) {
     res.status(400).json({
       success: false,
@@ -220,6 +234,7 @@ router.post("/integration/sync", async (req, res) => {
   const logs: string[] = [];
   const log = (m: string) => logs.push(m);
   let employeesSync = 0, eventsSync = 0, participantsSync = 0;
+  const skippedClosedCycle: { eventId: number; eventName: string; reason: string }[] = [];
   syncing = true;
 
   try {
@@ -240,24 +255,38 @@ router.post("/integration/sync", async (req, res) => {
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
     // 1) Eventos dentro do período do ciclo atual (startDate/endDate do
-    //    ciclo). Importamos TODOS os eventos da janela, independente de já
-    //    terem terminado ou não — a sincronização pode ser rodada durante o
-    //    ciclo para trazer eventos futuros/em andamento. Se o ciclo não tiver
-    //    datas definidas, caímos de volta no filtro por TARGET_YEAR
-    //    (compatibilidade).
+    //    ciclo), pela DATA DE INÍCIO — o critério único do app
+    //    (eventPeriodPosition): antes valia a data de fim, e um evento que
+    //    começa no último dia do ciclo e termina no seguinte ficava de fora.
+    //    Importamos TODOS os eventos da janela, independente de já terem
+    //    terminado ou não. Se o ciclo não tiver datas definidas, caímos de
+    //    volta no filtro por TARGET_YEAR (compatibilidade).
     const cycleStartDate = cycle.startDate;
     const cycleEndDate = cycle.endDate;
-    const keptEvents = cycleStartDate && cycleEndDate
+    const keptByPeriod = cycleStartDate && cycleEndDate
       ? extEvents.filter(ev => {
           const singleDate = ev.date ? normalizeDate(ev.date) : null;
-          const end = singleDate ?? (ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate));
-          return end >= cycleStartDate && end <= cycleEndDate;
+          const start = singleDate ?? normalizeDate(ev.startDate);
+          return start >= cycleStartDate && start <= cycleEndDate;
         })
       : extEvents.filter(ev => {
           const singleDate = ev.date ? normalizeDate(ev.date) : null;
           const yq = deriveYearQuarter(singleDate ?? ev.startDate);
           return (ev.year ?? yq.year) === TARGET_YEAR;
         });
+    // Evento que JÁ existe aqui e é de ciclo FECHADO (dentro do período dele)
+    // não é tocado: nem dados, nem ciclo, nem participações (A2).
+    const keptExtIds = keptByPeriod.map(ev => extIdOf(ev)).filter((v): v is string => !!v);
+    const existingByExt = keptExtIds.length > 0
+      ? await db.select({ id: eventsTable.id, externalId: eventsTable.externalId, name: eventsTable.name }).from(eventsTable).where(inArray(eventsTable.externalId, keptExtIds))
+      : [];
+    const lockedIds = await eventsLockedByClosedCycle(existingByExt.map(e => e.id));
+    const lockedExt = new Set(existingByExt.filter(e => lockedIds.has(e.id)).map(e => e.externalId!));
+    for (const e of existingByExt.filter(x => lockedIds.has(x.id))) {
+      skippedClosedCycle.push({ eventId: e.id, eventName: e.name, reason: "Ciclo fechado: só consulta — o evento não foi atualizado." });
+    }
+    if (skippedClosedCycle.length > 0) log(`${plural(skippedClosedCycle.length, "evento de ciclo fechado ignorado", "eventos de ciclo fechado ignorados")} (só consulta).`);
+    const keptEvents = keptByPeriod.filter(ev => { const id = extIdOf(ev); return !id || !lockedExt.has(id); });
     const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
 
     // 2) Participações nesses eventos com função Cenotécnica/Cenotécnico (e variantes) ou Sup Ceno.
@@ -371,7 +400,8 @@ router.post("/integration/sync", async (req, res) => {
       // Vincular os critérios padrão aos eventos sincronizados (igual à criação
       // manual de evento). Só anexa em eventos que ainda não têm critérios — assim
       // a re-sincronização não sobrescreve a configuração feita pelo RH.
-      const syncedEventIds = Array.from(evMap.values());
+      // Só os eventos desta sincronização (nunca os de ciclo fechado).
+      const syncedEventIds = [...keptEventIds].map(ext => evMap.get(ext)).filter((id): id is number => id != null);
       if (syncedEventIds.length > 0) {
         const activeCriteria = await tx.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
         if (activeCriteria.length > 0) {
@@ -389,7 +419,7 @@ router.post("/integration/sync", async (req, res) => {
             );
             // Critérios respondidos por várias áreas: cópia de cada área, como na criação manual.
             for (const eventId of toSeed) await applyAreaDefaults(eventId, tx);
-            log(`Critérios padrão vinculados a ${toSeed.length} novo(s) evento(s).`);
+            log(`Critérios padrão vinculados a ${plural(toSeed.length, "novo evento", "novos eventos")}.`);
           }
         }
       }
@@ -406,7 +436,7 @@ router.post("/integration/sync", async (req, res) => {
     lastSyncAt = new Date().toISOString();
     lastLogs = logs;
     await audit(req.user!.userId, "sync_integration", "integration", undefined, null, { employeesSync, eventsSync, participantsSync });
-    res.json({ success: true, message, eventsSync, employeesSync, participantsSync });
+    res.json({ success: true, message, eventsSync, employeesSync, participantsSync, skippedClosedCycle });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     log(`ERRO: ${msg}`);
@@ -719,6 +749,27 @@ router.post("/integration/import/historical-results", async (req, res) => {
     (g as Group & { _plan?: GroupPlan })._plan = planEntry;
   }
 
+  // M5: ciclo FECHADO só consulta — nem atualizar evento dele, nem criar
+  // evento novo nele, nem vincular o grupo a evento dele. Erro na prévia e
+  // 409 ao aplicar (nada é gravado).
+  const groupPlans = [...groups.values()].map(g => (g as Group & { _plan?: GroupPlan })._plan!);
+  const overrideIdOf = (p: GroupPlan) => {
+    const id = p.action === "create" ? overrideMap[p.groupKey] : undefined;
+    return id != null && p.overlapCandidates?.some(c => c.id === id) ? id : undefined;
+  };
+  const lockedForImport = await eventsLockedByClosedCycle(groupPlans.flatMap(p => [p.existingEventId, overrideIdOf(p)].filter((id): id is number => id != null)));
+  const closedCyclePlans = groupPlans.filter(p => {
+    const overrideId = overrideIdOf(p);
+    if (overrideId != null) return lockedForImport.has(overrideId);
+    if (p.action === "update") return p.existingEventId != null && lockedForImport.has(p.existingEventId);
+    if (p.action === "create") return p.cycleId != null && cyclesById.get(p.cycleId)?.status === "closed";
+    return false;
+  });
+  for (const p of closedCyclePlans) {
+    const cycleName = p.cycleName ?? "o ciclo";
+    errors.push(`Evento "${p.eventName}" (${p.date}): ciclo fechado (${cycleName}) — só consulta, a importação não grava nele.`);
+  }
+
   const preview = {
     totalRows: rows.length,
     matched: parsed.filter(r => r.employeeId !== null).length,
@@ -734,6 +785,10 @@ router.post("/integration/import/historical-results", async (req, res) => {
     return;
   }
 
+  if (closedCyclePlans.length > 0) {
+    res.status(409).json({ ...closedCycleBody(errors.find(e => e.includes("ciclo fechado")) ?? undefined), success: false, dryRun: false, errors, ...preview });
+    return;
+  }
   if (errors.length > 0) {
     res.status(400).json({ success: false, dryRun: false, errors, ...preview });
     return;
@@ -1100,6 +1155,14 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     });
   }
 
+  // Ciclo fechado só consulta: grupo vinculado a evento de ciclo fechado não
+  // é importado — vincule a outro evento ou ignore o grupo.
+  const lockedLinked = await eventsLockedByClosedCycle(groupPlans.filter(gp => !gp.ignored && gp.linkedEventId).map(gp => gp.linkedEventId!));
+  const closedCycleGroups = groupPlans.filter(gp => !gp.ignored && gp.linkedEventId != null && lockedLinked.has(gp.linkedEventId));
+  for (const gp of closedCycleGroups) {
+    errors.push(`Evento "${gp.linkedEvent?.name ?? gp.eventLabel}" é de ciclo fechado (só consulta): vincule o grupo "${gp.eventLabel}" a outro evento ou ignore-o.`);
+  }
+
   const allUsers = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role }).from(usersTable);
   const usersByName = new Map<string, typeof allUsers>();
   for (const u of allUsers) {
@@ -1168,7 +1231,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     if (dropped > 0) {
       duplicateRowsIgnored += dropped;
       const eventName = eventsById.get(eventId)?.name ?? String(eventId);
-      duplicateWarnings.push(`Evento "${eventName}": ${dropped} resposta(s) repetida(s) do mesmo avaliador — apenas a mais recente será importada.`);
+      duplicateWarnings.push(`Evento "${eventName}": ${plural(dropped, "resposta repetida", "respostas repetidas")} do mesmo avaliador — apenas a mais recente será importada.`);
     }
     rowsByEventId.set(eventId, Array.from(byEvaluator.values()));
   }
@@ -1183,7 +1246,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       const existingEvals = await db.select({ id: evaluationsTable.id }).from(evaluationsTable)
         .where(and(eq(evaluationsTable.eventId, gp.linkedEvent.id), inArray(evaluationsTable.criterionId, retiredCriteriaIdsForWarnings), eq(evaluationsTable.status, "submitted")));
       if (existingEvals.length > 0) {
-        warnings.push(`Evento "${gp.linkedEvent.name}": ${existingEvals.length} avaliação(ões) já enviada(s) em critérios que serão retirados do catálogo — essas notas deixarão de contar no cálculo após esta importação.`);
+        warnings.push(`Evento "${gp.linkedEvent.name}": ${plural(existingEvals.length, "avaliação já enviada", "avaliações já enviadas")} em critérios que serão retirados do catálogo — essas notas deixarão de contar no cálculo após esta importação.`);
       }
     }
     if (gp.linkedEvent.status === "closed") {
@@ -1214,7 +1277,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     }
     if (skippedHere > 0) {
       evaluationsAlreadyInApp += skippedHere;
-      warnings.push(`Evento "${targetEvent.name}": ${skippedHere} nota(s) da planilha já existem no app (mesmo avaliador e quesito) e serão puladas — as notas lançadas no app prevalecem.`);
+      warnings.push(`Evento "${targetEvent.name}": ${skippedHere === 1 ? "1 nota da planilha já existe" : `${skippedHere} notas da planilha já existem`} no app (mesmo avaliador e quesito) e serão puladas — as notas lançadas no app prevalecem.`);
     }
   }
 
@@ -1234,13 +1297,17 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     return;
   }
 
+  if (closedCycleGroups.length > 0) {
+    res.status(409).json({ ...closedCycleBody(errors.find(e => e.includes("ciclo fechado")) ?? undefined), success: false, dryRun: false, errors, ...preview });
+    return;
+  }
   if (errors.length > 0) {
     res.status(400).json({ success: false, dryRun: false, errors, ...preview });
     return;
   }
   const unresolved = groupPlans.filter(g => !g.resolved);
   if (unresolved.length > 0) {
-    res.status(400).json({ success: false, dryRun: false, errors: [`Vincule todos os eventos da planilha a um evento existente antes de confirmar (${unresolved.length} pendente(s)).`], ...preview });
+    res.status(400).json({ success: false, dryRun: false, errors: [`Vincule todos os eventos da planilha a um evento existente antes de confirmar (${plural(unresolved.length, "pendente")}).`], ...preview });
     return;
   }
 
@@ -1387,8 +1454,12 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       }
 
       const conformityAnswers: Partial<Record<ConformityField, boolean>> = {};
+      // Ciclo com a Conduta fora da Matriz: a resposta da planilha é ignorada
+      // (não é gravada e conta como "sim"), como na tela e no link.
+      const dropConduta = (await eventsWithoutConduta([eventId])).has(eventId);
       for (const r of eventRows) {
         for (const field of ["epi", "estaiamentos", "guardaEquipamentos", "conduta"] as const) {
+          if (field === "conduta" && dropConduta) continue;
           const v = r.conformity[field];
           if (v === undefined) continue;
           conformityAnswers[field] = conformityAnswers[field] === false ? false : v;
@@ -1492,6 +1563,15 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
   // Build target criteria map (after upsert)
   const targetCriteriaByName = new Map<string, { id: number }>();
 
+  // M4 (4ª revisão): ciclo fechado só consulta — os critérios e as avaliações
+  // de evento de ciclo fechado (dentro do período) não são tocados; vêm em
+  // skippedClosedCycle. O catálogo global (passos 1 e 2) segue normal.
+  const eventRows = await db.select({ id: eventsTable.id, name: eventsTable.name }).from(eventsTable);
+  const lockedEvents = await eventsLockedByClosedCycle(eventRows.map(e => e.id));
+  const skippedClosedCycle = eventRows.filter(e => lockedEvents.has(e.id))
+    .map(e => ({ eventId: e.id, eventName: e.name, reason: "Ciclo fechado: só consulta — os critérios e as avaliações deste evento não foram migrados." }));
+  const lockedIds = [...lockedEvents];
+
   await db.transaction(async (tx) => {
     // 1. Deactivate retired criteria globally
     for (const name of SURVEY_CRITERIA_RETIRED) {
@@ -1532,6 +1612,7 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
     // 3. Migrate event_criteria for ALL events (including historical/confirmed)
     const allEvents = await tx.select({ id: eventsTable.id }).from(eventsTable);
     for (const ev of allEvents) {
+      if (lockedEvents.has(ev.id)) continue;
       let changed = false;
       // 3a. Deactivate old retired criteria in event_criteria (mark inactive, don't delete,
       //     so we preserve history but they stop counting for scoring)
@@ -1565,16 +1646,19 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
       if (!oldCrit || !newCrit) continue;
       const result = await tx.update(evaluationsTable)
         .set({ criterionId: newCrit.id })
-        .where(eq(evaluationsTable.criterionId, oldCrit.id));
+        .where(and(
+          eq(evaluationsTable.criterionId, oldCrit.id),
+          ...(lockedIds.length > 0 ? [notInArray(evaluationsTable.eventId, lockedIds)] : []),
+        ));
       evaluationsRemapped += affectedRows(result);
     }
   });
 
   await audit(userId, "migrate_criteria_catalog", "criteria", undefined, null, {
-    catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed,
+    catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed, skippedClosedCycle: skippedClosedCycle.length,
   });
 
-  res.json({ success: true, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed, evaluationsRemapped });
+  res.json({ success: true, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed, evaluationsRemapped, skippedClosedCycle });
 });
 
 // Remove avaliações duplicadas: cópias EXATAS (mesmo evento, quesito, avaliador,
@@ -1609,8 +1693,12 @@ router.post("/integration/evaluations/dedupe", requireRole("admin"), async (req,
   const affectedEventIds = new Set<number>();
   let groupsAffected = 0;
   const idToEventId = new Map(all.map(e => [e.id, e.eventId]));
+  // Ciclo fechado só consulta: duplicatas de evento dele ficam como estão.
+  const lockedEvents = await eventsLockedByClosedCycle([...new Set(all.map(e => e.eventId))]);
+  let skippedClosedCycle = 0;
   for (const ids of byContent.values()) {
     if (ids.length <= 1) continue;
+    if (lockedEvents.has(idToEventId.get(ids[0])!)) { skippedClosedCycle += ids.length - 1; continue; }
     groupsAffected++;
     const sorted = [...ids].sort((a, b) => a - b);
     for (const id of sorted.slice(1)) {
@@ -1624,7 +1712,7 @@ router.post("/integration/evaluations/dedupe", requireRole("admin"), async (req,
     res.json({
       success: true, dryRun: true,
       duplicatesFound: idsToDelete.length, groupsAffected, eventsAffected: affectedEventIds.size,
-      duplicatesRemoved: 0, warnings: [],
+      duplicatesRemoved: 0, skippedClosedCycle, warnings: [],
     });
     return;
   }
@@ -1648,7 +1736,7 @@ router.post("/integration/evaluations/dedupe", requireRole("admin"), async (req,
   res.json({
     success: true, dryRun: false,
     duplicatesFound: idsToDelete.length, groupsAffected, eventsAffected: affectedEventIds.size,
-    duplicatesRemoved: idsToDelete.length, warnings: cycleWarnings,
+    duplicatesRemoved: idsToDelete.length, skippedClosedCycle, warnings: cycleWarnings,
   });
 });
 
@@ -1660,7 +1748,7 @@ router.post("/integration/fix-orphaned-evaluations", requireRole("admin"), async
   const userId = req.user!.userId;
 
   // Encontra event_criteria inativos que têm pelo menos uma avaliação submetida
-  const orphaned = await db
+  let orphaned = await db
     .selectDistinct({
       eventCriteriaId: eventCriteriaTable.id,
       eventId: eventCriteriaTable.eventId,
@@ -1677,8 +1765,14 @@ router.post("/integration/fix-orphaned-evaluations", requireRole("admin"), async
     )
     .where(eq(eventCriteriaTable.active, false));
 
+  // Ciclo fechado só consulta: critério de evento dele não é reativado (a
+  // reativação mudaria a nota oficial do ciclo fechado).
+  const lockedEvents = await eventsLockedByClosedCycle([...new Set(orphaned.map(r => r.eventId))]);
+  const skippedClosedCycle = orphaned.filter(r => lockedEvents.has(r.eventId)).length;
+  orphaned = orphaned.filter(r => !lockedEvents.has(r.eventId));
+
   if (orphaned.length === 0) {
-    res.json({ fixed: 0, eventsAffected: 0, criteriaReactivated: [] });
+    res.json({ fixed: 0, eventsAffected: 0, criteriaReactivated: [], skippedClosedCycle });
     return;
   }
 
@@ -1693,7 +1787,7 @@ router.post("/integration/fix-orphaned-evaluations", requireRole("admin"), async
     eventsAffected: affectedEventIds.length,
   });
 
-  res.json({ fixed: ids.length, eventsAffected: affectedEventIds.length, criteriaReactivated });
+  res.json({ fixed: ids.length, eventsAffected: affectedEventIds.length, criteriaReactivated, skippedClosedCycle });
 });
 
 export default router;

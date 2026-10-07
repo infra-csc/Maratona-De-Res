@@ -1,4 +1,3 @@
-import type { EventCriterion } from "@workspace/api-client-react";
 import { Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -12,37 +11,31 @@ type AreaUser = NonNullable<ReturnType<typeof useUsersByArea>["data"]>[number];
 interface PrincipalAreaCriteriaSectionProps {
   myPrincipalAreas: PrincipalAreaRow[];
   criterionAssignments: CriterionAssignmentRow[] | undefined;
-  activeCriteria: EventCriterion[];
   userId: number | undefined;
   onTakeCriterion: (criterionId: number) => void;
   onAssignCriterion: (target: AreaAssignTarget) => void;
 }
 
 // "Quesitos da Minha Área": visão do avaliador principal sobre todos os
-// quesitos da(s) área(s) dele no evento, com atribuir / pegar para mim.
+// quesitos das áreas dele no evento, com atribuir / pegar para mim.
 export function PrincipalAreaCriteriaSection({
-  myPrincipalAreas, criterionAssignments, activeCriteria, userId, onTakeCriterion, onAssignCriterion,
+  myPrincipalAreas, criterionAssignments, userId, onTakeCriterion, onAssignCriterion,
 }: PrincipalAreaCriteriaSectionProps) {
   const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
-  // Deriva a partir dos critérios ATIVOS do evento (não das atribuições já
-  // geradas) — assim a área principal enxerga e gerencia seus quesitos desde
-  // o primeiro momento, mesmo que ninguém tenha rodado "Gerar Sugestões"
-  // ainda para este evento (a linha de atribuição é criada na hora, no
-  // primeiro "Pegar para mim"/"Atribuir a...", como já acontece no backend).
-  const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
-  const areaCriteria = activeCriteria
-    .filter(c => c.responsibleAreaId != null && principalAreaIds.has(c.responsibleAreaId))
-    .map(c => {
-      const a = assignmentByCriterionId.get(c.criterionId);
-      return {
-        criterionId: c.criterionId,
-        criterionName: displayCriterionName(c.criterionName),
-        criterionAreaId: c.responsibleAreaId as number,
-        assignedToId: a?.assignedToId ?? null,
-        assignedToName: a?.assignedToName ?? null,
-        status: a?.status ?? "pending",
-      };
-    });
+  // Deriva das atribuições do evento: para o avaliador principal, o servidor
+  // já devolve TODOS os critérios ativos da área dele (os ainda sem atribuição
+  // vêm como linhas "virtuais", com o avaliador padrão do roteamento) — sem
+  // precisar ler a lista completa de critérios do evento.
+  const areaCriteria = (criterionAssignments ?? [])
+    .filter(a => a.criterionAreaId != null && principalAreaIds.has(a.criterionAreaId))
+    .map(a => ({
+      criterionId: a.criterionId,
+      criterionName: displayCriterionName(a.criterionName),
+      criterionAreaId: a.criterionAreaId as number,
+      assignedToId: a.assignedToId ?? null,
+      assignedToName: a.assignedToName ?? null,
+      status: a.status ?? "pending",
+    }));
   if (areaCriteria.length === 0) return null;
   const areaNameById = new Map(myPrincipalAreas.map(a => [a.id, a.name]));
   return (

@@ -55,6 +55,13 @@ function handleAuthError(error: unknown) {
     localStorage.removeItem("maratona_real_token");
     localStorage.removeItem("maratona_real_user");
     const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    // Sessão vencida no meio do uso: guarda o evento aberto para retomar
+    // depois do login (a tela de Avaliações consome "maratona_destino").
+    try {
+      if (/\/evaluations$/.test(window.location.pathname) && new URLSearchParams(window.location.search).get("evento")) {
+        sessionStorage.setItem("maratona_destino", window.location.pathname + window.location.search);
+      }
+    } catch { /* sem storage: segue sem retomar */ }
     if (!window.location.pathname.endsWith("/login")) {
       window.location.assign(`${base}/login`);
     }
@@ -83,6 +90,8 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
   }
   if (!user) return <Redirect to="/login" />;
   if (user.mustChangePassword) return <Redirect to="/trocar-senha" />;
+  // Regra do dono: o avaliador só avalia — qualquer outra tela volta para /evaluations.
+  if (user.role === "avaliador" && Component !== EvaluationsPage) return <Redirect to="/evaluations" />;
   if (roles && !roles.includes(user.role)) {
     return (
       <AppLayout>
@@ -161,7 +170,7 @@ function AppRoutes() {
       <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} roles={["admin", "rh"]} />} />
       <Route path="/meu-desempenho" component={() => <ProtectedRoute component={MyPerformancePage} />} />
       <Route path="/como-funciona" component={() => <ProtectedRoute component={ComoFuncionaPage} />} />
-      <Route component={NotFound} />
+      <Route>{user?.role === "avaliador" ? <Redirect to="/evaluations" /> : <NotFound />}</Route>
     </Switch>
     </Suspense>
   );

@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import type { HistoricalImportResult } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -79,7 +80,7 @@ export function HistoricalPreviewDialog({
 
             {eventsBlocked > 0 && (
               <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
-                <strong>{eventsBlocked} evento(s) não serão importados</strong> por causa dos erros listados abaixo — corrija a planilha e reenvie.
+                <strong>{eventsBlocked === 1 ? "1 evento não será importado" : `${eventsBlocked} eventos não serão importados`}</strong> por causa dos erros listados abaixo — corrija a planilha e reenvie.
               </p>
             )}
 
@@ -98,7 +99,7 @@ export function HistoricalPreviewDialog({
             {historicalPreview.employeesToCreate && historicalPreview.employeesToCreate.length > 0 && (
               <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
                 <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
-                  <Users size={14} /> {historicalPreview.employeesToCreate.length} colaborador(es) novo(s) serão cadastrados
+                  <Users size={14} /> {historicalPreview.employeesToCreate.length === 1 ? "1 colaborador novo será cadastrado" : `${historicalPreview.employeesToCreate.length} colaboradores novos serão cadastrados`}
                 </p>
                 <p className="text-[11px] text-[var(--info)] mb-2">Esses nomes não bateram com nenhum colaborador já cadastrado. Ao confirmar, eles serão criados automaticamente (cadastro básico, sem área/função definida) e já entram participando do evento correspondente na tabela abaixo. Se algum nome estiver digitado errado, cancele e corrija a planilha antes de confirmar.</p>
                 <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
@@ -110,7 +111,7 @@ export function HistoricalPreviewDialog({
             {historicalPreview.cycleFallback && historicalPreview.cycleFallback.length > 0 && (
               <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
                 <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
-                  <Calendar size={14} /> {historicalPreview.cycleFallback.length} evento(s) fora do período do ciclo cadastrado
+                  <Calendar size={14} /> {plural(historicalPreview.cycleFallback.length, "evento")} fora do período do ciclo cadastrado
                 </p>
                 <p className="text-[11px] text-[var(--info)] mb-2">A data desses eventos não cai dentro do período de nenhum ciclo configurado. Em vez de bloquear, eles serão vinculados ao ciclo atual (indicado na tabela abaixo) para que os resultados entrem normalmente nos relatórios.</p>
                 <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
@@ -144,7 +145,7 @@ export function HistoricalPreviewDialog({
                             {ev.matchedCount}/{ev.participantsCount}
                             {ev.newEmployeeNames && ev.newEmployeeNames.length > 0 && (
                               <div className="text-[11px] text-[var(--info)] mt-0.5">
-                                {ev.newEmployeeNames.length} novo(s): {ev.newEmployeeNames.join(", ")}
+                                {plural(ev.newEmployeeNames.length, "novo", "novos")}: {ev.newEmployeeNames.join(", ")}
                               </div>
                             )}
                           </td>

@@ -21,6 +21,43 @@ export interface CycleFields {
 
 export const CYCLE_NAME_MAX = 80;
 
+export interface CycleRuleValues {
+  minEvents?: number | null;
+  paymentDate?: string | null;
+  conformityWithoutConduta?: boolean;
+  areaEvaluation?: boolean;
+}
+
+/**
+ * Regras POR CICLO vindas do corpo da requisição (só as chaves enviadas).
+ * minEvents: inteiro 1–50 ou null (= regra global); paymentDate: AAAA-MM-DD
+ * ou null; conformityWithoutConduta: boolean.
+ */
+export function parseCycleRules(body: Record<string, unknown>): { values: CycleRuleValues } | { error: string } {
+  const values: CycleRuleValues = {};
+  if (body.minEvents !== undefined) {
+    const v = body.minEvents;
+    if (v === null || v === "") values.minEvents = null;
+    else if (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 50) values.minEvents = v;
+    else return { error: "Mínimo de eventos inválido (de 1 a 50, ou vazio para usar a regra geral)." };
+  }
+  if (body.paymentDate !== undefined) {
+    const v = body.paymentDate;
+    if (v === null || v === "") values.paymentDate = null;
+    else if (isIsoDate(v)) values.paymentDate = v;
+    else return { error: "Data de pagamento inválida." };
+  }
+  if (body.conformityWithoutConduta !== undefined) {
+    if (typeof body.conformityWithoutConduta !== "boolean") return { error: "Valor inválido para a Conduta na matriz." };
+    values.conformityWithoutConduta = body.conformityWithoutConduta;
+  }
+  if (body.areaEvaluation !== undefined) {
+    if (typeof body.areaEvaluation !== "boolean") return { error: "Valor inválido para a avaliação por área." };
+    values.areaEvaluation = body.areaEvaluation;
+  }
+  return { values };
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** "YYYY-MM-DD" válido no calendário (rejeita 2026-02-30). */
@@ -67,4 +104,36 @@ export function nextDay(value: string): string {
   const d = new Date(`${value}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * "O evento pertence ao período do ciclo?" — critério ÚNICO do app inteiro
+ * (lista de Eventos, selo "Fora do período", recálculo, fechamento, Análises,
+ * ranking e a mudança de ciclo): vale a DATA DE INÍCIO do evento (startDate).
+ *  - "before": começa antes do início do ciclo (ex.: histórico importado) —
+ *    continua contando no ciclo em que está;
+ *  - "after": começa depois do fim do ciclo (ex.: evento de outubro criado
+ *    com o ciclo de jun–set ainda atual) — NÃO conta no ciclo em que está:
+ *    fica "fora do período" e passa para o ciclo novo quando ele for criado;
+ *  - "inside": dentro do período (ciclo sem datas: tudo é "inside").
+ */
+export type EventPeriodPosition = "before" | "inside" | "after";
+
+export function eventPeriodPosition(
+  ev: { startDate: string | null | undefined },
+  cycle: { startDate: string | null | undefined; endDate: string | null | undefined } | null | undefined,
+): EventPeriodPosition {
+  const d = (ev.startDate ?? "").slice(0, 10);
+  if (!d || !cycle) return "inside";
+  if (cycle.endDate && d > cycle.endDate) return "after";
+  if (cycle.startDate && d < cycle.startDate) return "before";
+  return "inside";
+}
+
+/** Começa depois do fim do ciclo: não conta no ciclo em que está (ver eventPeriodPosition). */
+export function isAfterCycleEnd(
+  ev: { startDate: string | null | undefined },
+  cycle: { endDate: string | null | undefined } | null | undefined,
+): boolean {
+  return eventPeriodPosition(ev, cycle ? { startDate: null, endDate: cycle.endDate } : cycle) === "after";
 }

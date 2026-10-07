@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import { useImportHistoricalResults, type HistoricalImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -36,10 +37,10 @@ export function HistoricalImportSection() {
   const historicalCommitMutation = useImportHistoricalResults({
     mutation: {
       onSuccess: (data) => {
-        const employeesCreatedMsg = data.employeesCreated ? `, ${data.employeesCreated} colaborador(es) novo(s) cadastrado(s)` : "";
+        const employeesCreatedMsg = data.employeesCreated ? `, ${plural(data.employeesCreated, "colaborador novo cadastrado", "colaboradores novos cadastrados")}` : "";
         toast({
           title: "Resultados históricos importados",
-          description: `${data.eventsCreated ?? 0} evento(s) criado(s), ${data.eventsUpdated ?? 0} atualizado(s), ${data.participantsLinked ?? 0} participação(ões) vinculada(s)${employeesCreatedMsg}.`,
+          description: `${plural(data.eventsCreated ?? 0, "evento criado", "eventos criados")}, ${plural(data.eventsUpdated ?? 0, "atualizado", "atualizados")}, ${plural(data.participantsLinked ?? 0, "participação vinculada", "participações vinculadas")}${employeesCreatedMsg}.`,
         });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });

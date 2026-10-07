@@ -41,7 +41,8 @@ export function ConformityPanel({ selectedEventId, fullEvent, conformityState }:
                     { label: "Estaiamento", key: "estaiamentos" as const, commentKey: "estaiamentosComment" as const },
                     { label: "Conduta", key: "conduta" as const, commentKey: "condutaComment" as const },
                     { label: "Guarda Equip.", key: "guardaEquipamentos" as const, commentKey: "guardaEquipamentosComment" as const },
-                  ]).map(item => {
+                  // Ciclo novo: a Conduta sai da matriz (avaliada no critério Proatividade/Conduta).
+                  ]).filter(item => !(item.key === "conduta" && fullEvent?.conformityWithoutConduta)).map(item => {
                     const value = conformityForm[item.key];
                     const comment = conformityForm[item.commentKey];
                     const isExpanded = conformityExpandedComments.has(item.key);

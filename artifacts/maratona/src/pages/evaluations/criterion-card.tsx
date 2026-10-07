@@ -1,11 +1,11 @@
 import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
-import { CheckCircle, Clock, Building2, Save, CornerDownRight, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, Building2, Save, CornerDownRight, Loader2, Lock, Link2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { CONDENSED, AMBER } from "@/lib/premium-theme";
 import { AMBER_TINT, INFO_TINT, SCORE_LABELS as labels } from "./constants";
 import { ScoreButton } from "./score-button";
-import { displayCriterionName } from "./helpers";
+import { displayCriterionName, fmtDT } from "./helpers";
 import type { CriterionAssignmentRow } from "./types";
 
 export interface CriterionCardHandlers {
@@ -13,6 +13,9 @@ export interface CriterionCardHandlers {
   onCommentChange: (criterionId: number, value: string) => void;
   onAudioChange: (criterionId: number, path: string | null) => void;
   onSaveDraft: (criterionId: number) => void;
+  /** Descarta MEU rascunho de um critério que outra pessoa da área já fechou (DELETE /evaluations/{id}). */
+  onDiscardDraft?: (evaluationId: number, criterionId: number) => void;
+  isDiscarding?: boolean;
 }
 
 interface CriterionCardProps extends CriterionCardHandlers {
@@ -28,15 +31,78 @@ interface CriterionCardProps extends CriterionCardHandlers {
   isSaving: boolean;
   // Outras áreas também respondem este critério no evento (nota = média das áreas).
   sharedWithOtherAreas?: boolean;
+  // A área já respondeu por outra pessoa (primeira resposta fecha): só leitura.
+  closedBy?: { name: string | null; at: string | null; viaLink: boolean; score?: number | null; comment?: string | null } | null;
+  // Respondido por um freela pelo link que EU gerei (o feedback não é "meu").
+  answeredByLinkName?: string | null;
 }
 
 // Cartão de um critério: selos, escala 0–10, justificativa, áudio e rascunho.
 export function CriterionCard({
-  criterion: c, index, total, ev, score, comment, audio, assignment, isSaving, sharedWithOtherAreas,
-  onScoreClick, onCommentChange, onAudioChange, onSaveDraft,
+  criterion: c, index, total, ev, score, comment, audio, assignment, isSaving, sharedWithOtherAreas, closedBy, answeredByLinkName,
+  onScoreClick, onCommentChange, onAudioChange, onSaveDraft, onDiscardDraft, isDiscarding,
 }: CriterionCardProps) {
   const submitted = ev?.status === "submitted";
   const isDraft = ev?.status === "draft";
+
+  if (closedBy) {
+    return (
+      <div className="criterion-row border-l-4 pl-6 py-2" style={{ borderLeftColor: "var(--border)" }} data-testid={`criterion-closed-${c.criterionId}`}>
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          {c.responsibleAreaName && (
+            <span className="bg-secondary text-foreground border border-border rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
+              <Building2 size={11} /> {c.responsibleAreaName}
+            </span>
+          )}
+          <span className="bg-accent/15 text-accent-text border border-accent rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
+            <Lock size={11} /> Já respondido
+          </span>
+        </div>
+        <p className="text-[11px] font-black uppercase text-muted-foreground tracking-wider mb-0.5">Critério {index + 1} de {total}</p>
+        <div className="flex items-start justify-between gap-4">
+          <h4 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{index + 1}. {displayCriterionName(c.criterionName)}</h4>
+          {closedBy.score != null && (
+            <div className="shrink-0 text-right">
+              <p className="text-[11px] font-bold uppercase text-muted-foreground">Nota da área</p>
+              <p className="text-[40px] leading-none font-black" style={{ fontFamily: CONDENSED }} data-testid={`closed-score-${c.criterionId}`}>{closedBy.score}</p>
+            </div>
+          )}
+        </div>
+        {closedBy.comment && (
+          <div className="bg-secondary border border-border rounded-lg p-4 mt-3">
+            <p className="text-xs font-black uppercase mb-1">Comentário</p>
+            <p className="text-sm text-muted-foreground">"{closedBy.comment}"</p>
+          </div>
+        )}
+        <div className="mt-3 rounded-lg border border-border bg-secondary px-4 py-3 flex items-start gap-3">
+          <Lock size={16} className="shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-foreground">
+              Respondido por {closedBy.name ?? "avaliador da área"}{closedBy.viaLink ? " (link para freela)" : ""}{closedBy.at ? ` em ${fmtDT(closedBy.at)}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              A primeira resposta enviada fecha o critério neste evento. Se algo precisar mudar, fale com o RH.
+            </p>
+          </div>
+        </div>
+        {/* Sobrou um rascunho meu que não vai mais valer: dá para descartar. */}
+        {isDraft && ev && onDiscardDraft && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border px-4 py-2.5">
+            <p className="text-xs text-muted-foreground">Você tinha um rascunho para este critério. Ele não será usado.</p>
+            <button
+              type="button"
+              data-testid={`button-discard-draft-${c.criterionId}`}
+              disabled={isDiscarding}
+              onClick={() => onDiscardDraft(ev.id, c.criterionId)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold uppercase hover:bg-secondary disabled:opacity-50"
+            >
+              {isDiscarding ? "Descartando..." : "Descartar rascunho"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="criterion-row border-l-4 pl-6 py-2" style={{ borderLeftColor: submitted ? "var(--accent)" : isDraft ? AMBER : score != null ? "var(--accent)" : "var(--border)" }}>
@@ -59,7 +125,7 @@ export function CriterionCard({
             )}
             {submitted && (
               <span className="bg-accent/15 text-accent-text border border-accent rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
-                <CheckCircle size={12} /> Submetido
+                <CheckCircle size={12} /> Lançado
               </span>
             )}
             {isDraft && (
@@ -97,13 +163,18 @@ export function CriterionCard({
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-[11px] font-bold uppercase text-muted-foreground">Ritmo Atual</p>
-          <p className="text-[40px] leading-none font-black" style={{ fontFamily: CONDENSED }}>{score != null ? score : "-"}</p>
+          <p className="text-[11px] font-bold uppercase text-muted-foreground">Nota escolhida</p>
+          {/* Sem nota: texto discreto (o "-" na fonte condensada de 40 px virava uma barra preta). */}
+          {score != null
+            ? <p className="text-[40px] leading-none font-black" style={{ fontFamily: CONDENSED }}>{score}</p>
+            : <p className="text-sm font-bold text-muted-foreground mt-2">Ainda sem nota</p>}
         </div>
       </div>
 
       <div className="mb-4">
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1">
+        {/* Notas 0–10 com alvo de toque >= 44 px: 11 numa linha só quando a área
+            de conteúdo (container) tem largura; senão, duas linhas de 6. */}
+        <div className="grid grid-cols-6 @2xl:grid-cols-11 gap-1.5" data-testid={`score-grid-${c.criterionId}`}>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
             <ScoreButton
               key={val}
@@ -130,13 +201,14 @@ export function CriterionCard({
       {!submitted && (
         <div className="mt-4 border border-border rounded-lg p-4 bg-secondary">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <label className="text-xs font-black uppercase flex items-center gap-2">
+            <label htmlFor={`justificativa-${c.criterionId}`} className="text-xs font-black uppercase flex items-center gap-2">
               Justificativa / Feedback
               <span className="text-[11px] text-destructive-foreground bg-destructive rounded px-2 py-0.5 font-bold uppercase">Obrigatório</span>
             </label>
             <span className="text-[11px] font-bold text-muted-foreground tabular-nums shrink-0">{comment.length}/300</span>
           </div>
           <Textarea
+            id={`justificativa-${c.criterionId}`}
             placeholder="Descreva o desempenho da equipe para este critério (será compartilhado anonimamente)..."
             value={comment}
             maxLength={300}
@@ -175,7 +247,9 @@ export function CriterionCard({
 
       {submitted && comment && (
         <div className="bg-secondary border border-border rounded-lg p-4 mt-4">
-          <p className="text-xs font-black uppercase mb-1">Seu Feedback:</p>
+          <p className="text-xs font-black uppercase mb-1 flex items-center gap-1.5">
+            {answeredByLinkName ? <><Link2 size={12} /> Feedback de {answeredByLinkName} (link para freela):</> : "Seu Feedback:"}
+          </p>
           <p className="text-sm text-muted-foreground">"{comment}"</p>
         </div>
       )}

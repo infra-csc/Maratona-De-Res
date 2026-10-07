@@ -2,14 +2,23 @@ import { useState, useMemo } from "react";
 import { useGetRanking, getGetRankingQueryKey, exportRanking } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Users, Search, Trophy, ChevronRight } from "lucide-react";
-import { cn, fmtNum } from "@/lib/utils";
+import { cn, fmtNum, plural } from "@/lib/utils";
 import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
 import { fieldStyle, fmtScore, fmtBRLShort } from "./helpers";
 import { FaixaBadge } from "./badges";
 import { PodiumStage } from "./podium-stage";
 import { EmployeeDetailSheet } from "./employee-detail-sheet";
 
-export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
+export function RankingTab({ canViewDetail, cycleId, readOnly = false, minEvents, cycleClosed = false }: {
+  canViewDetail: boolean;
+  /** Ciclo escolhido no seletor (undefined = atual, mesma chave de cache de sempre). */
+  cycleId?: string;
+  readOnly?: boolean;
+  /** Mínimo de eventos do ciclo para o bônus (texto do filtro "Elegíveis"). */
+  minEvents?: number | null;
+  /** Ciclo fechado: o bônus é OFICIAL; aberto, é PROJETADO (muda até o fechamento). */
+  cycleClosed?: boolean;
+}) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
@@ -17,18 +26,19 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
   // Busca filtra no cliente: a lista tem dezenas de linhas e ir ao servidor a
   // cada tecla gerava uma requisição (e uma entrada de cache) por caractere.
-  const qKey = getGetRankingQueryKey();
-  const { data: rankingAll, isLoading } = useGetRanking(undefined, { query: { queryKey: qKey } });
+  const params = cycleId ? { cycleId } : undefined;
+  const qKey = getGetRankingQueryKey(params);
+  const { data: rankingAll, isLoading } = useGetRanking(params, { query: { queryKey: qKey } });
   const ranking = useMemo(() => {
-    const s = search.trim().toLowerCase();
+    const term = search.trim().toLowerCase();
     if (!rankingAll) return rankingAll;
-    if (!s) return rankingAll;
-    return rankingAll.filter(r => (r.employeeName ?? "").toLowerCase().includes(s));
+    if (!term) return rankingAll;
+    return rankingAll.filter(r => (r.employeeName ?? "").toLowerCase().includes(term));
   }, [rankingAll, search]);
 
   async function handleExport() {
     try {
-      const data = await exportRanking();
+      const data = await exportRanking(params);
       const blob = new Blob([data.data], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -94,8 +104,8 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
         <div className="text-center py-20 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
           <Trophy size={56} className="mx-auto mb-6 opacity-20" strokeWidth={1.5} />
           <h3 className="text-2xl font-black uppercase tracking-tight mb-2" style={{ fontFamily: CONDENSED }}>Ranking Indisponível</h3>
-          <p style={{ color: "var(--muted-foreground)" }}>Nenhum resultado consolidado para o ciclo atual.</p>
-          <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Feche o ciclo na aba "Bônus & Pagamentos" para gerar o ranking oficial.</p>
+          <p style={{ color: "var(--muted-foreground)" }}>{readOnly ? "Nenhum resultado consolidado neste ciclo." : "Nenhum resultado consolidado para o ciclo atual."}</p>
+          {!readOnly && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Feche o ciclo na aba "Bônus & Pagamentos" para gerar o ranking oficial.</p>}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
@@ -141,7 +151,11 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                   <div className="px-5 py-8 text-center">
                     <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador elegível ainda</p>
                     <p className="text-xs mt-1.5" style={{ color: "var(--muted-foreground)" }}>
-                      São necessários pelo menos 8 eventos no ciclo. Use <strong>Todos</strong> para ver o ranking parcial.
+                      {/* Mínimo do ciclo EXIBIDO (effectiveMinEvents) — sem número fixo; espera o ciclo carregar. */}
+                      {minEvents != null
+                        ? <>São necessários pelo menos {plural(minEvents, "evento")} no ciclo. </>
+                        : <span className="inline-block h-3 w-48 align-middle rounded animate-pulse mr-1" style={{ backgroundColor: "var(--secondary)" }} aria-label="Carregando o mínimo de eventos do ciclo" />}
+                      Use <strong>Todos</strong> para ver o ranking parcial.
                     </p>
                   </div>
                 )}
@@ -168,7 +182,7 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                         <p className="font-bold uppercase text-sm truncate" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
-                            {entry.eventsCount} eventos
+                            {plural(entry.eventsCount, "evento", "eventos")}
                           </span>
                           {entry.eligible === false && (
                             <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
@@ -177,7 +191,7 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                           )}
                           {entry.absences > 0 && (
                             <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
-                              {entry.absences} penalidades
+                              {plural(entry.absences, "penalidade", "penalidades")}
                             </span>
                           )}
                           <FaixaBadge name={entry.platoon} minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
@@ -189,15 +203,15 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                         </div>
                         <span className="text-[11px] font-bold w-14 text-right whitespace-nowrap">{fmtScore(entry.finalResult)}/100</span>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0 sm:pl-3 sm:w-[15rem] sm:justify-end">
+                      <div className="flex items-center gap-3 shrink-0 sm:pl-3 sm:w-[16rem] sm:justify-end">
                         <div className="text-right">
                           <span className="block text-[11px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
                           <p className="font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }} data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
                         </div>
-                        <div className="text-right hidden sm:block w-24 shrink-0">
+                        <div className="text-right hidden sm:block w-28 shrink-0">
                           {entry.bonusValue > 0 && (
-                            <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: "var(--primary)" }}>
-                              <span className="block text-[11px] uppercase font-bold leading-none mb-1" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus</span>
+                            <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: "var(--primary)" }} title={cycleClosed ? "Bônus oficial, apurado no fechamento do ciclo" : "Bônus projetado: o ciclo está aberto e o valor muda até o fechamento"}>
+                              <span className="block text-[11px] uppercase font-bold leading-none mb-1 whitespace-nowrap" style={{ color: "var(--primary-foreground)", opacity: 0.75 }} data-testid={`ranking-bonus-label-${entry.employeeId}`}>{cycleClosed ? "Bônus oficial" : "Bônus projetado"}</span>
                               <p className="font-black text-sm leading-none" style={{ color: "var(--primary-foreground)" }}>{fmtBRLShort(entry.bonusValue)}</p>
                             </div>
                           )}
@@ -226,7 +240,7 @@ export function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
         </div>
       )}
 
-      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
+      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} cycleId={cycleId} readOnly={readOnly} />
     </div>
   );
 }

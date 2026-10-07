@@ -3,7 +3,7 @@
 export type CritState = "unassigned" | "pending" | "partial" | "done";
 
 export type ConsoleView = "assign" | "table" | "people" | "criterios";
-export type QueueTab = "todo" | "done";
+export type QueueTab = "todo" | "waiting" | "done";
 export type QueueSort = "name" | "pct" | "pending" | "data" | "urgencia";
 export type ConformityFilter = "all" | "pending" | "done";
 export type CritFilter = "all" | "unassigned" | "pending" | "partial" | "done";
@@ -19,6 +19,10 @@ export interface CritRow {
   assignedToName: string | null;
   /** Nome que a pessoa digitou no formulário — pode diferir do atribuído (ex: freelancer via link) */
   formSubmitterName: string | null;
+  /** Usuário que enviou a resposta (aba Avaliadores no ciclo por área). */
+  formSubmitterId: number | null;
+  /** Evento de ciclo com avaliação por área: qualquer avaliador da área responde (sem designado não é falha). */
+  areaMode: boolean;
   state: CritState;
   submittedAt: string | null;
   score: number | null;
@@ -42,6 +46,20 @@ export interface EnrichedEvent {
   pct: number;
   areaNames: string[];
   evaluatorNames: string[];
+  /** Avaliação por área (qualquer avaliador da área responde). */
+  areaMode: boolean;
+  /** Evento do PRÓXIMO ciclo (começa depois do fim do ciclo): não aceita avaliação até o ciclo novo ser criado. */
+  nextCycle: boolean;
+  /** Do período, mas a avaliação ainda não abriu (abre no dia seguinte ao fim do evento). */
+  notOpenYet: boolean;
+  /** "Abre em DD/MM" ou "Próximo ciclo" (events/rules → opensLabelFor); null = já abriu. */
+  opensLabel: string | null;
+  /** Aberto pela regra única do app (isOpenEvent) — o KPI "Eventos abertos". */
+  isOpen: boolean;
+  /** Evento histórico (importado): só consulta. */
+  isHistorical: boolean;
+  /** Aba da fila (events/rules.ts → queueTabFor): partição única A fazer / A abrir / Concluídos. */
+  queueTab: QueueTab;
   /** Concluído = TODOS os critérios ativos completos. Publicação (parcial ou
    *  final) NÃO conclui o evento — vira apenas um badge informativo. */
   isDone: boolean;
@@ -146,6 +164,17 @@ export interface EventEvaluatorCard extends CardStyle {
   assigned: number;
   submitted: number;
   pct: number;
+}
+
+/** Aba Avaliadores no ciclo por área: quem respondeu, em qual área e quantos critérios. */
+export interface AreaResponderRow {
+  key: string;
+  name: string;
+  area: string;
+  /** Critérios respondidos (resposta enviada). */
+  answered: number;
+  /** Eventos em que respondeu. */
+  events: { id: number; name: string }[];
 }
 
 /** Card da aba Avaliadores — visão global (todos os eventos do ciclo). */

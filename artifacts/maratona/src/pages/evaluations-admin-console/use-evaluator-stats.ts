@@ -1,7 +1,26 @@
 import { useMemo } from "react";
 import type { EventDetail } from "@workspace/api-client-react";
 import { AMBER, GOOD, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
-import type { ConformityRow, EnrichedEvent, EventEvaluatorCard, GlobalEvaluatorCard, PendingEvaluatorStats } from "./types";
+import type { AreaResponderRow, ConformityRow, EnrichedEvent, EventEvaluatorCard, GlobalEvaluatorCard, PendingEvaluatorStats } from "./types";
+
+/**
+ * Ciclo por área: quem RESPONDEU, por área — nome, área, quantos critérios
+ * (resposta enviada) e em quais eventos. Ordem: área, depois mais respostas.
+ */
+export function areaResponders(events: EnrichedEvent[]): AreaResponderRow[] {
+  const map = new Map<string, AreaResponderRow>();
+  for (const ev of events) {
+    for (const c of ev.criteria) {
+      if (c.state !== "done" || !c.formSubmitterName) continue;
+      const key = `${c.formSubmitterId ?? c.formSubmitterName}|${c.areaName}`;
+      const cur = map.get(key) ?? { key, name: c.formSubmitterName, area: c.areaName, answered: 0, events: [] };
+      cur.answered++;
+      if (!cur.events.some(e => e.id === ev.id)) cur.events.push({ id: ev.id, name: ev.name });
+      map.set(key, cur);
+    }
+  }
+  return [...map.values()].sort((a, b) => a.area.localeCompare(b.area, "pt-BR") || b.answered - a.answered || a.name.localeCompare(b.name, "pt-BR"));
+}
 
 /** KPI "Avaliadores pendentes" + cards da aba Avaliadores (por evento e global). */
 export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, conformityRows }: {
@@ -14,9 +33,10 @@ export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, co
   const pendingEvaluatorNames = useMemo(() => {
     const map = new Map<number, PendingEvaluatorStats>();
     for (const ev of enrichedEvents) {
-      // Critérios regulares
+      // Critérios regulares — no ciclo por área não há designado (qualquer
+      // avaliador da área responde): designação antiga não vira "pendente".
       for (const c of ev.criteria) {
-        if (c.assignedToId == null || !c.assignedToName) continue;
+        if (c.assignedToId == null || !c.assignedToName || ev.areaMode) continue;
         const cur = map.get(c.assignedToId) ?? { name: c.assignedToName, assigned: 0, submitted: 0, pendingEvents: [] };
         cur.assigned++;
         if (c.state === "done") {
@@ -54,9 +74,9 @@ export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, co
     if (!selected) return [];
     const byEval = new Map<number, { name: string; area: string; assigned: number; submitted: number }>();
 
-    // Critérios regulares
+    // Critérios regulares (no ciclo por área, designação antiga não conta)
     for (const c of selected.criteria) {
-      if (c.assignedToId == null || !c.assignedToName) continue;
+      if (c.assignedToId == null || !c.assignedToName || selected.areaMode) continue;
       const cur = byEval.get(c.assignedToId) ?? { name: c.assignedToName, area: c.areaName, assigned: 0, submitted: 0 };
       cur.assigned++;
       if (c.state === "done") cur.submitted++;
@@ -100,5 +120,9 @@ export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, co
     }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [pendingEvaluatorNames]);
 
-  return { pendingEvaluatorsCount, evaluatorCards, globalEvaluatorCards };
+  // ---- Ciclo por área: quem respondeu (todos os eventos / evento selecionado) ----
+  const globalAreaResponders = useMemo(() => areaResponders(enrichedEvents.filter(e => e.areaMode)), [enrichedEvents]);
+  const eventAreaResponders = useMemo(() => (selected?.areaMode ? areaResponders([selected]) : []), [selected]);
+
+  return { pendingEvaluatorsCount, evaluatorCards, globalEvaluatorCards, globalAreaResponders, eventAreaResponders };
 }

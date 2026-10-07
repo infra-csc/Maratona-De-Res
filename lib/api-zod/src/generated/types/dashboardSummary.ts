@@ -6,20 +6,47 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AtRiskEmployee } from './atRiskEmployee';
+import type { DashboardSummaryScope } from './dashboardSummaryScope';
 import type { EventPendency } from './eventPendency';
 
 export interface DashboardSummary {
+  /** Ciclo dos números (0 = Total geral) */
   cycleId?: number;
   cycleName?: string;
+  /** cycle = um ciclo; all = Total geral (todos os ciclos) */
+  scope?: DashboardSummaryScope;
+  /**
+     * Ciclo das pendências operacionais (progresso de avaliações, eventos com pendência, zona de risco) — o escolhido ou, no Total geral, o atual
+     * @nullable
+     */
+  operationalCycleId?: number | null;
+  /** @nullable */
+  operationalCycleName?: string | null;
   totalEvents: number;
   totalEmployeesEvaluated: number;
+  /**
+     * Progresso de avaliações, em EVENTOS do ciclo operacional abertos para avaliação (não históricos,
+     * já no dia seguinte ao fim, com critério ativo): pendente = sem nota completa — inclusive evento sem
+     * nenhuma nota. Rascunho não conta (nem o "órfão" do modo por área).
+     */
   pendingEvaluations: number;
+  /** Eventos abertos para avaliação já avaliados (resultado confirmado ou todos os critérios ativos com nota). Progresso = submitted ÷ (submitted + pending). */
   submittedEvaluations: number;
   eventsInCalibration: number;
   eventsInCycle: number;
-  /** @nullable */
+  /**
+     * Um ciclo: média das notas finais de quem tem evento com nota, no MESMO recorte de Análises e do Ranking
+     * (rankingScope), 1 casa. No Total geral (scope all): o KPI único (TotalGeralSummary.avgFinalResult de
+     * GET /ranking/total) — Σ(nota final × eventos com nota) ÷ Σ(eventos com nota).
+     * @nullable
+     */
   quarterAverage: number | null;
+  /** bonusOfficial + bonusProjected (compatibilidade). Prefira mostrar os dois separados. */
   totalBonusPreview: number;
+  /** Bônus de ciclos FECHADOS (oficial). Um ciclo aberto → 0. Só gestores (senão 0). */
+  bonusOfficial?: number;
+  /** Bônus de ciclos ainda ABERTOS (projeção — muda até o fechamento). Só gestores (senão 0). */
+  bonusProjected?: number;
   totalAbsences: number;
   eventsWithPendencies: EventPendency[];
   atRiskEmployees: AtRiskEmployee[];

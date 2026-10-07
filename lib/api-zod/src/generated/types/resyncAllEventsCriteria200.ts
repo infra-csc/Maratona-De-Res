@@ -10,6 +10,8 @@ import type { ResyncAllEventsCriteria200EventsItem } from './resyncAllEventsCrit
 export type ResyncAllEventsCriteria200 = {
   processed?: number;
   skipped?: number;
+  /** Eventos de ciclo FECHADO pulados (só consulta; já contados em skipped) */
+  skippedClosedCycle?: number;
   totalAdded?: number;
   totalDeactivated?: number;
   events?: ResyncAllEventsCriteria200EventsItem[];

@@ -1,17 +1,17 @@
 // Tela "Eventos do Ciclo": estado dos filtros (espelhado na URL), dados e
 // orquestração. As peças visuais e as regras vivem em ./events/.
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetCurrentCycle, getGetEventsQueryKey, useNormalizeEventDates } from "@workspace/api-client-react";
+import { useGetEvents, getGetEventsQueryKey, useNormalizeEventDates } from "@workspace/api-client-react";
 import type { NormalizeDatesResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCycleWeekends } from "@/lib/utils";
+import { getCycleWeekends, weekendsEnd, todayBR } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { formatCyclePeriod } from "@/components/cycle-badge";
+import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
 import { CONDENSED } from "@/lib/premium-theme";
 import { readUrlFilters, DEFAULT_SORT } from "./events/url-filters";
-import { filterAndSortEvents } from "./events/rules";
+import { filterAndSortEvents, countCycleEvents } from "./events/rules";
 import { serverErrorMessage } from "./events/form-bits";
 import { EventsHeader } from "./events/events-header";
 import { EventsFilterBar, WeekendChipsRow } from "./events/events-filters";
@@ -52,12 +52,19 @@ export default function EventsPage() {
   const [deleteTarget, setDeleteTarget] = useState<EventRef | null>(null);
   const [editingEvent, setEditingEvent] = useState<EditingEvent | null>(null);
 
-  const queryKey = getGetEventsQueryKey();
+  // Seletor de ciclo: atual (padrão, como sempre), anterior ou Total geral —
+  // os dois últimos só de consulta (sem criar/editar/excluir/confirmar).
+  const scope = useCycleScope();
+  const { readOnly } = scope;
+  const queryKey = getGetEventsQueryKey(scope.params);
   const { data: events, isLoading } = useGetEvents(
-    undefined,
-    { query: { queryKey, refetchInterval: 60000, refetchOnWindowFocus: true } }
+    scope.params,
+    { query: { queryKey, refetchInterval: readOnly ? false : 60000, refetchOnWindowFocus: !readOnly } }
   );
-  const { data: cycle } = useGetCurrentCycle();
+  // Período dos chips de fim de semana: o do ciclo escolhido (no Total geral, sem chips).
+  const cycle = scope.isAll ? null : scope.cycle;
+  const cycleNameById = new Map(scope.options.map(c => [c.id, c.name]));
+  const cycleById = new Map(scope.options.map(c => [c.id, c]));
 
   // "Unificar Datas" em dois passos: prévia (dryRun) → diálogo com a lista →
   // aplicar só depois de digitar APLICAR (o servidor exige a mesma palavra).
@@ -82,14 +89,15 @@ export default function EventsPage() {
   });
 
   const all = events ?? [];
-  // Data local "YYYY-MM-DD" (sv-SE) para comparar como string com as datas dos eventos.
-  const todayStr = new Date().toLocaleDateString("sv-SE");
+  // Hoje em Brasília "YYYY-MM-DD" para comparar como string com as datas dos eventos.
+  const todayStr = todayBR();
+  // Contagens pela regra única (a mesma de Ciclos e da Central de Avaliações).
+  const counts = countCycleEvents(all, ev => cycleById.get(ev.cycleId) ?? null, todayStr);
   const filtered = filterAndSortEvents(all, { search, filterDateFrom, filterDateTo, cardFilter, sortBy, todayStr });
 
-  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
-  const cyclePeriod = cycle ? formatCyclePeriod(cycle.startDate, cycle.endDate) : null;
+  const cycleWeekends = cycle ? getCycleWeekends(cycle.startDate, weekendsEnd(cycle.endDate, all)) : [];
 
-  const canCreate = user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador"));
+  const canCreate = !readOnly && user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador"));
   const hasDateFilter = !!(filterDateFrom || filterDateTo);
 
   useEffect(() => {
@@ -105,19 +113,29 @@ export default function EventsPage() {
   const dateRange = { filterDateFrom, filterDateTo, setFilterDateFrom, setFilterDateTo, hasDateFilter };
 
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="min-h-full flex flex-col min-w-0">
 
       {/* ── Header ── */}
       <EventsHeader
-        cycle={cycle}
-        cyclePeriod={cyclePeriod}
+        title={scope.isAll ? "Eventos · Total Geral" : "Eventos do Ciclo"}
+        cycleSlot={<CycleSelect scope={scope} />}
         events={all}
-        showNormalize={user?.role === "admin"}
+        counts={counts}
+        showNormalize={!readOnly && user?.role === "admin"}
         normalizePending={normalizeDatesMutation.isPending}
         onNormalizePreview={() => normalizeDatesMutation.mutate({ data: { dryRun: true } })}
       >
         {canCreate && <CreateEventDialog />}
       </EventsHeader>
+
+      {readOnly && (
+        <div className="px-4 sm:px-6 pt-4">
+          <CycleScopeNotice
+            scope={scope}
+            allHelp={<>Eventos de <strong>todos os ciclos</strong>, cada um com o selo do seu ciclo na coluna Data. Para criar, editar ou confirmar eventos, volte ao ciclo atual.</>}
+          />
+        </div>
+      )}
 
       {/* ── Filter bar ── */}
       <EventsFilterBar
@@ -136,7 +154,7 @@ export default function EventsPage() {
       )}
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-auto px-6 py-5">
+      <div className="flex-1 overflow-auto px-4 sm:px-6 py-5">
         {isLoading ? (
           <div className="space-y-1">
             {[1, 2, 3, 4, 5].map(i => (
@@ -160,7 +178,7 @@ export default function EventsPage() {
           </div>
         ) : (
           <>
-            {cardFilter === "unconfirmed" && user?.role === "admin" && (
+            {!readOnly && cardFilter === "unconfirmed" && user?.role === "admin" && (
               <BulkConfirmBanner events={filtered} hasDateFilter={hasDateFilter} />
             )}
             <EventsTable
@@ -168,6 +186,9 @@ export default function EventsPage() {
               user={user}
               sortBy={sortBy}
               setSortBy={setSortBy}
+              readOnly={readOnly}
+              cycleLabelOf={scope.isAll ? (ev => cycleNameById.get(ev.cycleId) ?? null) : undefined}
+              cycleOf={ev => cycleById.get(ev.cycleId) ?? null}
               onEdit={(ev) => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
               onMerge={(ev) => setMergeForEvent({ id: ev.id, name: ev.name })}
               onDelete={(ev) => setDeleteTarget({ id: ev.id, name: ev.name })}
@@ -177,7 +198,7 @@ export default function EventsPage() {
 
         {/* Legend + count */}
         {!isLoading && filtered.length > 0 && (
-          <EventsLegend shown={filtered.length} total={all.length} />
+          <EventsLegend shown={filtered.length} total={all.length} scopeLabel={scope.isAll ? "em todos os ciclos" : "no ciclo"} afterEnd={counts.afterEnd} />
         )}
       </div>
 

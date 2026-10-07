@@ -10,7 +10,7 @@ import { HScroller } from "@/components/shared";
 
 const chipFilters: { key: string | null; label: string; title: string }[] = [
   { key: null,          label: "Todos",           title: "Todos os eventos do ciclo" },
-  { key: "pendingRH",   label: "Aguardando RH",   title: "Aguardando o RH confirmar os critérios do evento" },
+  { key: "pendingRH",   label: "Aguardando RH",   title: "A avaliação já devia ter aberto (dia seguinte ao evento) e os critérios não foram confirmados" },
   { key: "unconfirmed", label: "Não Confirmados", title: "Resultados não confirmados: ainda não contam na elegibilidade nem na nota" },
   { key: "inEval",      label: "Em Avaliação",    title: "Avaliações em andamento, sem calibração salva" },
   { key: "pendingCal",  label: "Falta calibrar",  title: "Eventos encerrados sem nenhuma calibração ou publicação" },
@@ -44,7 +44,7 @@ export function EventsFilterBar({
     // Uma linha só a partir do md: busca | chips de situação (rolam na
     // horizontal, com setas, quando não cabem) | datas. Antes os chips
     // quebravam linha e empurravam o "Filtrar datas" sozinho para baixo.
-    <div className="px-6 py-3 flex items-center gap-2 shrink-0 flex-wrap md:flex-nowrap" style={{ borderBottom: "1px solid var(--border)" }}>
+    <div className="px-4 sm:px-6 py-3 flex items-center gap-2 shrink-0 flex-wrap md:flex-nowrap" style={{ borderBottom: "1px solid var(--border)" }}>
       {/* Search */}
       <div className="flex items-center gap-2 rounded-lg px-3 py-2 w-full md:w-60 xl:w-72 shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
         <Search size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
@@ -148,7 +148,7 @@ type WeekendChipsRowProps = DateRangeProps & {
 /** Faixa "Fim de Semana": um clique filtra sáb–dom; clicar de novo limpa. */
 export function WeekendChipsRow({ weekends, weekendRowRef, filterDateFrom, filterDateTo, setFilterDateFrom, setFilterDateTo, hasDateFilter }: WeekendChipsRowProps) {
   return (
-    <div className="px-6 py-2.5 flex items-center gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+    <div className="px-4 sm:px-6 py-2.5 flex items-center gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
       <span className="text-[11px] font-black uppercase tracking-widest shrink-0 flex items-center gap-1.5" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
         <Calendar size={12} />
         Fim de Semana

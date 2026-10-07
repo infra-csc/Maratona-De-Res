@@ -53,7 +53,7 @@ test("link público: admin gera o link, freelancer avalia sem login e a nota che
       await expect(fl.getByText(`Preparado para: ${FREELANCER}`)).toBeVisible();
       await checkA11y(fl, "eval-publico", testInfo);
 
-      await fl.getByRole("textbox", { name: "Confirme seu nome antes de responder" }).fill(FREELANCER);
+      await fl.getByRole("textbox", { name: /Seu nome completo/ }).fill(FREELANCER);
       for (const c of CRITERIA) {
         await fl.getByRole("group", { name: `Nota do critério ${c.name}` }).getByRole("button", { name: `Nota ${NOTAS[c.id]}`, exact: true }).click();
         await fl.locator(`#crit-${c.id}-comment`).fill(`E2E (link): ${c.name} observada em campo.`);
@@ -92,7 +92,8 @@ test("link público: admin gera o link, freelancer avalia sem login e a nota che
     await page.getByRole("button", { name: new RegExp(LINK_EVENT.name, "i") }).click();
     await expect(page.getByRole("heading", { level: 2, name: LINK_EVENT.name })).toBeVisible();
     await expect(page.getByText("2 de 2 critérios completos")).toBeVisible();
-    await expect(page.getByText(`Preenchido por: ${FREELANCER}`).first()).toBeVisible();
+    // Ciclo por área: o painel diz quem respondeu (o link vale como resposta da área).
+    await expect(page.getByText(`Respondido por ${FREELANCER}`).first()).toBeVisible();
   });
 
   expect(errosDePagina, "Erros de JavaScript não tratados nas páginas").toEqual([]);

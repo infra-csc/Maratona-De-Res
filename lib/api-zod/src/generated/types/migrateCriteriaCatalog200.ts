@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { ClosedCycleSkip } from './closedCycleSkip';
 
 export type MigrateCriteriaCatalog200 = {
   success: boolean;
@@ -12,4 +13,7 @@ export type MigrateCriteriaCatalog200 = {
   catalogActivated: number;
   catalogCreated: number;
   eventCriteriaFixed: number;
+  evaluationsRemapped?: number;
+  /** Eventos de ciclo FECHADO (só consulta) — critérios e avaliações deles não foram migrados */
+  skippedClosedCycle?: ClosedCycleSkip[];
 };

@@ -7,6 +7,7 @@ import { eventsTable } from "./events";
 import { employeesTable } from "./employees";
 import { criteriaTable } from "./criteria";
 import { usersTable } from "./users";
+import { publicEvalTokensTable } from "./routing";
 
 // Avaliação por TIME do evento: a nota é por (evento, critério, avaliador).
 // O resultado do evento é aplicado a TODOS os participantes do time.
@@ -22,6 +23,10 @@ export const evaluationsTable = pgTable("evaluations", {
   status: text("status").notNull().default("draft"),
   submittedAt: timestamptz("submitted_at"),
   createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  // Link público que gravou esta resposta (migração 0011): liga a nota ao
+  // freela que preencheu ("Respondido por") sem adivinhar pelo horário.
+  // Nulo = enviada pela tela (ou antes da 0011).
+  publicTokenId: text("public_token_id").references(() => publicEvalTokensTable.id, { onDelete: "set null" }),
 }, (t) => ({
   // Uma avaliação por (evento, critério, avaliador): duplo clique/duas abas
   // criavam duas linhas e a média contava o avaliador em dobro.

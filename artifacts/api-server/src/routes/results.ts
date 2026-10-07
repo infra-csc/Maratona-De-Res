@@ -8,7 +8,8 @@ import {
 import { eq, and, inArray, exists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, validateCalculationExample, validateConformityCalculationExample } from "../lib/calculations.js";
-import { getCurrentCycle } from "../lib/cycle.js";
+import { getCurrentCycle, getGlobalMinEvents, eventWithinItsCycleSql } from "../lib/cycle.js";
+import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
 import { audit, currentLastAction } from "../lib/audit.js";
 import { diffScoreSnapshots } from "../lib/score-history.js";
 import { participantCountsForScore } from "../lib/participation.js";
@@ -75,8 +76,17 @@ export async function computeEventTeamResultsBatch(eventIds: number[]) {
  * Usado tanto pelo fechamento manual do ciclo quanto automaticamente quando
  * um evento é fechado/reaberto/liberado, mantendo dashboard, resultados e
  * ranking sempre atualizados.
+ *
+ * CICLO FECHADO só consulta: o resultado oficial dele não é reescrito por
+ * nenhum recálculo automático (um evento, uma falta, um cargo que mudou…).
+ * Só o próprio fechamento (POST /results/quarterly/close) pede
+ * `allowClosed: true`. Pagamento continua liberado (rota própria, não recalcula).
  */
-export async function recomputeCycleResults(cycleId: number, userId: number) {
+export async function recomputeCycleResults(cycleId: number, userId: number, opts: { allowClosed?: boolean } = {}): Promise<{ processed: number; warnings: string[]; skipped?: "closed" }> {
+  if (!opts.allowClosed) {
+    const [c] = await db.select({ status: cyclesTable.status }).from(cyclesTable).where(eq(cyclesTable.id, cycleId)).limit(1);
+    if (c?.status === "closed") return { processed: 0, warnings: [], skipped: "closed" };
+  }
   // FASE DE LEITURA — tudo antes de escrever, para gravar dentro de uma única
   // transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
   const input = await loadCycleRecomputeInput(cycleId, userId);
@@ -276,8 +286,11 @@ router.get("/results/quarterly", async (req, res) => {
   try {
     const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
     const { employeeId, platoon } = req.query;
-    const cycle = await getCurrentCycle();
-    if (!cycle) { res.json([]); return; }
+    // ?cycleId= vazio = ciclo atual; id = aquele ciclo (anterior: só consulta).
+    const scoped = await resolveCycleScope(req.query.cycleId, { allowAll: false });
+    if (sendScopeError(res, scoped)) return;
+    if (!scoped.scope || scoped.scope.kind !== "cycle") { res.json([]); return; }
+    const { cycle, isCurrent } = scoped.scope;
 
     const query = db
       .select({
@@ -306,7 +319,11 @@ router.get("/results/quarterly", async (req, res) => {
         paymentNotes: quarterlyResultsTable.paymentNotes,
       })
       .from(quarterlyResultsTable)
-      .innerJoin(employeesTable, and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
+      // Ciclo atual: só ativos (como sempre). Ciclo anterior: o histórico
+      // mantém quem foi desligado depois (mesma regra de /cycles/:id/history).
+      .innerJoin(employeesTable, isCurrent
+        ? and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true))
+        : eq(quarterlyResultsTable.employeeId, employeesTable.id))
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
@@ -370,9 +387,15 @@ router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"),
   const { forced, reason } = req.body;
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+  if (cycle.status === "closed") {
+    res.status(409).json({ error: `O ciclo "${cycle.name}" já está fechado. Crie o próximo ciclo em Ciclos.` });
+    return;
+  }
 
+  // Eventos que começam depois do fim do ciclo ("fora do período") não são
+  // deste ciclo: nem contam como fechados nem travam o fechamento como abertos.
   const closedEvents = await db.select().from(eventsTable)
-    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "closed")));
+    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "closed"), eventWithinItsCycleSql()));
 
   if (closedEvents.length === 0) {
     res.status(400).json({ error: "Nenhum evento fechado neste ciclo" });
@@ -382,12 +405,12 @@ router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"),
   // Fechamento forçado: se ainda há eventos abertos no ciclo, exige confirmação
   // explícita (forced=true) com justificativa obrigatória.
   const openEvents = await db.select({ id: eventsTable.id }).from(eventsTable)
-    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "open")));
+    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "open"), eventWithinItsCycleSql()));
 
   if (openEvents.length > 0) {
     if (!forced) {
       res.status(409).json({
-        error: `Há ${openEvents.length} evento(s) ainda aberto(s) neste ciclo. Para fechar mesmo assim, confirme o fechamento forçado com justificativa.`,
+        error: `${openEvents.length === 1 ? "Há 1 evento ainda aberto" : `Há ${openEvents.length} eventos ainda abertos`} neste ciclo. Para fechar mesmo assim, confirme o fechamento forçado com justificativa.`,
         requiresForce: true,
         openEventsCount: openEvents.length,
       });
@@ -400,10 +423,13 @@ router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"),
   }
   const isForced = openEvents.length > 0 && !!forced;
 
-  const { processed, warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
+  const { processed, warnings } = await recomputeCycleResults(cycle.id, req.user!.userId, { allowClosed: true });
 
+  // O mínimo de eventos do ciclo fechado fica gravado nele: se a regra geral
+  // mudar depois, o histórico continua dizendo qual mínimo valeu.
+  const minEvents = cycle.minEvents ?? await getGlobalMinEvents();
   await db.update(cyclesTable)
-    .set({ status: "closed", closedAt: new Date() })
+    .set({ status: "closed", closedAt: new Date(), minEvents })
     .where(eq(cyclesTable.id, cycle.id));
 
   await audit(
@@ -430,6 +456,10 @@ router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"),
 router.post("/results/quarterly/recompute", requireRole("admin", "rh"), async (req, res) => {
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+  if (cycle.status === "closed") {
+    res.status(409).json({ error: "Ciclo fechado: o resultado oficial não é mais recalculado. Crie o próximo ciclo em Ciclos." });
+    return;
+  }
   const { processed, warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
   await audit(req.user!.userId, "recompute_cycle", "cycles", cycle.id, null, { totalProcessed: processed });
   res.json({ success: true, cycleId: cycle.id, totalProcessed: processed, warnings, forced: false });

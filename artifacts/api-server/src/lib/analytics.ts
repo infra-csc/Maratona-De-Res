@@ -1,14 +1,33 @@
 // Agregações da tela de Análises. Função pura: recebe as linhas já lidas do
 // banco e devolve os indicadores — testável sem Postgres (analytics.test.ts).
 import { getPlatoonByScore, calculateTieredBonus, CONFORMITY_ITEM_POINTS, CONFORMITY_PENALTY_FACTOR, type PlatoonRuleData } from "./calculations.js";
+import { totalGeralSummary } from "./total-geral.js";
 
 export interface AnalyticsInput {
   events: { id: number; name: string; clientName: string | null; startDate: string; endDate: string; resultsConfirmed: boolean; isHistorical: boolean }[];
   /** Nota oficial por evento (employee_event_results.finalEventScore, 0-100). */
   officialScores: { eventId: number; score: number }[];
-  quarterly: { employeeId: number; employeeName: string; finalResult: number; platoon: string | null; bonusValue: number; eligible: boolean; eventsCount: number; participatedEventsCount: number }[];
+  /**
+   * Um resultado por pessoa NO CICLO. No Total geral vem uma linha por pessoa
+   * e por ciclo, cada uma com o mínimo de eventos do próprio ciclo (`minEvents`).
+   */
+  quarterly: {
+    employeeId: number; employeeName: string; finalResult: number; platoon: string | null; bonusValue: number; eligible: boolean; eventsCount: number; participatedEventsCount: number; minEvents?: number;
+    /** Ciclo da linha (Total geral: a média é ponderada por pessoa somando os ciclos). */
+    cycleId?: number;
+    /** Ciclo FECHADO = bônus oficial; aberto = projeção. Ausente = aberto. */
+    official?: boolean;
+    /** Motivo gravado na apuração quando não elegível (quarterly_results.eligibility_reason). */
+    eligibilityReason?: string | null;
+  }[];
   rules: PlatoonRuleData[];
   minEvents: number;
+  /**
+   * "cycle" (padrão) = um ciclo. "all" = Total geral: contagens de pessoas
+   * viram participações (pessoa × ciclo) e "perto da próxima faixa" não se
+   * aplica (é projeção de um ciclo em andamento).
+   */
+  scope?: "cycle" | "all";
   evaluations: { eventId: number; criterionId: number; evaluatorUserId: number; evaluatorName: string; score: number; status: string; submittedAt: Date | null }[];
   calibrations: { eventId: number; criterionId: number; calibratedScore: number }[];
   /** weight = peso efetivo no evento (weightOverride ?? peso padrão); ausente = 1. */
@@ -20,6 +39,14 @@ export interface AnalyticsInput {
    */
   criteriaCatalog?: { id: number; name: string; eventScoped: boolean; sourceCriterionId: number | null }[];
   conformities: { eventId: number; epi: boolean | null; estaiamentos: boolean | null; conduta: boolean | null; guardaEquipamentos: boolean | null }[];
+  /**
+   * A Conduta está na Matriz de Conformidade dos eventos do recorte? "all" =
+   * em todos (padrão); "none" = ciclo(s) sem a Conduta (pergunta some e conta
+   * como "sim"); "some" = Total geral misturando ciclos com e sem.
+   */
+  condutaInMatrix?: "all" | "some" | "none";
+  /** Mínimo de eventos de cada ciclo do recorte (no Total geral, vários). */
+  minEventsByCycle?: { cycleId: number; cycleName: string; minEvents: number }[];
   adjustments: { employeeId: number; employeeName?: string | null; label: string; kind: "penalty" | "merit"; points: number; quantity: number }[];
 }
 
@@ -29,7 +56,10 @@ export interface AdjustedPerson { employeeId: number; name: string; points: numb
 export interface AnalyticsOverview {
   kpis: {
     eventsTotal: number; eventsConfirmed: number; eventsScored: number; avgEventScore: number | null; avgFinalResult: number | null;
-    collaborators: number; reachedMinEvents: number; eligible: number; withBonus: number; bonusTotal: number;
+    /** Linhas de resultado (no Total geral, participações pessoa × ciclo). */
+    collaborators: number; /** Pessoas diferentes (no ciclo, igual a collaborators). */ distinctCollaborators: number; reachedMinEvents: number; eligible: number; withBonus: number; bonusTotal: number;
+    /** Bônus de ciclos FECHADOS (oficial) e de ciclos abertos (projeção); bonusTotal = soma dos dois. */
+    bonusOfficial: number; bonusProjected: number;
     evaluationsSubmitted: number; evaluationsDraft: number; calibratedCriteria: number; avgCalibrationShift: number | null;
     penaltiesCount: number; meritsCount: number; minEvents: number;
   };
@@ -38,7 +68,13 @@ export interface AnalyticsOverview {
   conformity: { item: string; label: string; answered: number; nao: number; naoPct: number | null }[];
   faixas: { name: string; color: string | null; minScore: number | null; maxScore: number | null; bonusValue: number | null; bonusPerExtraEvent: number | null; count: number; bonusTotal: number }[];
   /** Parâmetros das regras de negócio em vigor (para o relatório explicar com os números reais). */
-  ruleSet: { minEvents: number; conformityItemPoints: number; conformityPenaltyFactor: number; conformityPenaltyPerNo: number };
+  ruleSet: {
+    minEvents: number; conformityItemPoints: number; conformityPenaltyFactor: number; conformityPenaltyPerNo: number;
+    /** Itens que o avaliador responde na matriz: 4, ou 3 quando a Conduta saiu (ver condutaInMatrix). */
+    conformityItemsAsked: number;
+    condutaInMatrix: "all" | "some" | "none";
+    minEventsByCycle: { cycleId: number; cycleName: string; minEvents: number }[];
+  };
   funnel: { stage: string; label: string; count: number }[];
   nearNextFaixa: { employeeId: number; name: string; finalResult: number; currentFaixa: string | null; nextFaixa: string; gap: number; currentBonus: number; potentialBonus: number }[];
   evaluators: { userId: number; name: string; submitted: number; drafts: number; avgGiven: number | null; calibrationBias: number | null; biasSamples: number; avgDaysToSubmit: number | null }[];
@@ -68,6 +104,22 @@ const CONFORMITY_ITEMS = [
   { item: "conduta", label: "Conduta e comportamento" },
   { item: "guardaEquipamentos", label: "Guarda de equipamentos" },
 ] as const;
+
+/**
+ * "Atingiu o mínimo de eventos" no funil. Elegível ao bônus SEMPRE atingiu
+ * (o funil é decrescente: mínimo ≥ elegíveis ≥ com bônus). Ciclo FECHADO vale
+ * o resultado GRAVADO na apuração, não a regra de hoje: recusado pelo mínimo
+ * ("Participou de X de N eventos exigidos") não atingiu; inelegível por outro
+ * motivo (fora do ciclo, Sup Ceno…) conta pelas participações gravadas.
+ */
+export function reachedMinEvents(
+  q: { eligible: boolean; participatedEventsCount: number; minEvents?: number; official?: boolean; eligibilityReason?: string | null },
+  defaultMin: number,
+): boolean {
+  if (q.eligible) return true;
+  if (q.official && q.eligibilityReason && /^Participou de \d+ de \d+ eventos/.test(q.eligibilityReason)) return false;
+  return q.participatedEventsCount >= (q.minEvents ?? defaultMin);
+}
 
 export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   const eventById = new Map(input.events.map(e => [e.id, e]));
@@ -156,7 +208,9 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
 
   // ── Matriz de conformidade ──
   const confirmedConformities = input.conformities.filter(c => eventById.get(c.eventId)?.resultsConfirmed);
-  const conformity = CONFORMITY_ITEMS.map(({ item, label }) => {
+  const condutaInMatrix = input.condutaInMatrix ?? "all";
+  // Recorte só de ciclos sem a Conduta: o item nem aparece (não é perguntado).
+  const conformity = CONFORMITY_ITEMS.filter(({ item }) => !(item === "conduta" && condutaInMatrix === "none")).map(({ item, label }) => {
     let answered = 0; let nao = 0;
     for (const c of confirmedConformities) {
       const v = c[item];
@@ -186,18 +240,26 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   for (const [name, f] of faixaCount) {
     if (!rulesAsc.some(r => r.name === name)) faixas.push({ name, color: null, minScore: null, maxScore: null, bonusValue: null, bonusPerExtraEvent: null, count: f.count, bonusTotal: r2(f.bonus) });
   }
-  const reachedMin = input.quarterly.filter(q => q.participatedEventsCount >= input.minEvents).length;
+  const isAll = input.scope === "all";
+  const reachedMin = input.quarterly.filter(q => reachedMinEvents(q, input.minEvents)).length;
   const eligible = input.quarterly.filter(q => q.eligible).length;
   const withBonus = input.quarterly.filter(q => q.eligible && q.bonusValue > 0).length;
-  const funnel = [
-    { stage: "participated", label: "Participaram no ciclo", count: input.quarterly.length },
-    { stage: "reachedMin", label: `Atingiram ${input.minEvents} eventos`, count: reachedMin },
-    { stage: "eligible", label: "Elegíveis ao bônus", count: eligible },
-    { stage: "withBonus", label: "Com bônus", count: withBonus },
-  ];
+  const funnel = isAll
+    ? [
+      { stage: "participated", label: "Participações nos ciclos", count: input.quarterly.length },
+      { stage: "reachedMin", label: "Atingiram o mínimo do ciclo", count: reachedMin },
+      { stage: "eligible", label: "Elegíveis ao bônus", count: eligible },
+      { stage: "withBonus", label: "Com bônus", count: withBonus },
+    ]
+    : [
+      { stage: "participated", label: "Participaram no ciclo", count: input.quarterly.length },
+      { stage: "reachedMin", label: `Atingiram ${input.minEvents} eventos`, count: reachedMin },
+      { stage: "eligible", label: "Elegíveis ao bônus", count: eligible },
+      { stage: "withBonus", label: "Com bônus", count: withBonus },
+    ];
 
-  // ── Perto da próxima faixa (até 3 pontos) ──
-  const nearNextFaixa = input.quarterly
+  // ── Perto da próxima faixa (até 3 pontos) — só num ciclo ──
+  const nearNextFaixa = isAll ? [] : input.quarterly
     .filter(q => q.eligible)
     .map(q => {
       const current = getPlatoonByScore(q.finalResult, input.rules);
@@ -205,7 +267,7 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
       if (!next) return null;
       const gap = r2(next.minScore - q.finalResult);
       if (gap <= 0 || gap > 3) return null;
-      const extras = Math.max(0, q.eventsCount - input.minEvents);
+      const extras = Math.max(0, q.eventsCount - (q.minEvents ?? input.minEvents));
       const potentialBonus = calculateTieredBonus(next.minScore, new Array(extras).fill(next.minScore), input.rules);
       return { employeeId: q.employeeId, name: q.employeeName, finalResult: r2(q.finalResult), currentFaixa: current?.name ?? null, nextFaixa: next.name, gap, currentBonus: r2(q.bonusValue), potentialBonus: r2(potentialBonus) };
     })
@@ -283,6 +345,15 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
     .slice(0, 12);
 
   const officialConfirmed = scoredConfirmed.map(e => officialByEvent.get(e.id)!);
+  // Média e bônus: a MESMA conta do Total geral de Resultados (lib/total-geral.ts)
+  // — no Total geral, média ponderada pelos eventos com nota de cada pessoa.
+  const totals = totalGeralSummary(
+    input.quarterly.map(q => ({ employeeId: q.employeeId, cycleId: q.cycleId ?? 0, finalResult: q.finalResult, eventsCount: q.eventsCount, eligible: q.eligible, bonusValue: q.bonusValue })),
+    () => false,
+  );
+  const officialRows = input.quarterly.filter(q => q.official === true && q.eligible);
+  const bonusOfficial = r2(officialRows.reduce((s, q) => s + q.bonusValue, 0));
+  const bonusTotal = r2(input.quarterly.filter(q => q.eligible).reduce((s, q) => s + q.bonusValue, 0));
   const calibratedCriteria = input.calibrations.filter(c => eventById.has(c.eventId)).length;
   return {
     kpis: {
@@ -290,13 +361,21 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
       eventsConfirmed: input.events.filter(e => e.resultsConfirmed).length,
       eventsScored: scoredConfirmed.length,
       avgEventScore: officialConfirmed.length ? r1(avg(officialConfirmed)!) : null,
-      // Mesma conta da tela de Resultados: média das notas finais de quem tem evento com nota.
-      avgFinalResult: (() => { const xs = input.quarterly.filter(q => q.eventsCount > 0).map(q => q.finalResult); return xs.length ? r1(avg(xs)!) : null; })(),
+      // Um ciclo: média das notas finais de quem tem evento com nota (como
+      // Resultados). Total geral: Σ(nota × eventos com nota) ÷ Σ(eventos com
+      // nota), a mesma conta de GET /ranking/total e do Dashboard
+      // (lib/total-geral.ts).
+      avgFinalResult: isAll
+        ? totals.avgFinalResult
+        : (() => { const xs = input.quarterly.filter(q => q.eventsCount > 0).map(q => q.finalResult); return xs.length ? r1(avg(xs)!) : null; })(),
       collaborators: input.quarterly.length,
+      distinctCollaborators: new Set(input.quarterly.map(q => q.employeeId)).size,
       reachedMinEvents: reachedMin,
       eligible,
       withBonus,
-      bonusTotal: r2(input.quarterly.filter(q => q.eligible).reduce((s, q) => s + q.bonusValue, 0)),
+      bonusTotal,
+      bonusOfficial,
+      bonusProjected: r2(bonusTotal - bonusOfficial),
       evaluationsSubmitted: submitted.length,
       evaluationsDraft: input.evaluations.length - submitted.length,
       calibratedCriteria,
@@ -306,6 +385,9 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
       minEvents: input.minEvents,
     },
     ruleSet: {
+      conformityItemsAsked: condutaInMatrix === "none" ? 3 : 4,
+      condutaInMatrix,
+      minEventsByCycle: input.minEventsByCycle ?? [],
       minEvents: input.minEvents,
       conformityItemPoints: CONFORMITY_ITEM_POINTS,
       conformityPenaltyFactor: CONFORMITY_PENALTY_FACTOR,

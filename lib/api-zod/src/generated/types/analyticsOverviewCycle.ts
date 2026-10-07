@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Ciclo consultado; no Total geral id = 0, nome "Total geral" e o período do primeiro ao último ciclo
+ */
 export type AnalyticsOverviewCycle = {
   id: number;
   name: string;
