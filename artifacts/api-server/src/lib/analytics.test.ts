@@ -207,3 +207,34 @@ test("quem mais perdeu e quem mais ganhou pontos: soma pontos × quantidade por 
   ]);
   assert.deepEqual(o.topMerited.map(p => [p.name, p.points]), [["Bruno", 3]]);
 });
+
+test("critérios de todas as áreas: cópias de peso 0 entram numa linha só ('Todas as áreas') com a média das áreas; calibração vale", () => {
+  const input = base();
+  input.criteriaCatalog = [
+    { id: 200, name: "Prazo", eventScoped: false, sourceCriterionId: null },
+    { id: 201, name: "Prazo (2)", eventScoped: true, sourceCriterionId: 200 },
+    { id: 202, name: "Prazo (3)", eventScoped: true, sourceCriterionId: 200 },
+  ];
+  input.eventCriteria = [
+    { eventId: 1, criterionId: 200, active: true, name: "Prazo", area: "Produção", weight: 3 },
+    { eventId: 1, criterionId: 201, active: true, name: "Prazo (2)", area: "Cenografia", weight: 0 },
+    { eventId: 1, criterionId: 202, active: true, name: "Prazo (3)", area: "Logística", weight: 0 },
+    { eventId: 2, criterionId: 200, active: true, name: "Prazo", area: "Produção", weight: 3 },
+    { eventId: 2, criterionId: 201, active: true, name: "Prazo (2)", area: "Cenografia", weight: 0 },
+  ];
+  input.evaluations = [
+    { eventId: 1, criterionId: 200, evaluatorUserId: 5, evaluatorName: "P", score: 9, status: "submitted", submittedAt: new Date() },
+    { eventId: 1, criterionId: 201, evaluatorUserId: 6, evaluatorName: "C", score: 7, status: "submitted", submittedAt: new Date() },
+    { eventId: 1, criterionId: 202, evaluatorUserId: 7, evaluatorName: "L", score: 8, status: "submitted", submittedAt: new Date() },
+    { eventId: 2, criterionId: 201, evaluatorUserId: 6, evaluatorName: "C", score: 6, status: "submitted", submittedAt: new Date() },
+  ];
+  // Evento 2 calibrado no critério de origem: vale a calibração (5).
+  input.calibrations = [{ eventId: 2, criterionId: 200, calibratedScore: 5 }];
+  const o = computeAnalytics(input);
+  const rows = o.criteria.filter(c => c.name === "Prazo");
+  assert.equal(rows.length, 1, JSON.stringify(o.criteria));
+  assert.equal(rows[0].area, "Todas as áreas");
+  // Evento 1: média das áreas (9+7+8)/3 = 8 → 80; evento 2: calibração 5 → 50. Média 65.
+  assert.equal(rows[0].avgScore, 65);
+  assert.equal(rows[0].eventsCount, 2);
+});

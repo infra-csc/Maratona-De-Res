@@ -117,14 +117,14 @@ export default function DashboardPage() {
         </section>
       ) : (
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Média Geral */}
+        {/* Nota média (ciclo) / Nota média geral (Total geral) — o mesmo nome em Resultados, Análises e Ciclos */}
         <PremiumCard className="p-6 h-40 flex flex-col justify-between relative overflow-hidden group">
           <div className="z-10">
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{isAll ? "Média Geral" : "Média do Ciclo"}</p>
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{isAll ? "Nota média geral" : "Nota média"}</p>
             <h2 data-testid="text-quarter-avg" className="text-[40px] leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>
               {summary?.quarterAverage != null ? fmtNum(summary.quarterAverage, 1) : "—"}
             </h2>
-            <p className="text-[11px] font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>{isAll ? "Média de cada pessoa ponderada pelos eventos com nota" : "Pontos no ciclo"}</p>
+            <p className="text-[11px] font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>{isAll ? "Média de cada colaborador ponderada pelos eventos com nota" : "Pontos no ciclo"}</p>
           </div>
           <div className="absolute -right-3 -bottom-3 opacity-[0.06] group-hover:scale-110 transition-transform duration-500">
             <Trophy size={110} strokeWidth={1.5} />

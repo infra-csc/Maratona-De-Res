@@ -19,7 +19,7 @@ type SortKey = "position" | "employeeName" | "cyclesWithScore" | "avgFinalResult
 const COLS = "minmax(200px,1.7fr) 0.8fr 0.9fr 0.8fr 1fr 1fr 1fr 1.1fr 40px";
 
 function csvOf(rows: RankingTotalRow[]): string {
-  const head = ["Posição", "Colaborador", "Ciclos com nota", "Média final (ponderada pelos eventos)", "Eventos com nota", "Bônus oficial — ciclos fechados (R$)", "Bônus projetado — ciclo aberto (R$)", "Bônus pago (R$)", "Faixa do ciclo mais recente", "Ciclo mais recente"];
+  const head = ["Posição", "Colaborador", "Ciclos com nota", "Nota média geral (ponderada pelos eventos)", "Eventos com nota", "Bônus oficial — ciclos fechados (R$)", "Bônus projetado — ciclo aberto (R$)", "Bônus pago (R$)", "Faixa do ciclo mais recente", "Ciclo mais recente"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = rows.map(r => [
     r.position, r.employeeName, r.cyclesWithScore, r.avgFinalResult == null ? "" : fmtNum(r.avgFinalResult, 1),
@@ -130,9 +130,9 @@ export function TotalTab({ onOpenCycle }: { onOpenCycle: (cycleId: number, isCur
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {[
           // Média geral do summary da API: a MESMA do Dashboard e de Análises no Total geral.
-          { icon: Trophy, label: "Média geral", value: data?.summary?.avgFinalResult != null ? fmtScore(data.summary.avgFinalResult) : "—", title: "Ponderada pelos eventos com nota (a mesma do Dashboard e de Análises)", testId: "total-avg-final" },
+          { icon: Trophy, label: "Nota média geral", value: data?.summary?.avgFinalResult != null ? fmtScore(data.summary.avgFinalResult) : "—", title: "Ponderada pelos eventos com nota", testId: "total-avg-final" },
           { icon: Layers, label: "Ciclos somados", value: String(cycles.length) },
-          { icon: Users, label: "Pessoas", value: String(data?.summary?.people ?? rows.length) },
+          { icon: Users, label: "Colaboradores", value: String(data?.summary?.people ?? rows.length) },
           { icon: Wallet2, label: "Bônus oficial", value: fmtBRLShort(bonusOfficial), title: "Ciclos fechados: o bônus que vale", testId: "total-bonus-official" },
           { icon: Hourglass, label: "Bônus projetado", value: fmtBRLShort(bonusProjected), title: "Ciclo ainda aberto: projeção que muda até o fechamento", testId: "total-bonus-projected" },
           { icon: CheckCircle2, label: "Bônus pago", value: fmtBRLShort(bonusPaid), title: "Soma do bônus marcado como pago" },
@@ -195,7 +195,7 @@ export function TotalTab({ onOpenCycle }: { onOpenCycle: (cycleId: number, isCur
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{r.avgFinalResult == null ? "—" : fmtScore(r.avgFinalResult)}</span>
-                    <span className="text-[10px] font-bold uppercase" style={muted}>Média</span>
+                    <span className="text-[10px] font-bold uppercase" style={muted}>Nota média geral</span>
                   </span>
                 </div>
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-[12px]">
@@ -223,7 +223,7 @@ export function TotalTab({ onOpenCycle }: { onOpenCycle: (cycleId: number, isCur
               <div role="row" className="grid items-center" style={{ gridTemplateColumns: COLS, backgroundColor: "var(--secondary)" }}>
                 {head("Colaborador", "employeeName", "left")}
                 {head("Ciclos c/ nota", "cyclesWithScore", "center", "Ciclos em que teve evento com nota")}
-                {head("Média final", "avgFinalResult", "center", "Média ponderada pelos eventos com nota: Σ (nota final do ciclo × eventos) ÷ Σ eventos")}
+                {head("Nota média geral", "avgFinalResult", "center", "Média ponderada pelos eventos com nota: Σ (nota final do ciclo × eventos) ÷ Σ eventos")}
                 {head("Eventos c/ nota", "eventsCount", "center", "Soma dos eventos com nota em todos os ciclos")}
                 {head("Bônus oficial", "bonusOfficial", "center", "Ciclos fechados em que foi elegível")}
                 {head("Bônus projetado", "bonusProjected", "center", "Ciclo aberto: projeção que muda até o fechamento")}

@@ -25,7 +25,7 @@ const score = (v: number | string | null | undefined) => (v == null ? "—" : fm
 export function PublishStatusCell({ c, cal, avg, isFinalPublished, canFinalize, publishIntents, setPublishIntents }: PublishStatusCellProps) {
   const intent = publishIntents[c.criterionId] ?? "partial";
   return (
-    <td className="px-1.5 py-2 hidden sm:table-cell align-middle" onClick={e => e.stopPropagation()}>
+    <td className="px-1.5 py-2 hidden sm:table-cell align-top" onClick={e => e.stopPropagation()}>
       {cal ? (
         <div className="flex flex-col items-stretch gap-1.5 min-w-[118px] max-w-[150px] mx-auto">
           <PublishedBlock c={c} isFinalPublished={isFinalPublished} />

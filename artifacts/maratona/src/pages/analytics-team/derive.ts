@@ -1,4 +1,5 @@
 import type { AnalyticsOverview, EventsReport } from "@workspace/api-client-react";
+import { displayCriterionName } from "../../lib/criterion-name";
 
 /**
  * Números da apresentação para a equipe, derivados das Análises e do relatório
@@ -47,10 +48,10 @@ export function buildTeamStory(data: AnalyticsOverview, report: EventsReport | u
   const mean = crit.length ? crit.reduce((s, c) => s + c.avgScore, 0) / crit.length : 0;
   const byScore = [...crit].sort((a, b) => b.avgScore - a.avgScore);
   const strengths = byScore.filter(c => c.avgScore >= mean).slice(0, TOP)
-    .map(c => ({ label: c.name, detail: c.area ?? undefined, value: c.avgScore }));
+    .map(c => ({ label: displayCriterionName(c.name), detail: c.area ?? undefined, value: c.avgScore }));
   const strongKeys = new Set(byScore.filter(c => c.avgScore >= mean).slice(0, TOP).map(c => c.key));
   const improvements = [...byScore].reverse().filter(c => c.avgScore < mean && !strongKeys.has(c.key)).slice(0, TOP)
-    .map(c => ({ label: c.name, detail: c.area ?? undefined, value: c.avgScore }));
+    .map(c => ({ label: displayCriterionName(c.name), detail: c.area ?? undefined, value: c.avgScore }));
 
   // Por área: média dos critérios ponderada pelo número de eventos.
   const areaAcc = new Map<string, { sum: number; w: number }>();

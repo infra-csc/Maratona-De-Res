@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fieldStyle } from "./helpers";
 import type { CriteriaManagement } from "./use-criteria-management";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /** Aba Critérios — tabela de critérios do evento (peso, avaliador principal/backup, ações). */
 export function CriteriaTable({ mgmt, isAdmin, areaMode = false }: { mgmt: CriteriaManagement; isAdmin: boolean; areaMode?: boolean }) {
@@ -65,11 +66,11 @@ export function CriteriaTable({ mgmt, isAdmin, areaMode = false }: { mgmt: Crite
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="font-black uppercase text-sm">{meta?.criterionName ?? item.name}</span>
+                          <span className="font-black uppercase text-sm">{displayCriterionName(meta?.criterionName ?? item.name)}</span>
                           {item.eventScoped && (areaCopyParent.has(item.criterionId) ? (
                             <span
                               className="px-1.5 py-0.5 rounded text-[11px] font-black uppercase whitespace-nowrap"
-                              title={`Área extra de "${critMeta.get(areaCopyParent.get(item.criterionId)!)?.criterionName ?? "critério original"}": a nota do critério é a média das áreas`}
+                              title={`Área extra de "${displayCriterionName(critMeta.get(areaCopyParent.get(item.criterionId)!)?.criterionName) || "critério original"}": a nota do critério é a média das áreas`}
                               style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
                             >
                               Área extra
@@ -238,7 +239,7 @@ export function CriteriaTable({ mgmt, isAdmin, areaMode = false }: { mgmt: Crite
                             disabled={areasLockedReason != null || setCriterionAreas.isPending}
                             onClick={() => openAreasDialog(item.criterionId)}
                             title={areasLockedReason ?? "Escolher as áreas que avaliam este critério neste evento"}
-                            aria-label={`Áreas que avaliam ${meta?.criterionName ?? item.name}`}
+                            aria-label={`Áreas que avaliam ${displayCriterionName(meta?.criterionName ?? item.name)}`}
                             className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
                             style={{ border: "1px solid var(--border)" }}
                           >

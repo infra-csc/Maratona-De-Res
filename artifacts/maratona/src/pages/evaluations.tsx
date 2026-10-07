@@ -4,8 +4,8 @@ import { ArrowLeft, Rocket, SearchX } from "lucide-react";
 import { useGetEvent, getGetEventQueryKey, useGetEvaluations, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, useDeleteEvaluationDraft, getGetEvaluationsQueryKey, createEvaluation, submitEvaluation, ApiError, type EventConformityInput, type EventCriterion } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { withServerMessage } from "@/lib/calibration-api";
-import { apiErrorCode, EVENT_NEXT_CYCLE } from "@/lib/utils";
-import { isNextCycleEvent, opensLabelFor, NEXT_CYCLE_NOTICE } from "./events/rules";
+import { apiErrorCode, evaluationErrorTitle } from "@/lib/utils";
+import { isNextCycleEvent, opensLabelFor, NEXT_CYCLE_NOTICE, fmtEventDate } from "./events/rules";
 import { serverErrorMessage } from "./eval-public/helpers";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -255,9 +255,9 @@ export default function EvaluationsPage() {
         // 409 = a área já respondeu enquanto eu preenchia: a tela recarrega e
         // o critério passa a mostrar quem respondeu.
         if (e instanceof ApiError && e.status === 409) { invalidateMyArea(qc); qc.invalidateQueries({ queryKey: evalsQKey }); }
-        // 409 EVENT_NEXT_CYCLE: o evento é do próximo ciclo — a mensagem é do servidor.
-        const nextCycle = apiErrorCode(e) === EVENT_NEXT_CYCLE;
-        toast({ title: nextCycle ? "Evento do próximo ciclo" : e instanceof ApiError && e.status === 409 ? "Critério já respondido pela área" : "Erro ao salvar", description: serverErrorMessage(e, s => `Erro ${s}`), variant: "destructive" });
+        // Título pelo code do 409 (próximo ciclo, ciclo fechado, área já respondeu,
+        // outra área); a explicação é a mensagem do servidor.
+        toast({ title: evaluationErrorTitle(e), description: serverErrorMessage(e, s => `Erro ${s}`), variant: "destructive" });
       },
     },
   });
@@ -271,6 +271,16 @@ export default function EvaluationsPage() {
   // tiver aberto (dia seguinte ao evento) — o servidor (GET
   // /evaluations/my-area) decide. Sem isso, a tela explica.
   const currentEvent = selectedInfo;
+  // Diálogos de link para freela mostram o evento (nome, data, cidade).
+  const linkEvent = currentEvent
+    ? {
+        name: currentEvent.name,
+        detail: [
+          currentEvent.startDate ? fmtEventDate(currentEvent.startDate) + (currentEvent.endDate && currentEvent.endDate !== currentEvent.startDate ? `–${fmtEventDate(currentEvent.endDate)}` : "") : null,
+          currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `/${currentEvent.state}` : ""}` : currentEvent.location,
+        ].filter(Boolean).join(" · ") || null,
+      }
+    : null;
   const eventUnavailable = selectedEventId != null && areaEvent.isSuccess && !selectedInfo;
   // Evento indisponível: as datas dizem se a avaliação ainda vai abrir
   // ("Abre em DD/MM", dia seguinte ao fim, BRT) ou se o evento é do próximo
@@ -468,7 +478,7 @@ export default function EvaluationsPage() {
           ? "1 critério foi enviado antes da falha."
           : `${sentCount} critérios foram enviados antes da falha.`;
       toast({
-        title: apiErrorCode(e) === EVENT_NEXT_CYCLE ? "Evento do próximo ciclo: avaliação ainda não abriu"
+        title: apiErrorCode(e) ? evaluationErrorTitle(e)
           : failingCriterionName ? `Erro ao lançar "${failingCriterionName}"` : "Erro ao lançar avaliação",
         description: `${sentMsg}${reason ? ` Motivo: ${reason}.` : ""} Confira o que ficou pendente e tente novamente.`,
         variant: "destructive",
@@ -928,6 +938,7 @@ export default function EvaluationsPage() {
 
       <PublicLinkDialog
         criteriaIds={publicLinkDialogCriteriaIds}
+        event={linkEvent}
         areaName={publicLinkDialogAreaName}
         recipientName={publicLinkRecipientName}
         setRecipientName={setPublicLinkRecipientName}
@@ -952,6 +963,7 @@ export default function EvaluationsPage() {
 
       <ConformityPublicLinkDialog
         linkType={conformityPublicLinkType}
+        event={linkEvent}
         recipientName={conformityPublicRecipientName}
         setRecipientName={setConformityPublicRecipientName}
         generatedUrl={generatedConformityUrl}

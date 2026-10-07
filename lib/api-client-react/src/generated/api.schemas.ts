@@ -326,6 +326,8 @@ export interface Employee {
   cycleExcluded?: boolean;
   /** @nullable */
   cycleExcludedReason?: string | null;
+  /** Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo. */
+  inPreviousCycle?: boolean;
   /** @nullable */
   linkedUserId?: number | null;
   hasAccess?: boolean;
@@ -2970,6 +2972,11 @@ export interface PublicEvalCriterion {
   closedByName?: string | null;
   /** @nullable */
   closedAt?: string | null;
+  /**
+     * Fechado por outro motivo que não uma resposta (ciclo por área, link em nome de alguém de outra área) — a tela mostra este texto.
+     * @nullable
+     */
+  closedReason?: string | null;
 }
 
 export interface PublicEvalSubmitResult {

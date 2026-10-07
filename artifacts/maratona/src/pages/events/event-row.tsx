@@ -1,6 +1,7 @@
 // Um evento da lista: a LINHA da tabela (telas largas) e o CARTÃO (celular e
 // tablet) — os dois com os mesmos dados: nome, data (+ selo de período), barras,
 // nota, status (com atalho para o próximo passo) e o menu de ações por papel.
+import { useState } from "react";
 import { Link } from "wouter";
 import type { Cycle, User } from "@workspace/api-client-react";
 import { ChevronRight, Users, GitMerge, SlidersHorizontal, Trash2, Pencil, MoreHorizontal, ClipboardList, Info } from "lucide-react";
@@ -10,8 +11,9 @@ import { hasRole } from "@/lib/auth-context";
 import { fmtDate, fmtNum, eventPeriodPosition } from "@/lib/utils";
 import { CONDENSED, GOOD, AMBER, AMBER_TEXT, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { MiniBar, CalBar } from "./bars";
-import { deriveEventRow, NEXT_CYCLE_BADGE, NEXT_CYCLE_NOTICE, type EventBadge } from "./rules";
+import { deriveEventRow, NEXT_CYCLE_BADGE, NEXT_CYCLE_NOTICE, type AreaResponseCount, type EventBadge } from "./rules";
 import type { EventItem } from "./types";
+import { EventDetailsDialog, type EventDetailsKind } from "./event-details-dialog";
 
 export type EventRowActions = {
   onEdit: (ev: EventItem) => void;
@@ -29,7 +31,27 @@ type EventRowProps = EventRowActions & {
   cycleLabel?: string | null;
   /** Ciclo do evento (para o selo "Fora do período"). */
   eventCycle?: Cycle | null;
+  /** Ciclo por área: respostas por área (a mesma conta da Central); null = conta por critério. */
+  areaCounts?: AreaResponseCount | null;
 };
+
+const PREVIEW_TITLE = "Média das avaliações enviadas até agora; a nota oficial sai da calibração publicada";
+
+/** Nota da linha/cartão: oficial (publicada) ou "Prévia" (só com ao menos uma resposta; parcial mostra "3/20"). */
+function ScoreBlock({ score, fc, label, labelColor, isPreview, previewPartial, hasEvals, big }: {
+  score: number | null; fc: boolean; label: string; labelColor: string; isPreview: boolean; previewPartial: string | null; hasEvals: boolean; big?: boolean;
+}) {
+  if (score == null || (isPreview && !hasEvals)) return <span className="text-sm italic opacity-40" aria-label="Sem nota">—</span>;
+  return (
+    <div title={isPreview ? PREVIEW_TITLE : undefined}>
+      <span className={`font-black ${big ? "text-xl" : "text-lg"} leading-none block`} style={{ fontFamily: CONDENSED, color: fc && !isPreview ? GOOD_TEXT : isPreview ? "var(--muted-foreground)" : "var(--foreground)" }}>
+        {fmtNum(score, 1)}
+      </span>
+      <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: isPreview ? "var(--muted-foreground)" : labelColor }}>{label}</span>
+      {previewPartial && <span className="block text-[11px] font-semibold tabular-nums" style={{ color: "var(--muted-foreground)" }} title="Respostas das áreas até agora">{previewPartial}</span>}
+    </div>
+  );
+}
 
 const FULL: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
 
@@ -227,6 +249,32 @@ function EventActions({ ev, user, readOnly, evaluationsHref, onEdit, onMerge, on
   );
 }
 
+/** Admin: a barra vira botão que abre o detalhe (quem respondeu, calibrações, matriz). Demais papéis: só informativa. */
+function DetailTrigger({ enabled, label, onOpen, children }: { enabled: boolean; label: string; onOpen: () => void; children: React.ReactNode }) {
+  if (!enabled) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      title={label}
+      className="block text-left rounded-md -mx-1.5 px-1.5 -my-1 py-1 cursor-pointer transition-colors hover:bg-[var(--secondary)]"
+      style={{ width: "calc(100% + 0.75rem)" }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Mesma altura do selo "N a publicar" — mantém as três barras na mesma linha. */
+function PendingSpacer({ ev }: { ev: EventItem }) {
+  if ((ev.pendingPublishCount ?? 0) <= 0) return null;
+  return <span aria-hidden className="invisible mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED }}>0</span>;
+}
+
+/** Cor do número da Matriz: legível também quando ninguém respondeu (antes var(--border) quase sumia). */
+const matrixColor = (ev: EventItem) => ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--muted-foreground)";
+
 function PendingPublishBadge({ ev }: { ev: EventItem }) {
   if ((ev.pendingPublishCount ?? 0) <= 0) return null;
   return (
@@ -259,12 +307,14 @@ function NameMeta({ ev, pendingRH }: { ev: EventItem; pendingRH: boolean }) {
   );
 }
 
-export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null }: EventRowProps) {
+export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null }: EventRowProps) {
   const {
     score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,
     hasEvals, hasAnyPublication, missing, evaluationsHref, evalTooltip, accentColor,
-    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle,
-  } = deriveEventRow(ev, undefined, eventCycle);
+    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle, isPreview, previewPartial,
+  } = deriveEventRow(ev, undefined, eventCycle, areaCounts);
+  const isAdmin = hasRole(user, "admin");
+  const [details, setDetails] = useState<EventDetailsKind | null>(null);
 
   return (
     <div
@@ -290,7 +340,10 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOn
 
       {/* Date */}
       <div className="px-3.5 py-3 text-xs font-semibold min-w-0">
-        <span className="whitespace-nowrap">{dateStr}</span>
+        {/* Período em duas linhas (início / fim): com ano não cabe numa linha só e invadia "Part.". */}
+        {dateStr.split("–").map((part, i) => (
+          <span key={i} className="block whitespace-nowrap leading-snug">{i > 0 ? `– ${part}` : part}</span>
+        ))}
         <div><PeriodBadge ev={ev} cycle={eventCycle} hideAfter={nextCycle} /></div>
         {cycleLabel && <CycleLabelBadge ev={ev} cycleLabel={cycleLabel} />}
       </div>
@@ -301,51 +354,50 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOn
         <span className="text-[12px] font-bold">{ev.participantCount ?? 0}</span>
       </div>
 
-      {/* Avaliações mini bar */}
-      <div className="px-3.5 py-3">
+      {/* Avaliações / Publicadas / Matriz: a mesma estrutura de célula (barra + espaço do selo
+          "a publicar"), então as três barras ficam na mesma linha. */}
+      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
         {ev.isHistorical || evalTotal === 0 ? (
           <span className="text-[11px] italic opacity-40" title={ev.isHistorical ? "Evento histórico: sem avaliações neste sistema" : "Nenhum critério ativo neste evento"}>—</span>
         ) : (
-          <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={evalTooltip} />
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das avaliações de ${ev.name}`} onOpen={() => setDetails("evaluations")}>
+            <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={isAdmin ? undefined : evalTooltip} />
+          </DetailTrigger>
         )}
+        <PendingSpacer ev={ev} />
       </div>
 
-      {/* Calibrações mini bar */}
-      <div className="px-3.5 py-3">
+      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
         {isPureHistorical || total === 0 ? (
           <span className="text-[11px] italic opacity-40">—</span>
         ) : (
-          <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das calibrações de ${ev.name}`} onOpen={() => setDetails("calibrations")}>
+            <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
+          </DetailTrigger>
         )}
-        <PendingPublishBadge ev={ev} />
+        <div><PendingPublishBadge ev={ev} /></div>
       </div>
 
-      {/* Matriz de Conformidade mini bar */}
-      <div className="px-3.5 py-3">
+      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
         {!ev.conformityNeeded ? (
           <span className="text-[11px] italic opacity-40">—</span>
         ) : (
-          <MiniBar
-            value={ev.conformityFilled ?? 0}
-            total={ev.conformityTotal ?? 0}
-            color={ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--border)"}
-            title={`${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
-          />
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => setDetails("matrix")}>
+            <MiniBar
+              value={ev.conformityFilled ?? 0}
+              total={ev.conformityTotal ?? 0}
+              color={matrixColor(ev)}
+              title={isAdmin ? undefined : `${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
+            />
+          </DetailTrigger>
         )}
+        <PendingSpacer ev={ev} />
+        {details && <EventDetailsDialog ev={ev} kind={details} areaMode={!!eventCycle?.areaEvaluation} onClose={() => setDetails(null)} />}
       </div>
 
       {/* Score */}
       <div className="px-1 py-3 text-center">
-        {score != null ? (
-          <div>
-            <span className="font-black text-lg leading-none block" style={{ fontFamily: CONDENSED, color: fc ? GOOD_TEXT : "var(--foreground)" }}>
-              {fmtNum(score, 1)}
-            </span>
-            <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
-          </div>
-        ) : (
-          <span className="text-sm italic opacity-40">—</span>
-        )}
+        <ScoreBlock score={score} fc={fc} label={scoreLabel} labelColor={scoreLabelColor} isPreview={isPreview} previewPartial={previewPartial} hasEvals={hasEvals} />
       </div>
 
       {/* Status badge */}
@@ -375,12 +427,14 @@ function CardMetric({ label, children }: { label: string; children: React.ReactN
  * Cartão do evento para celular e tablet (no lugar da tabela de 9 colunas,
  * que espremia o nome até sumir e sobrepunha a data). Mesmos dados e ações.
  */
-export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null }: Omit<EventRowProps, "gridCols">) {
+export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null }: Omit<EventRowProps, "gridCols">) {
   const {
     score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,
     hasEvals, hasAnyPublication, missing, evaluationsHref, evalTooltip, accentColor,
-    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle,
-  } = deriveEventRow(ev, undefined, eventCycle);
+    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle, isPreview, previewPartial,
+  } = deriveEventRow(ev, undefined, eventCycle, areaCounts);
+  const isAdmin = hasRole(user, "admin");
+  const [details, setDetails] = useState<EventDetailsKind | null>(null);
 
   return (
     <article
@@ -399,14 +453,7 @@ export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = fals
           <NameMeta ev={ev} pendingRH={pendingRH} />
         </div>
         <div className="shrink-0 text-right">
-          {score != null ? (
-            <>
-              <span className="font-black text-xl leading-none block" style={{ fontFamily: CONDENSED, color: fc ? GOOD_TEXT : "var(--foreground)" }}>{fmtNum(score, 1)}</span>
-              <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
-            </>
-          ) : (
-            <span className="text-sm italic opacity-40" aria-label="Sem nota">—</span>
-          )}
+          <ScoreBlock big score={score} fc={fc} label={scoreLabel} labelColor={scoreLabelColor} isPreview={isPreview} previewPartial={previewPartial} hasEvals={hasEvals} />
         </div>
       </div>
 
@@ -430,23 +477,34 @@ export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = fals
       <div className="mt-3 grid grid-cols-3 gap-3">
         <CardMetric label="Avaliações">
           {ev.isHistorical || evalTotal === 0 ? <span className="text-[11px] italic opacity-40">—</span>
-            : <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={evalTooltip} />}
+            : (
+              <DetailTrigger enabled={isAdmin} label={`Ver detalhes das avaliações de ${ev.name}`} onOpen={() => setDetails("evaluations")}>
+                <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={isAdmin ? undefined : evalTooltip} />
+              </DetailTrigger>
+            )}
         </CardMetric>
-        <CardMetric label="Calibrações">
+        <CardMetric label="Publicadas">
           {isPureHistorical || total === 0 ? <span className="text-[11px] italic opacity-40">—</span>
-            : <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />}
+            : (
+              <DetailTrigger enabled={isAdmin} label={`Ver detalhes das calibrações de ${ev.name}`} onOpen={() => setDetails("calibrations")}>
+                <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
+              </DetailTrigger>
+            )}
         </CardMetric>
         <CardMetric label="Matriz">
           {!ev.conformityNeeded ? <span className="text-[11px] italic opacity-40">—</span> : (
-            <MiniBar
-              value={ev.conformityFilled ?? 0}
-              total={ev.conformityTotal ?? 0}
-              color={ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--border)"}
-              title={`${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
-            />
+            <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => setDetails("matrix")}>
+              <MiniBar
+                value={ev.conformityFilled ?? 0}
+                total={ev.conformityTotal ?? 0}
+                color={matrixColor(ev)}
+                title={isAdmin ? undefined : `${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
+              />
+            </DetailTrigger>
           )}
         </CardMetric>
       </div>
+      {details && <EventDetailsDialog ev={ev} kind={details} areaMode={!!eventCycle?.areaEvaluation} onClose={() => setDetails(null)} />}
 
       <div className="mt-3 flex items-center justify-between gap-2">
         <PendingPublishBadge ev={ev} />

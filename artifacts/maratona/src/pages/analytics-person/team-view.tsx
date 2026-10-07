@@ -100,7 +100,7 @@ export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="person-team-kpis">
-        <StatTile hero label="Nota final média" value={n1(teamAvg)} detail={`${plural(all.length, "colaborador", "colaboradores")} no ranking`} />
+        <StatTile hero label="Nota média" value={n1(teamAvg)} detail={`${plural(all.length, "colaborador", "colaboradores")} no ranking`} />
         <StatTile label="Com penalidade" value={withPenalty.length} detail={withPenalty.length ? `${pts(penaltyPts)} pontos lançados no total` : "Nenhuma penalidade no ciclo"} />
         <StatTile label="Faixa perdida por penalidade" value={lostFaixa.length} detail={lostFaixa.length ? "Sem as penalidades, estariam numa faixa acima" : "Ninguém mudou de faixa por penalidade"} />
         <StatTile label="Com mérito" value={counts.merito} detail="Ganharam pontos por mérito" />

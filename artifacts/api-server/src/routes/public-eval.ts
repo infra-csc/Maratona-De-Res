@@ -33,6 +33,9 @@ interface Rejected { criterionId: number; criterionName: string; reason: string;
 
 /** Tudo o que veio no envio já estava respondido (critérios e/ou matriz): nada gravado. */
 function nothingSavedMessage(rejected: Rejected[]): string {
+  if (rejected.length > 0 && rejected.every(r => r.reason === AREA_MODE_LINK_REASON)) {
+    return "Este link foi gerado em nome de alguém de outra área: no ciclo por área, só o avaliador da área do critério responde. Nada foi gravado e o link não foi usado.";
+  }
   return rejected.some(r => r.kind === "conformity")
     ? "Tudo o que este link pedia já tinha sido respondido. Nada foi gravado."
     : "Todos os critérios deste link já foram respondidos. Nada foi gravado.";
@@ -168,13 +171,20 @@ router.get("/public-eval/:token", async (req, res) => {
   const closures = token.usedAt === null && token.createdByUserId != null
     ? await tokenCriterionClosures(db, token.eventId, token.createdByUserId, tokenCriteria.map(c => c.criterionId))
     : new Map<number, Closure>();
+  // Ciclo por área: critério de outra área (link em nome de quem não é da
+  // área dele) não é pedido — fica fechado com o motivo.
+  const foreign = token.usedAt === null && token.createdByUserId != null
+    ? await areaModeForeignCriteria(db, token.eventId, token.createdByUserId, tokenCriteria.map(c => c.criterionId))
+    : new Set<number>();
   const criteria = tokenCriteria.map(c => {
     const closure = closures.get(c.criterionId);
+    const otherArea = !closure && foreign.has(c.criterionId);
     return {
       ...c,
-      closed: !!closure,
+      closed: !!closure || otherArea,
       closedByName: closure?.name ?? null,
       closedAt: closure?.submittedAt?.toISOString() ?? null,
+      closedReason: otherArea ? AREA_MODE_LINK_REASON : null,
     };
   });
 
@@ -304,8 +314,11 @@ router.post("/public-eval/:token/submit", async (req, res) => {
   // a um com o motivo — nunca descartados em silêncio). Os ainda abertos
   // precisam estar todos respondidos.
   const closedNow = await tokenCriterionClosures(db, token.eventId, token.createdByUserId, [...activeIds]);
+  // Ciclo por área: critério de outra área não é cobrado (nem gravado).
+  const foreignNow = await areaModeForeignCriteria(db, token.eventId, token.createdByUserId, [...activeIds]);
+  for (const id of closedNow.keys()) foreignNow.delete(id);
   const answeredIds = new Set(parsedEvaluations.map(e => e.criterionId));
-  if ([...activeIds].some(id => !closedNow.has(id) && !answeredIds.has(id))) {
+  if ([...activeIds].some(id => !closedNow.has(id) && !foreignNow.has(id) && !answeredIds.has(id))) {
     res.status(400).json({ error: "É necessário avaliar todos os critérios do questionário" });
     return;
   }
@@ -320,7 +333,8 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     ({ criterionId: 0, criterionName: CONFORMITY_PART, reason: conformityClosedMessage(c), kind: "conformity" });
 
   const criteriaRejected = (): Rejected[] => [...inactiveRejected, ...[...closedNow.entries()]
-    .map(([criterionId, c]) => ({ criterionId, criterionName: criterionNameOf.get(criterionId) ?? "", reason: closedMessage(c), kind: "criterion" as const }))];
+    .map(([criterionId, c]) => ({ criterionId, criterionName: criterionNameOf.get(criterionId) ?? "", reason: closedMessage(c), kind: "criterion" as const })),
+    ...[...foreignNow].map(criterionId => ({ criterionId, criterionName: criterionNameOf.get(criterionId) ?? "", reason: AREA_MODE_LINK_REASON, kind: "criterion" as const }))];
   if (activeIds.size === 0 && !wantsConformity) {
     // Todos os critérios do link foram desativados no evento: nada a gravar.
     const rejected = criteriaRejected();
@@ -328,9 +342,13 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     res.status(409).json({ error: "Os critérios deste link foram desativados neste evento. Nada foi gravado e o link não foi usado.", code: "CRITERIA_INACTIVE", rejected });
     return;
   }
-  if (closedNow.size === activeIds.size && !wantsConformity) {
+  if (closedNow.size + foreignNow.size === activeIds.size && !wantsConformity) {
     const rejected = criteriaRejected();
     if (isCombined && sentConformity) rejected.push(conformityRejection(conformityBefore));
+    if (closedNow.size === 0) {
+      res.status(409).json({ error: "Este link foi gerado em nome de alguém de outra área: no ciclo por área, só o avaliador da área do critério responde. Nada foi gravado e o link não foi usado.", code: "AREA_MODE_OTHER_AREA", rejected });
+      return;
+    }
     res.status(409).json({ error: nothingSavedMessage(rejected), code: "AREA_ALREADY_ANSWERED", rejected });
     return;
   }
@@ -736,7 +754,11 @@ router.delete("/public-eval-tokens/:tokenId", requireAuth, async (req, res) => {
 // Erros lançados dentro das transações de submissão (link já usado).
 router.use((err: unknown, _req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
   if (err instanceof TokenAlreadyUsedError) { res.status(409).json({ error: err.message }); return; }
-  if (err instanceof NothingSavedError) { res.status(409).json({ error: err.message, code: "AREA_ALREADY_ANSWERED", rejected: err.rejected }); return; }
+  if (err instanceof NothingSavedError) {
+    const otherArea = err.rejected.length > 0 && err.rejected.every(r => r.reason === AREA_MODE_LINK_REASON);
+    res.status(409).json({ error: err.message, code: otherArea ? "AREA_MODE_OTHER_AREA" : "AREA_ALREADY_ANSWERED", rejected: err.rejected });
+    return;
+  }
   if (err instanceof ConformityAlreadyAnsweredError) { res.status(409).json({ error: err.message, code: "CONFORMITY_ALREADY_ANSWERED", rejected: err.rejected }); return; }
   next(err);
 });

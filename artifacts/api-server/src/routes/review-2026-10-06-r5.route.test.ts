@@ -141,3 +141,72 @@ test("M2: mudar o período do ciclo aberto recalcula na hora (evento que sai do 
   assert.equal(depois.events_count, 1);
   assert.equal(Number(depois.final_result), 90);
 });
+
+// ── 6ª revisão ─────────────────────────────────────────────────────────────
+test("R6-M1: ciclo por área — admin não gera link de critério em nome próprio pela rota comum (409 AREA_MODE_OTHER_AREA)", async () => {
+  const ev = await openEvent(areaCycle, [critA], "Evento R6-M1", "2024-08-01");
+  await h.fx.criterionAssignment({ eventId: ev, criterionId: critA, assignedToId: adminU });
+  const r = await h.api("POST", `/events/${ev}/public-token`, { role: "admin", userId: adminU, body: { recipientName: "Freela" } });
+  assert.equal(r.status, 409, JSON.stringify(r.data));
+  assert.equal(r.data.code, "AREA_MODE_OTHER_AREA");
+  assert.equal((await h.sql("select 1 from public_eval_tokens where event_id = $1", [ev])).length, 0);
+  // O avaliador da área gera normalmente.
+  assert.equal((await h.api("POST", `/events/${ev}/public-token`, { ...as(ana), body: { recipientName: "Freela" } })).status, 200);
+});
+
+test("R6-B1: link antigo em nome de outra área — o GET já mostra o critério fechado com o motivo e o envio diz isso (409 AREA_MODE_OTHER_AREA)", async () => {
+  const ev = await openEvent(areaCycle, [critA], "Evento R6-B1", "2024-08-02");
+  const t = await token(ev, beto, [critA]);
+  const info = (await h.api("GET", `/public-eval/${t}`)).data;
+  assert.equal(info.criteria[0].closed, true);
+  assert.equal(info.criteria[0].closedReason, AREA_LINK_REASON);
+  assert.equal(info.allClosed, true);
+  const r = await h.api("POST", `/public-eval/${t}/submit`, { body: { submitterName: "Freela", evaluations: [{ criterionId: critA, score: 5, comments: "x" }] } });
+  assert.equal(r.status, 409, JSON.stringify(r.data));
+  assert.equal(r.data.code, "AREA_MODE_OTHER_AREA");
+  assert.match(r.data.error, /outra área/);
+});
+
+test("R6-M2: juntar usuários — dado de ciclo fechado → 409 CLOSED_CYCLE; avaliação no mesmo critério dos dois → 409 (nunca 500)", async () => {
+  const fechado = await h.fx.cycle({ name: "Fechado R6", startDate: "2010-01-01", endDate: "2010-12-31", status: "closed", isCurrent: false });
+  const canon = await user("Canon R6", "avaliador", areaA);
+  const dup = await user("Dup R6", "avaliador", areaA);
+  const evF = await h.fx.event({ cycleId: fechado, date: "2010-05-01", status: "closed", resultsConfirmed: true, criteria: [critA], name: "Evento fechado R6" });
+  await h.fx.evaluation({ eventId: evF, criterionId: critA, evaluatorUserId: dup, score: 8 });
+  const r = await h.api("POST", `/users/${canon}/merge`, { role: "admin", userId: adminU, body: { duplicateIds: [dup] } });
+  assert.equal(r.status, 409, JSON.stringify(r.data));
+  assert.equal(r.data.code, "CLOSED_CYCLE");
+  assert.equal((await h.one("select evaluator_user_id from evaluations where event_id = $1", [evF])).evaluator_user_id, dup);
+
+  const canon2 = await user("Canon2 R6", "avaliador", areaA);
+  const dup2 = await user("Dup2 R6", "avaliador", areaA);
+  const evO = await openEvent(areaCycle, [critA], "Evento choque R6", "2024-08-03");
+  await h.fx.evaluation({ eventId: evO, criterionId: critA, evaluatorUserId: canon2, score: 7 });
+  await h.fx.evaluation({ eventId: evO, criterionId: critA, evaluatorUserId: dup2, score: 6, status: "draft" });
+  const r2 = await h.api("POST", `/users/${canon2}/merge`, { role: "admin", userId: adminU, body: { duplicateIds: [dup2] } });
+  assert.equal(r2.status, 409, JSON.stringify(r2.data));
+  assert.equal(r2.data.code, "MERGE_EVALUATION_CLASH");
+});
+
+test("R6-B2: export de avaliações pendentes segue a regra única de 'aberto' (evento futuro não entra)", async () => {
+  const passado = await openEvent(areaCycle, [critB], "Evento passado pendente R6", "2024-09-01");
+  const futuro = await openEvent(atual, [critB], "Evento futuro R6", "2030-05-01");
+  const r = await h.api("GET", "/exports/pending-evaluations", { role: "admin", userId: adminU });
+  assert.equal(r.status, 200);
+  assert.ok(String(r.data.data).includes("Evento passado pendente R6"), "pendência real aparece");
+  assert.ok(!String(r.data.data).includes("Evento futuro R6"), "evento que não abriu não é pendência");
+  void passado; void futuro;
+});
+
+test("Colaboradores no ciclo novo: GET /employees marca quem estava no ciclo anterior (inPreviousCycle)", async () => {
+  const anterior = await h.fx.cycle({ name: "Anterior R7", startDate: "2099-01-01", endDate: "2099-03-31", status: "closed", isCurrent: false });
+  const emp = await h.fx.employee({ name: "Colab anterior R7" });
+  const outro = await h.fx.employee({ name: "Colab sem histórico R7" });
+  await h.sql("insert into quarterly_results (employee_id, cycle_id, final_result, events_count, participated_events_count, eligible) values ($1, $2, 80, 3, 3, true)", [emp, anterior]);
+  await h.sql("update cycles set is_current = false");
+  const novo = await h.fx.cycle({ name: "Novo R7", startDate: "2099-04-01", endDate: "2099-06-30" });
+  const list = (await h.api("GET", "/employees", { role: "admin", userId: adminU })).data as { id: number; inPreviousCycle: boolean }[];
+  assert.equal(list.find(e => e.id === emp)?.inPreviousCycle, true);
+  assert.equal(list.find(e => e.id === outro)?.inPreviousCycle, false);
+  void novo;
+});

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 import { ClipboardCheck, Table2, Users, SlidersHorizontal } from "lucide-react";
 import { CONDENSED, WARNING, AMBER, AMBER_TEXT, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import type { ConsoleView, EnrichedEvent, QueueTab } from "./types";
@@ -89,7 +89,7 @@ export function KpiStrip({ openCount, selected, currentWeekendDoneCount, pending
         <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{selected ? `${selected.pct}%` : "—"}</div>
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Concluído no evento</div>
         {currentWeekendDoneCount != null && (
-          <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{currentWeekendDoneCount} do fim de semana atual</div>
+          <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{plural(currentWeekendDoneCount, "evento concluído", "eventos concluídos")} no fim de semana atual</div>
         )}
       </div>
       {areaMode ? (

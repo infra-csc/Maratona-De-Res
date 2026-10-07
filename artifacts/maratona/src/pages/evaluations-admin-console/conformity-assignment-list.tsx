@@ -3,7 +3,6 @@ import { CheckCircle2, Link2 } from "lucide-react";
 import { CONDENSED, GOOD, GOOD_TEXT } from "@/lib/premium-theme";
 import { STATE_CFG } from "./helpers";
 import { InlinePicker } from "./pickers";
-import { NEXT_CYCLE_NOTICE } from "../events/rules";
 import type { SelectedEventDetail } from "./use-event-mutations";
 import type { ConformityKey, ConformityLinkDialogState, ConformityRow, EnrichedEvent } from "./types";
 
@@ -38,11 +37,6 @@ export function ConformityAssignmentList(props: {
   return (
     <>
       <p className="text-[11px] font-bold uppercase tracking-wide mt-[18px] mb-2.5" style={{ color: "var(--muted-foreground)" }}>Matriz de conformidade</p>
-      {nextCycle && canManage && (
-        <p data-testid="matrix-next-cycle-note" className="mb-2.5 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
-          {NEXT_CYCLE_NOTICE}
-        </p>
-      )}
       <div className="flex flex-col gap-2.5">
         {conformityRows.map(cf => {
           const complete = cf.total > 0 && cf.filled === cf.total;

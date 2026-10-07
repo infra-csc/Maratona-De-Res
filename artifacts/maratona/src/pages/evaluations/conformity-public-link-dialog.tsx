@@ -7,9 +7,11 @@ import { CONDENSED } from "@/lib/premium-theme";
 import { fmtDT, publicEvalBaseUrl } from "./helpers";
 import { cenografiaItemsLabel } from "./constants";
 import type { ConformityLinkType, ToastFn } from "./types";
+import { LinkEventLine, type LinkEventInfo } from "./public-link-dialog";
 
 interface ConformityPublicLinkDialogProps {
   linkType: ConformityLinkType | null;
+  event: LinkEventInfo;
   recipientName: string;
   setRecipientName: (value: string) => void;
   generatedUrl: string | null;
@@ -28,7 +30,7 @@ interface ConformityPublicLinkDialogProps {
 
 // ── Dialog: Link Público de Conformidade (Cenografia / Ferramentas) ──
 export function ConformityPublicLinkDialog({
-  linkType, recipientName, setRecipientName, generatedUrl, linkCopied, setLinkCopied,
+  linkType, event, recipientName, setRecipientName, generatedUrl, linkCopied, setLinkCopied,
   conformityHistory, ferramentasHistory, isGenerating, onGenerate, onClose, toast, withoutConduta,
 }: ConformityPublicLinkDialogProps) {
   return (
@@ -40,6 +42,7 @@ export function ConformityPublicLinkDialog({
             {linkType === "cenografia" ? "Link para freela — Cenografia" : "Link para freela — Ferramentas"}
           </DialogTitle>
         </DialogHeader>
+        <LinkEventLine event={event} />
 
         {(() => {
           // Um link só por formulário: se já existe um pendente, mostramos o

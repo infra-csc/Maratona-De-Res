@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useGetEventActivityLog, getGetEventActivityLogQueryKey } from "@workspace/api-client-react";
 import { CONDENSED } from "@/lib/premium-theme";
 import { fmtNum } from "@/lib/utils";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 const KIND_CFG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   eval:          { icon: <Star size={9} />,            color: "#9ab000", bg: "rgba(154,176,0,0.14)" },
@@ -91,7 +92,7 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
                           <span className="text-[11px] font-bold truncate">{e.userName}</span>
                         )}
                         {e.criterionName && (
-                          <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>· {e.criterionName}</span>
+                          <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>· {displayCriterionName(e.criterionName)}</span>
                         )}
                         {e.score != null && (
                           <span className="text-[11px] font-black" style={{ color: cfg.color }}>→ {fmtNum(e.score, 2)}</span>

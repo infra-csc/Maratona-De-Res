@@ -94,7 +94,7 @@ export function CycleStatTiles({ cycle }: { cycle: CycleSummary }) {
   const openCount = s.eventsOpen;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      <Stat hero label="Nota final média" value={n1(s.avgFinalResult)} detail={`${plural(s.collaborators, "colaborador", "colaboradores")} no ranking`} />
+      <Stat hero label="Nota média" value={n1(s.avgFinalResult)} detail={`${plural(s.collaborators, "colaborador", "colaboradores")} no ranking`} />
       {/* Mesma contagem da lista de Eventos: total guardado no ciclo, e à parte
           os "fora do período" (não contam aqui; vão para o próximo ciclo). */}
       <Stat label="Eventos confirmados" value={`${s.eventsConfirmed}/${s.eventsTotal}`}

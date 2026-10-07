@@ -7,6 +7,7 @@ import { CriterionWeightCell } from "./weight-cell";
 import { EvaluatorPickerCell } from "./evaluator-pickers";
 import { EvaluatingAreasChip } from "./evaluating-areas";
 import type { AreaOption, EvaluatorOption } from "./types";
+import { displayCriterionName } from "@/lib/criterion-name";
 
 /** Uma linha da tabela de critérios: nome, área (+ duplicar), peso, avaliador padrão e status. */
 export function CriterionRow({
@@ -29,7 +30,7 @@ export function CriterionRow({
   return (
     <tr data-testid={`row-criterion-${c.id}`} className="transition-colors group" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", opacity: c.active ? 1 : 0.6 }}>
       <td className="px-5 py-3.5">
-        <p className="font-bold uppercase transition-colors">{c.name}</p>
+        <p className="font-bold uppercase transition-colors">{displayCriterionName(c.name)}</p>
         {c.description && <p className="text-xs mt-1 max-w-md leading-relaxed" style={{ color: "var(--muted-foreground)" }}>{c.description}</p>}
       </td>
       <td className="px-5 py-3.5">

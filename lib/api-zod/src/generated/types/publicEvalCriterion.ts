@@ -17,4 +17,9 @@ export interface PublicEvalCriterion {
   closedByName?: string | null;
   /** @nullable */
   closedAt?: Date | null;
+  /**
+     * Fechado por outro motivo que não uma resposta (ciclo por área, link em nome de alguém de outra área) — a tela mostra este texto.
+     * @nullable
+     */
+  closedReason?: string | null;
 }

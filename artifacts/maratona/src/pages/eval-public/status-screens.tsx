@@ -116,6 +116,21 @@ export function DoneScreen({ shellStyle, submitterName, rejected = [], nothingSa
 
 /** Todos os critérios do link já foram respondidos pela área: avisa ANTES de a pessoa preencher. */
 export function AllClosedScreen({ shellStyle, info }: ShellProps & { info: PublicEvalInfo }) {
+  // Ciclo por área: link gerado em nome de alguém de outra área — nada a responder.
+  const otherArea = info.criteria.length > 0 && info.criteria.every(c => c.closed && !!c.closedReason);
+  if (otherArea) {
+    return (
+      <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
+        <Card className="max-w-md w-full p-8 text-center">
+          <Lock size={36} className="mx-auto mb-4" style={{ color: "var(--muted-foreground)" }} />
+          <h1 className="font-black text-2xl uppercase tracking-wide mb-2" style={{ fontFamily: CONDENSED }}>Link sem critérios para você</h1>
+          <p className="text-sm mb-4" style={{ color: "var(--muted-foreground)" }}>
+            {info.criteria[0]?.closedReason} Peça um link novo ao responsável pelo evento.
+          </p>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
       <Card className="max-w-md w-full p-8 text-center">
@@ -145,7 +160,9 @@ export function ClosedCriteriaList({ criteria }: { criteria: PublicEvalCriterion
           <span className="min-w-0">
             <span className="block text-sm font-bold uppercase" style={{ fontFamily: CONDENSED }}>{displayCriterionName(c.criterionName)}</span>
             <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {c.closedByName ? `Já respondido por ${c.closedByName}` : "Já respondido"}{c.closedAt ? ` em ${fmtDT(c.closedAt)}` : ""}
+              {c.closedReason
+                ? c.closedReason
+                : <>{c.closedByName ? `Já respondido por ${c.closedByName}` : "Já respondido"}{c.closedAt ? ` em ${fmtDT(c.closedAt)}` : ""}</>}
             </span>
           </span>
         </li>

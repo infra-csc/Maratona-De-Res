@@ -1,4 +1,5 @@
 import type { EventsReport, PlatoonRule, QuarterlyResult, RankingDetail, RankingDetailEvent } from "@workspace/api-client-react";
+import { displayCriterionName } from "../../lib/criterion-name";
 
 /**
  * Contas da análise por colaborador. Tudo aqui replica, no navegador, as
@@ -256,9 +257,9 @@ export function criteriaCompare(report: EventsReport | undefined, myEventIds: Se
       // O relatório só lista inativos já calibrados, e esses CONTAM na nota
       // (computeEventTeamResultFromData): o filtro é ter nota usada, não `active`.
       if (c.used == null) continue;
-      const key = `${c.name}|${c.area ?? ""}`.toLowerCase();
+      const key = `${displayCriterionName(c.name)}|${c.area ?? ""}`.toLowerCase();
       const v = c.used <= 10 ? c.used * 10 : c.used;
-      const a = acc.get(key) ?? { name: c.name, area: c.area ?? null, mine: [], team: [] };
+      const a = acc.get(key) ?? { name: displayCriterionName(c.name), area: c.area ?? null, mine: [], team: [] };
       a.team.push(v);
       if (myEventIds.has(ev.id)) a.mine.push(v);
       acc.set(key, a);

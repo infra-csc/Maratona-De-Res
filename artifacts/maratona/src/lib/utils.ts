@@ -199,3 +199,14 @@ export function isLightColor(hex: string | null | undefined): boolean {
 export function faixaEdge(hex: string | null | undefined): { boxShadow?: string } {
   return isLightColor(hex) ? { boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.22)" } : {};
 }
+
+/** Título do aviso quando a API recusa salvar/enviar uma avaliação (pelo `code` do 409). */
+export function evaluationErrorTitle(e: unknown, fallback = "Não foi possível salvar"): string {
+  switch (apiErrorCode(e)) {
+    case EVENT_NEXT_CYCLE: return "Evento do próximo ciclo";
+    case "CLOSED_CYCLE": return "Ciclo fechado";
+    case "AREA_ALREADY_ANSWERED": return "Critério já respondido pela área";
+    case "AREA_MODE_OTHER_AREA": return "Critério de outra área";
+    default: return fallback;
+  }
+}

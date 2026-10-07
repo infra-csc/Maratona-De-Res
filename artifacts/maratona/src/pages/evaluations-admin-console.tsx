@@ -70,7 +70,8 @@ export function AdminEvaluationsConsole() {
   const linkState = useLinkDialogState();
   const {
     linkDialog, setLinkDialog, linkRecipientName, setLinkRecipientName, generatedLinkUrl, setGeneratedLinkUrl, linkCopied, setLinkCopied,
-    batchOpen, setBatchOpen, batchRunning, batchLinks, batchAllCopied, setBatchAllCopied,
+    linkReusedName, setLinkReusedName,
+    batchOpen, setBatchOpen, batchRunning, batchLinks, batchAllCopied, setBatchAllCopied, batchPlan, setBatchPlan,
     conformityLinkDialog, setConformityLinkDialog, conformityLinkRecipientName, setConformityLinkRecipientName,
     conformityLinkUrl, setConformityLinkUrl, conformityLinkCopied, setConformityLinkCopied,
   } = linkState;
@@ -179,7 +180,7 @@ export function AdminEvaluationsConsole() {
   const confirmResults = useConfirmResults(qc, toast);
 
   // ---- Links públicos (tokens) ----
-  const { createAdminToken, allTokens, createConformityToken, createFerramentasToken, openLinkDialog, handleGenerateLink, handleGenerateAllLinks, handleGenerateConformityLink } =
+  const { createAdminToken, allTokens, createConformityToken, createFerramentasToken, openLinkDialog, handleGenerateLink, handleGenerateAllLinks, runAreaBatch, handleGenerateConformityLink } =
     useLinkActions({ linkState, selected, selectedEventId, selectedDetail, toast });
 
   function handleAssign(criterionId: number, userId: number) {
@@ -328,6 +329,7 @@ export function AdminEvaluationsConsole() {
               handleAssign={handleAssign}
               openLinkDialog={openLinkDialog}
               setViewEvalCrit={setViewEvalCrit}
+              allTokens={allTokens}
               conformitySection={
                 <ConformityAssignmentList
                   selected={selected}
@@ -372,6 +374,9 @@ export function AdminEvaluationsConsole() {
             handleAssign={handleAssign}
             openLinkDialog={openLinkDialog}
             setConformityLinkDialog={setConformityLinkDialog}
+            allTokens={allTokens}
+            canViewSubmissions={canViewSubmissions}
+            setViewEvalCrit={setViewEvalCrit}
             // O seletor da Matriz vive na aba de eventos: abre lá, já aberto.
             setOpenConformityPicker={(k) => { setOpenConformityPicker(k); setView("assign"); }}
           />
@@ -405,6 +410,9 @@ export function AdminEvaluationsConsole() {
           setBatchOpen={setBatchOpen}
           batchEventHeader={batchEventHeader}
           toast={toast}
+          batchPlan={batchPlan}
+          setBatchPlan={setBatchPlan}
+          runAreaBatch={runAreaBatch}
         />
       )}
 
@@ -429,6 +437,8 @@ export function AdminEvaluationsConsole() {
           setGeneratedLinkUrl={setGeneratedLinkUrl}
           linkCopied={linkCopied}
           setLinkCopied={setLinkCopied}
+          linkReusedName={linkReusedName}
+          setLinkReusedName={setLinkReusedName}
           handleGenerateLink={handleGenerateLink}
           generating={createAdminToken.isPending}
           allTokens={allTokens}

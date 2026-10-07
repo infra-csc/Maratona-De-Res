@@ -23,6 +23,26 @@ export function completedCriteriaCount(e: Pick<EventItem, "totalCriteria" | "eva
   return Math.min(total, done);
 }
 
+/** Contagem de respostas no ciclo por área: done de total. */
+export type AreaResponseCount = { done: number; total: number };
+
+/**
+ * Ciclo por ÁREA: respostas por área — cada critério ATIVO do evento conta,
+ * inclusive as cópias por área dos critérios multiárea (5 critérios = 2 de
+ * uma área + 3 × 6 áreas = 20). Completo pela regra única (enviado ou
+ * publicado). É a mesma conta da Central (quadro por área), da lista de
+ * Eventos, dos cartões do celular e do detalhe do evento.
+ */
+export function areaResponseCounts(
+  criteria: { criterionId: number; eventId?: number; active: boolean; partialPublishedAt?: string | null; finalPublishedAt?: string | null }[],
+  evaluations: { criterionId: number; eventId?: number; status: string }[],
+): AreaResponseCount {
+  const submitted = new Set(evaluations.filter(e => e.status === "submitted").map(e => e.criterionId));
+  const active = criteria.filter(c => c.active);
+  const done = active.filter(c => isCriterionComplete({ submitted: submitted.has(c.criterionId), published: c.partialPublishedAt != null || c.finalPublishedAt != null })).length;
+  return { done, total: active.length };
+}
+
 /** Aba da fila da Central: "A fazer" (aberto e não concluído), "A abrir" ou "Concluídos". */
 export type QueueTabKind = "todo" | "waiting" | "done";
 

@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { invalidateCycleResults } from "@/lib/invalidate-results";
 import { plural } from "@/lib/utils";
 import type { BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
-import { cycleStatus, getEligibilityStatus, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
+import { cycleStatus, getEligibilityStatus, hasCycleScore, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
 import { EmployeesFilters, EmployeesHeader, EmployeesKpis } from "./employees/employees-header";
 import { CreateEmployeeDialog, EditEmployeeDialog } from "./employees/employee-form-dialogs";
 import { EmployeesTable } from "./employees/employees-table";
@@ -333,9 +333,13 @@ export default function EmployeesPage() {
     }
   }
 
+  // "Com nota no ciclo" conta só quem tem nota; a lista "No ciclo" também traz
+  // quem veio do ciclo anterior e ainda não tem nota no ciclo novo.
+  const withScore = inCycle.filter(hasCycleScore);
   const stats = {
-    noCiclo: inCycle.length,
-    elegiveis: inCycle.filter(e => getEligibilityStatus(e) === "eligible").length,
+    noCiclo: withScore.length,
+    listaNoCiclo: inCycle.length,
+    elegiveis: withScore.filter(e => getEligibilityStatus(e) === "eligible").length,
     foraDoCiclo: outOfCycle.length,
   };
 

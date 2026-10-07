@@ -6,6 +6,8 @@ import { fmtDT } from "./helpers";
 import { cenografiaItemCount } from "../evaluations/constants";
 import type { ConformityKey, CritRow } from "./types";
 import { fmtNum } from "@/lib/utils";
+import { displayCriterionName } from "@/lib/criterion-name";
+import { AudioPlayer } from "@/components/audio-recorder";
 
 /** Ver avaliação (modal de leitura) */
 export function ViewEvaluationDialog({ viewEvalCrit, setViewEvalCrit }: {
@@ -18,7 +20,7 @@ export function ViewEvaluationDialog({ viewEvalCrit, setViewEvalCrit }: {
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>{viewEvalCrit.areaName}</p>
-            <h3 className="font-black uppercase text-[16px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{viewEvalCrit.criterionName}</h3>
+            <h3 className="font-black uppercase text-[16px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{displayCriterionName(viewEvalCrit.criterionName)}</h3>
           </div>
           <button type="button" onClick={() => setViewEvalCrit(null)} aria-label="Fechar avaliação" title="Fechar" className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
         </div>
@@ -72,7 +74,7 @@ export function ViewEvaluationDialog({ viewEvalCrit, setViewEvalCrit }: {
           {viewEvalCrit.audioUrl && (
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>Áudio</p>
-              <audio controls src={viewEvalCrit.audioUrl} className="w-full h-9" style={{ borderRadius: 8 }} />
+              <AudioPlayer objectPath={viewEvalCrit.audioUrl} className="w-full" />
             </div>
           )}
         </div>

@@ -45,6 +45,8 @@ export interface Employee {
   cycleExcluded?: boolean;
   /** @nullable */
   cycleExcludedReason?: string | null;
+  /** Tinha resultado no ciclo anterior (o último fechado antes do atual) — a lista "No ciclo" o mostra enquanto ele não tiver nota no ciclo novo. */
+  inPreviousCycle?: boolean;
   /** @nullable */
   linkedUserId?: number | null;
   hasAccess?: boolean;

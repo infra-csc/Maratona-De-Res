@@ -18,13 +18,29 @@ export function deriveCriteria(
         const crit = activeCriteria.find(ac => ac.criterionId === e.criterionId);
         const respondedRaw = e.submittedAt ?? e.createdAt ?? null;
         // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
-        return { name: e.evaluatorName ?? "Avaliador", score: Number(e.score), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw) : null };
+        return { name: e.evaluatorName ?? "Avaliador", evaluatorUserId: e.evaluatorUserId ?? null, criterionId: e.criterionId, score: Number(e.score), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw) : null };
       });
   }
 
+  /** Uma linha por ÁREA do critério (o de origem + as cópias por área): respostas e média de cada uma. */
+  function getMembers(critId: number) {
+    const ids = [critId, ...(childCriterionIdsMap.get(critId) ?? [])];
+    const scores = getAreaScores(critId);
+    return ids
+      .map(id => {
+        const crit = activeCriteria.find(ac => ac.criterionId === id);
+        const answers = scores.filter(s => s.criterionId === id);
+        const avg = answers.length > 0 ? answers.reduce((a, b) => a + b.score, 0) / answers.length : null;
+        return { criterionId: id, areaName: crit?.responsibleAreaName ?? null, answers, avg };
+      })
+      .sort((a, b) => (a.criterionId === critId ? -1 : b.criterionId === critId ? 1 : (a.areaName ?? "").localeCompare(b.areaName ?? "", "pt-BR")));
+  }
+
+  // Mesma conta do servidor (mergeEventScopedCriteria): média das ÁREAS que
+  // avaliaram — cada área entra com a média das respostas dela.
   function getAvgScore(critId: number) {
-    const scores = getAreaScores(critId).map(s => s.score);
-    return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    const avgs = getMembers(critId).map(m => m.avg).filter((v): v is number => v != null);
+    return avgs.length > 0 ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
   }
 
   function getCalibration(critId: number) {
@@ -78,11 +94,12 @@ export function deriveCriteria(
     !(c.eventScoped && c.sourceCriterionId != null)
   );
 
-  return { getAreaScores, getAvgScore, getCalibration, activeCriteria, childCriterionIdsMap, displayActiveCriteria };
+  return { getAreaScores, getMembers, getAvgScore, getCalibration, activeCriteria, childCriterionIdsMap, displayActiveCriteria };
 }
 
 export type DerivedCriteria = ReturnType<typeof deriveCriteria>;
 export type AreaScore = ReturnType<DerivedCriteria["getAreaScores"]>[number];
+export type AreaMember = ReturnType<DerivedCriteria["getMembers"]>[number];
 export type CalibrationRecord = NonNullable<ReturnType<DerivedCriteria["getCalibration"]>>;
 
 // Contadores de edições locais pendentes (nota, justificativa, peso, Parc./Final).

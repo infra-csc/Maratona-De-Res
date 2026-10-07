@@ -184,7 +184,9 @@ export default function ComoFuncionaPage() {
             <div className="space-y-2 mt-2">
               <InfoRow label="Duração" value="Cada ciclo cobre um período específico definido pelo RH (ex.: um trimestre)." />
               <InfoRow label="Eventos" value="São as atividades/trabalhos em que você participa. Cada evento tem critérios de avaliação com pesos diferentes." />
-              <InfoRow label="Avaliação" value="Após cada evento, um avaliador designado pontua você em cada critério. A nota final do evento é a média ponderada dos critérios." />
+              <InfoRow label="Avaliação" value={currentCycle?.areaEvaluation === false
+                ? "A avaliação abre sozinha no dia seguinte ao fim do evento: os avaliadores pontuam você em cada critério. A nota final do evento é a média ponderada dos critérios."
+                : "A avaliação abre sozinha no dia seguinte ao fim do evento: os avaliadores de cada área avaliam os critérios da sua área, e a primeira resposta da área é a que vale. Critério avaliado por várias áreas entra pela média das áreas. A nota final do evento é a média ponderada dos critérios."} />
             </div>
           </Section>
         )}
@@ -198,7 +200,7 @@ export default function ComoFuncionaPage() {
             <div className="space-y-2 mt-2">
               <InfoRow label="Nota do Evento" value="Média ponderada dos critérios avaliados (cada critério tem um peso). Escala de 0 a 10, convertida para 0 a 100." />
               <InfoRow label="Matriz de Conformidade" value="Checklist de itens obrigatórios. Cada item marcado como 'Não' desconta 10 pontos da nota daquele evento." />
-              <InfoRow label="Média do Ciclo" value="Média simples de todos os eventos com nota confirmada que contam para a sua pontuação." highlight />
+              <InfoRow label="Nota média" value="Média simples de todos os eventos com nota confirmada que contam para a sua pontuação." highlight />
               <InfoRow label="Penalidades" value="Descontam pontos do total acumulado de notas antes de calcular a média final (ex.: faltas, advertências). O desconto pode reduzir sua nota até o mínimo de 0." />
               <InfoRow label="Méritos" value="Somam pontos ao total acumulado de notas antes de calcular a média final, podendo aumentar até o máximo de 100." />
               <InfoRow label="Nota Final" value="= (Soma das notas dos eventos − Penalidades + Méritos) ÷ Nº de eventos (limitada entre 0 e 100)." highlight />
@@ -293,7 +295,7 @@ export default function ComoFuncionaPage() {
             </div>
 
             <div className="mt-4 p-4 rounded-lg text-[13px] leading-relaxed text-muted-foreground" style={{ backgroundColor: "var(--muted)", borderLeft: "3px solid #ccff00" }}>
-              Os pontos são descontados da <strong className="text-foreground">soma total das notas</strong> e depois divididos pelo número de eventos — por isso o impacto na sua média depende de quantos eventos você participou. Exemplo: uma penalidade de 50 pts em 8 eventos reduz a média em 6,25 pts. O RH pode ajustar os valores ou criar novos tipos conforme as regras do ciclo.
+              Os pontos são descontados da <strong className="text-foreground">soma total das notas</strong> e depois divididos pelo número de eventos — por isso o impacto na sua média depende de quantos eventos você participou. Exemplo: uma penalidade de 50 pts em 10 eventos reduz a média em 5 pts. O RH pode ajustar os valores ou criar novos tipos conforme as regras do ciclo.
             </div>
           </Section>
         )}
@@ -384,7 +386,7 @@ export default function ComoFuncionaPage() {
               <StatusBadge
                 label="Pendente"
                 color="text-muted-foreground"
-                text="O evento ainda não tem notas publicadas. A avaliação está em andamento ou aguardando avaliador."
+                text="O evento ainda não tem notas publicadas. A avaliação está em andamento ou aguardando a resposta da área."
               />
               <StatusBadge
                 label="Avaliação Parcial"
@@ -412,7 +414,7 @@ export default function ComoFuncionaPage() {
               <StatusBadge
                 label="Pendente"
                 color="text-muted-foreground"
-                text="Este quesito ainda não tem nota lançada. Aguarde o avaliador concluir a avaliação."
+                text="Este quesito ainda não tem nota lançada. Aguarde o avaliador da área responder."
               />
               <StatusBadge
                 label="Projeção Parcial"

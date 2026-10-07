@@ -1,4 +1,6 @@
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { AdminPublicToken } from "@/lib/routing-api";
+import { AreaBoard, boardCounts, boardGroups, type AreaBoardMode } from "./area-board";
 import type { useGenerateCriterionAssignments } from "@/lib/routing-api";
 import { CheckCircle2, Clock, Link2, CheckCircle, Lock, RefreshCw, UserCheck, Calendar, AlertTriangle, CalendarClock, Info } from "lucide-react";
 import { plural } from "@/lib/utils";
@@ -38,18 +40,33 @@ export function EventAssignmentPanel(props: {
   setViewEvalCrit: SetState<CritRow | null>;
   /** Bloco "Matriz de conformidade" (renderizado ao final do corpo). */
   conformitySection: ReactNode;
+  /** Links do evento (quem respondeu "via link"). */
+  allTokens: AdminPublicToken[] | undefined;
 }) {
   const {
     selected, canManage, canViewSubmissions, todayStr, toast, confirmResults, resyncCriteria, generateAssignments,
     batchRunning, handleGenerateAllLinks, critFilter, setCritFilter, bulkAssignAreaId, setBulkAssignAreaId, bulkBusy, handleBulkAssign,
-    openPickerCriterionId, setOpenPickerCriterionId, handleAssign, openLinkDialog, setViewEvalCrit, conformitySection,
+    openPickerCriterionId, setOpenPickerCriterionId, handleAssign, openLinkDialog, setViewEvalCrit, conformitySection, allTokens,
   } = props;
-  const { filteredCriteria, critPillCounts } = computeCriteriaFilter(selected, critFilter);
+  const { filteredCriteria, critPillCounts: criteriaCounts } = computeCriteriaFilter(selected, critFilter);
+  // Ciclo por área: quadro por ÁREA (ou por critério de origem) — os filtros e
+  // contadores passam a contar grupos, não critérios soltos.
+  const [boardMode, setBoardMode] = useState<AreaBoardMode>("area");
+  const allGroups = selected.areaMode ? boardGroups(selected, boardMode) : [];
+  const critPillCounts = selected.areaMode ? boardCounts(allGroups) : criteriaCounts;
+  const visibleGroups = critFilter === "all" || critFilter === "unassigned" ? allGroups : allGroups.filter(g => g.state === critFilter);
   // Ainda não aceita avaliação: do próximo ciclo ou o evento não terminou — não é "A fazer".
   const waiting = selected.queueTab === "waiting" && !!selected.opensLabel;
   // Avaliação por área: ninguém precisa ser designado — sem "Sem avaliador",
   // sem "Atribuir"; designação antiga aparece só como informação.
   const areaMode = selected.areaMode;
+  // Link para freela: no ciclo por área sai em nome de um avaliador da área
+  // (escolhido no diálogo) — vale para todo critério ainda aberto, com ou sem
+  // designação; fora dele, segue a designação.
+  const canLink = (c: CritRow) => !selected.nextCycle && (c.areaMode ? c.state !== "done" && c.areaId != null : c.assignedToId != null);
+  const showGenerateAll = !selected.nextCycle && (areaMode
+    ? selected.criteria.some(c => c.state !== "done" && c.areaId != null)
+    : (selected.total - critPillCounts.unassigned) > 0);
   return (
     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
       <div className="px-[18px] py-4" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -127,14 +144,32 @@ export function EventAssignmentPanel(props: {
             <div className="h-full rounded-full" style={{ width: `${selected.pct}%`, backgroundColor: "var(--accent)" }} />
           </div>
           <span className="text-[13px] font-black" style={{ fontFamily: CONDENSED }}>{selected.pct}%</span>
-          <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>{selected.done} de {plural(selected.total, "critério completo", "critérios completos")}</span>
+          <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>{selected.done} de {areaMode ? plural(selected.total, "resposta das áreas", "respostas das áreas") : plural(selected.total, "critério completo", "critérios completos")}</span>
         </div>
       </div>
 
       <div className="p-4">
         <div className="flex items-center justify-between gap-2.5 mb-3 flex-wrap">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
+            {areaMode ? (
+              <div role="group" aria-label="Agrupar" className="inline-flex rounded-lg p-0.5" style={{ backgroundColor: "var(--secondary)" }}>
+                {([["area", "Por área"], ["criterion", "Por critério"]] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={boardMode === k}
+                    data-testid={`board-mode-${k}`}
+                    onClick={() => setBoardMode(k)}
+                    className="rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide transition-colors"
+                    style={{ fontFamily: CONDENSED, backgroundColor: boardMode === k ? "var(--card)" : "transparent", color: boardMode === k ? "var(--foreground)" : "var(--muted-foreground)", boxShadow: boardMode === k ? "0 1px 2px rgba(0,0,0,0.08)" : undefined }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
+            )}
             {canManage && (
               <button
                 type="button"
@@ -165,7 +200,7 @@ export function EventAssignmentPanel(props: {
               </button>
             )}
             {/* Evento do próximo ciclo: a API recusa link público (409 EVENT_NEXT_CYCLE) — sem o botão. */}
-            {canManage && !selected.nextCycle && (selected.total - critPillCounts.unassigned) > 0 && (
+            {canManage && showGenerateAll && (
               <button
                 type="button"
                 data-testid="button-generate-all-links"
@@ -173,7 +208,9 @@ export function EventAssignmentPanel(props: {
                 onClick={handleGenerateAllLinks}
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black uppercase tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--foreground)" }}
-                title="Gera um link por avaliador (Cenografia já vem com a Matriz de Conformidade no mesmo questionário)"
+                title={areaMode
+                  ? "Gera um link por área, em nome do avaliador da área que você escolher (Cenografia já vem com a Matriz de Conformidade)"
+                  : "Gera um link por avaliador (Cenografia já vem com a Matriz de Conformidade no mesmo questionário)"}
               >
                 <Link2 size={12} /> {batchRunning ? "Gerando..." : "Gerar Todos os Links"}
               </button>
@@ -206,7 +243,7 @@ export function EventAssignmentPanel(props: {
         {areaMode && (
           <p data-testid="notice-area-mode-admin" className="mb-3 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
             <Info size={13} className="shrink-0 mt-[2px]" aria-hidden />
-            <span><strong style={{ color: "var(--foreground)" }}>No ciclo por área, só o avaliador da área responde.</strong> Ajustes na Calibração.</span>
+            <span><strong style={{ color: "var(--foreground)" }}>No ciclo por área, só o avaliador da área responde</strong> — a primeira resposta da área vale. Ajustes na Calibração.</span>
           </p>
         )}
 
@@ -255,6 +292,18 @@ export function EventAssignmentPanel(props: {
           );
         })()}
 
+        {areaMode ? (
+          <AreaBoard
+            selected={selected}
+            groups={visibleGroups}
+            mode={boardMode}
+            canManage={canManage}
+            canViewSubmissions={canViewSubmissions}
+            tokens={allTokens}
+            openLinkDialog={openLinkDialog}
+            setViewEvalCrit={setViewEvalCrit}
+          />
+        ) : (
         <div className="flex flex-col gap-2.5">
           {filteredCriteria.length === 0 ? (
             <div className="rounded-lg py-4 px-3.5 text-center text-[11px] font-bold uppercase" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
@@ -318,7 +367,7 @@ export function EventAssignmentPanel(props: {
                   {canManage && (
                     <div className="flex items-center gap-2 whitespace-nowrap">
                       {/* Evento do próximo ciclo: a API recusa link público (409 EVENT_NEXT_CYCLE). */}
-                      {c.assignedToId != null && !selected.nextCycle && (
+                      {canLink(c) && (
                         <button
                           type="button"
                           onClick={() => openLinkDialog(c)}
@@ -377,6 +426,7 @@ export function EventAssignmentPanel(props: {
             );
           })}
         </div>
+        )}
 
         {conformitySection}
       </div>

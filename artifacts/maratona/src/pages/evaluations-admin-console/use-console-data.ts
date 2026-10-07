@@ -175,7 +175,7 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
           ? (critEvals.find(e => e.evaluatorUserId === assignedToId && e.status === "submitted")
              ?? critEvals.find(e => e.evaluatorUserId === assignedToId)
              ?? critEvals.find(e => e.status === "submitted"))
-          : critEvals.find(e => e.status === "submitted");
+          : (critEvals.find(e => e.status === "submitted") ?? (areaMode ? critEvals.find(e => e.status === "draft") : undefined));
         // Se o assignedToId não corresponde ao evaluatorUserId real (ex: avaliador
         // chegou pelo event_area_assignments enquanto o criterion_routing aponta outro
         // default), a avaliação ainda existe mas o lookup acima não encontra.

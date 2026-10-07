@@ -35,7 +35,7 @@ export function CriterionCard({ c, ans, setScore, setComments }: {
           </p>
           {/* No celular a escala quebra em duas linhas (0–5 / 6–10): cada botão
               fica com pelo menos 32 px de toque (11 numa linha davam ~25 px em 390 px). */}
-          <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 sm:gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${c.criterionName}`}>
+          <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 sm:gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${displayCriterionName(c.criterionName)}`}>
             {[0,1,2,3,4,5,6,7,8,9,10].map(s => (
               <button
                 key={s}

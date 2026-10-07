@@ -1,6 +1,6 @@
 // Tela "Eventos do Ciclo": estado dos filtros (espelhado na URL), dados e
 // orquestração. As peças visuais e as regras vivem em ./events/.
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useGetEvents, getGetEventsQueryKey, useNormalizeEventDates } from "@workspace/api-client-react";
 import type { NormalizeDatesResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { serverErrorMessage } from "./events/form-bits";
 import { EventsHeader } from "./events/events-header";
 import { EventsFilterBar, WeekendChipsRow } from "./events/events-filters";
 import { EventsTable, EventsLegend } from "./events/events-table";
+import { useAreaResponseCounts } from "./events/use-area-counts";
 import { CreateEventDialog, EditEventDialog } from "./events/event-form-dialogs";
 import { MergeEventDialog, DeleteEventDialog, BulkConfirmBanner, NormalizeDatesDialog } from "./events/event-action-dialogs";
 import type { EditingEvent, EventRef } from "./events/types";
@@ -64,7 +65,9 @@ export default function EventsPage() {
   // Período dos chips de fim de semana: o do ciclo escolhido (no Total geral, sem chips).
   const cycle = scope.isAll ? null : scope.cycle;
   const cycleNameById = new Map(scope.options.map(c => [c.id, c.name]));
-  const cycleById = new Map(scope.options.map(c => [c.id, c]));
+  const cycleById = useMemo(() => new Map(scope.options.map(c => [c.id, c])), [scope.options]);
+  // Ciclo por área: Avaliações conta respostas por área (a mesma conta da Central).
+  const areaCountsOf = useAreaResponseCounts(events, cycleById, user);
 
   // "Unificar Datas" em dois passos: prévia (dryRun) → diálogo com a lista →
   // aplicar só depois de digitar APLICAR (o servidor exige a mesma palavra).
@@ -189,6 +192,7 @@ export default function EventsPage() {
               readOnly={readOnly}
               cycleLabelOf={scope.isAll ? (ev => cycleNameById.get(ev.cycleId) ?? null) : undefined}
               cycleOf={ev => cycleById.get(ev.cycleId) ?? null}
+              areaCountsOf={areaCountsOf}
               onEdit={(ev) => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
               onMerge={(ev) => setMergeForEvent({ id: ev.id, name: ev.name })}
               onDelete={(ev) => setDeleteTarget({ id: ev.id, name: ev.name })}

@@ -61,12 +61,8 @@ export function conformityFormFromData(data: EventConformity): ConformityEvalFor
   };
 }
 
-// Nome que o avaliador vê: sem o sufixo " (2)", " (3)", " (cópia)" das cópias
-// de área — ele responde "o critério", não "a cópia 3".
-const COPY_SUFFIX = /\s*\((\d+|c[óo]pia)\)\s*$/i;
-export function displayCriterionName(name: string | null | undefined): string {
-  return (name ?? "").replace(COPY_SUFFIX, "");
-}
+// Nome que o avaliador vê: sem o sufixo " (2)", " (cópia)" das cópias de área (helper único do app).
+export { displayCriterionName } from "../../lib/criterion-name";
 
 // Critérios do evento respondidos por mais de uma área: o original e as cópias
 // (eventScoped, sourceCriterionId = original) com áreas diferentes.

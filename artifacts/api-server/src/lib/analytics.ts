@@ -158,13 +158,27 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   // na nota oficial do evento as duas entram pela média. Um ponto por evento.
   const catalogById = new Map((input.criteriaCatalog ?? []).map(c => [c.id, c]));
   const baseName = (n: string) => n.replace(/\s*\((?:\d+|c[óo]pia)\)\s*$/i, "").trim();
-  const rootOf = (ec: { criterionId: number; name: string; area: string | null }) => {
+  // Critério de TODAS as áreas (catálogo evaluate_all_areas / áreas extras):
+  // cópias de peso 0 por área cuja nota entra pela MÉDIA no critério de
+  // origem (mergeEventScopedCriteria). Em Análises viram UMA linha, com a
+  // média das áreas (ou a calibração do critério, que vale para a nota).
+  const isAreaCopy = (ec: { criterionId: number; weight?: number | null }) => {
+    const cat = catalogById.get(ec.criterionId);
+    return !!cat?.eventScoped && cat.sourceCriterionId != null && (ec.weight ?? 1) <= 0;
+  };
+  const multiAreaOrigins = new Set<string>();
+  for (const ec of input.eventCriteria) {
+    if (isAreaCopy(ec)) multiAreaOrigins.add(`${ec.eventId}:${catalogById.get(ec.criterionId)!.sourceCriterionId}`);
+  }
+  const ALL_AREAS = "Todas as áreas";
+  const rootOf = (ec: { eventId: number; criterionId: number; name: string; area: string | null; weight?: number | null }) => {
     const cat = catalogById.get(ec.criterionId);
     const src = cat?.sourceCriterionId != null ? catalogById.get(cat.sourceCriterionId) : undefined;
     const name = baseName(src?.name ?? cat?.name ?? ec.name);
-    return { key: `${name.toLocaleLowerCase("pt-BR")}|${(ec.area ?? "").toLocaleLowerCase("pt-BR")}`, name, area: ec.area };
+    const area = isAreaCopy(ec) || multiAreaOrigins.has(`${ec.eventId}:${ec.criterionId}`) ? ALL_AREAS : ec.area;
+    return { key: `${name.toLocaleLowerCase("pt-BR")}|${(area ?? "").toLocaleLowerCase("pt-BR")}`, name, area, merged: area === ALL_AREAS };
   };
-  const perEvent = new Map<string, { rootKey: string; name: string; area: string | null; used: number[]; evalAvg: number[]; cal: number[] }>();
+  const perEvent = new Map<string, { rootKey: string; name: string; area: string | null; merged: boolean; used: number[]; evalAvg: number[]; cal: number[] }>();
   const shifts: number[] = [];
   for (const ec of input.eventCriteria) {
     const ev = eventById.get(ec.eventId);
@@ -173,14 +187,14 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
     // Mesma regra da nota oficial: entram os ativos e os inativos calibrados;
     // peso 0 não conta na nota do evento, então também não entra na média.
     if (!ec.active && !calByEc.has(k)) continue;
-    if ((ec.weight ?? 1) <= 0) continue;
+    if ((ec.weight ?? 1) <= 0 && !isAreaCopy(ec)) continue;
     const evalAvg = avg(evalsByEc.get(k) ?? []);
     const cal = calByEc.get(k);
     const used = cal ?? evalAvg;
     if (used == null) continue;
     const root = rootOf(ec);
     const pk = `${ec.eventId}|${root.key}`;
-    if (!perEvent.has(pk)) perEvent.set(pk, { rootKey: root.key, name: root.name, area: root.area, used: [], evalAvg: [], cal: [] });
+    if (!perEvent.has(pk)) perEvent.set(pk, { rootKey: root.key, name: root.name, area: root.area, merged: root.merged, used: [], evalAvg: [], cal: [] });
     const e = perEvent.get(pk)!;
     e.used.push(used * 10);
     if (evalAvg != null) e.evalAvg.push(evalAvg * 10);
@@ -193,7 +207,8 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   for (const e of perEvent.values()) {
     if (!critAgg.has(e.rootKey)) critAgg.set(e.rootKey, { name: e.name, area: e.area, used: [], evalAvg: [], cal: [] });
     const a = critAgg.get(e.rootKey)!;
-    a.used.push(avg(e.used)!);
+    // Multiárea: a calibração do critério vale para a nota; sem ela, a média das áreas.
+    a.used.push(e.merged && e.cal.length ? avg(e.cal)! : e.merged && e.evalAvg.length ? avg(e.evalAvg)! : avg(e.used)!);
     if (e.evalAvg.length) a.evalAvg.push(avg(e.evalAvg)!);
     if (e.cal.length) a.cal.push(avg(e.cal)!);
   }

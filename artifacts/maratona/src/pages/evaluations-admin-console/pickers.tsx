@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUsersByArea } from "@/lib/routing-api";
 import { Search, ChevronDown, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DANGER_TEXT } from "@/lib/premium-theme";
 
 /** Seletor de evento com busca (abas Critérios, Tabela e Avaliadores). */
 export function EventCombobox({ events, value, onChange, accentStyle }: {
@@ -92,5 +93,47 @@ export function InlinePicker({ areaId, excludeId, onPick, disabled }: { areaId: 
         </button>
       ))}
     </div>
+  );
+}
+
+/** Ciclo por área: escolhe em nome de qual avaliador ATIVO da área o link sai
+ *  (a API recusa outro papel/área com 409 AREA_MODE_OTHER_AREA). Com um
+ *  avaliador só na área, já vem escolhido. */
+export function AreaEvaluatorSelect({ areaId, areaName, value, onChange, id, compact }: {
+  areaId: number;
+  areaName: string;
+  value: number | null;
+  onChange: (userId: number | null, name: string | null) => void;
+  id?: string;
+  compact?: boolean;
+}) {
+  const { data: users, isLoading, isError } = useUsersByArea(areaId);
+  const evaluators = (users ?? []).filter(u => (u.role ?? "").trim().toLowerCase() === "avaliador");
+  const only = evaluators.length === 1 ? evaluators[0] : null;
+  useEffect(() => {
+    if (only && value == null) onChange(only.id, only.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only?.id, value]);
+  if (isLoading) return <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>Carregando avaliadores de {areaName}…</p>;
+  if (isError) return <p className="text-[12px] font-bold" style={{ color: DANGER_TEXT }}>Não foi possível carregar os avaliadores de {areaName}.</p>;
+  if (evaluators.length === 0) {
+    return <p className="text-[12px] font-bold" style={{ color: "var(--muted-foreground)" }} data-testid={`area-evaluator-none-${areaId}`}>Nenhum avaliador ativo em {areaName} — cadastre um em Usuários.</p>;
+  }
+  return (
+    <select
+      id={id}
+      aria-label={`Avaliador de ${areaName} em nome de quem o link responde`}
+      data-testid={`area-evaluator-select-${areaId}`}
+      value={value ?? ""}
+      onChange={e => {
+        const u = evaluators.find(x => x.id === Number(e.target.value));
+        onChange(u ? u.id : null, u ? u.name : null);
+      }}
+      className={`w-full min-w-0 rounded-lg px-3 ${compact ? "py-1.5 text-[12px]" : "py-2 text-sm"} font-bold`}
+      style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+    >
+      <option value="">Escolha o avaliador…</option>
+      {evaluators.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+    </select>
   );
 }

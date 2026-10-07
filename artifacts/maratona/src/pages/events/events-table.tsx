@@ -7,6 +7,7 @@ import { EventRow, EventCard, type EventRowActions } from "./event-row";
 import { nextColSort, isColActive, isColAsc } from "./url-filters";
 import { useWideScreen } from "./use-wide-screen";
 import type { EventItem } from "./types";
+import type { AreaResponseCount } from "./rules";
 
 // Data com 112px: cabe o selo "Fora do período" embaixo da data sem invadir "Part.".
 // Status com 140px: cabe "Abre em DD/MM" e "Próximo ciclo" sem invadir os botões.
@@ -15,7 +16,7 @@ const GRID_COLS = "1fr 112px 56px 120px 120px 104px 80px 140px 72px";
 const COLUMNS = ["name", "date", "participants", "evaluated", "calibr", "matrix", "score"] as const;
 const COLUMN_LABELS: Record<(typeof COLUMNS)[number], string> = {
   name: "Evento", date: "Data", participants: "Part.",
-  evaluated: "Avaliações", calibr: "Calibrações", matrix: "Matriz", score: "Nota",
+  evaluated: "Avaliações", calibr: "Publicadas", matrix: "Matriz", score: "Nota",
 };
 
 type EventsTableProps = EventRowActions & {
@@ -29,16 +30,18 @@ type EventsTableProps = EventRowActions & {
   cycleLabelOf?: (ev: EventItem) => string | null;
   /** Ciclo de cada evento (selo "Fora do período"). */
   cycleOf?: (ev: EventItem) => Cycle | null;
+  /** Ciclo por área: respostas por área de cada evento (a mesma conta da Central). */
+  areaCountsOf?: (ev: EventItem) => AreaResponseCount | null;
 };
 
-export function EventsTable({ events, user, sortBy, setSortBy, readOnly = false, cycleLabelOf, cycleOf, ...actions }: EventsTableProps) {
+export function EventsTable({ events, user, sortBy, setSortBy, readOnly = false, cycleLabelOf, cycleOf, areaCountsOf, ...actions }: EventsTableProps) {
   const wide = useWideScreen();
   // Celular e tablet: cartões (a tabela de 9 colunas não cabe).
   if (!wide) return (
     <ul className="grid gap-2.5 md:grid-cols-2" data-testid="events-cards" aria-label="Eventos">
       {events.map((ev) => (
         <li key={ev.id}>
-          <EventCard ev={ev} user={user} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} {...actions} />
+          <EventCard ev={ev} user={user} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} areaCounts={areaCountsOf?.(ev) ?? null} {...actions} />
         </li>
       ))}
     </ul>
@@ -90,7 +93,7 @@ export function EventsTable({ events, user, sortBy, setSortBy, readOnly = false,
 
       {/* Rows */}
       {events.map((ev) => (
-        <EventRow key={ev.id} ev={ev} user={user} gridCols={GRID_COLS} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} {...actions} />
+        <EventRow key={ev.id} ev={ev} user={user} gridCols={GRID_COLS} readOnly={readOnly} cycleLabel={cycleLabelOf?.(ev) ?? null} eventCycle={cycleOf?.(ev) ?? null} areaCounts={areaCountsOf?.(ev) ?? null} {...actions} />
       ))}
     </PremiumCard>
   );

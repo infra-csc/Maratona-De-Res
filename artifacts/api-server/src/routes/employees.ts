@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, scoreChangesTable, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
-import { eq, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
+import { db, cyclesTable, scoreChangesTable, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
+import { eq, ne, desc, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole, bumpTokenVersion } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -65,6 +65,7 @@ router.get("/employees", async (req, res) => {
   // Fora do ciclo (decisão do admin): a tela Colaboradores lista quem tem nota
   // no ciclo + quem foi tirado dele (para poder reativar).
   const exclusions = new Map<number, string | null>();
+  const previousCycleMembers = new Set<number>();
   if (cycle) {
     const [rows, excludedRows] = await Promise.all([
       db
@@ -89,6 +90,18 @@ router.get("/employees", async (req, res) => {
       };
     }
     for (const r of excludedRows) exclusions.set(r.employeeId, r.reason ?? null);
+
+    // Ciclo recém-criado ainda sem nota: a lista traz quem estava no ciclo
+    // ANTERIOR (o último fechado antes deste), para o time não "sumir" até
+    // os primeiros eventos do ciclo novo terem nota.
+    const [prev] = await db.select({ id: cyclesTable.id }).from(cyclesTable)
+      .where(and(eq(cyclesTable.status, "closed"), ne(cyclesTable.id, cycle.id), sql`${cyclesTable.endDate} < ${cycle.startDate}`))
+      .orderBy(desc(cyclesTable.endDate)).limit(1);
+    if (prev) {
+      const prevRows = await db.select({ employeeId: quarterlyResultsTable.employeeId }).from(quarterlyResultsTable)
+        .where(eq(quarterlyResultsTable.cycleId, prev.id));
+      for (const r of prevRows) previousCycleMembers.add(r.employeeId);
+    }
   }
 
   // Map linked user accounts so the UI can offer "view as employee" and show access status
@@ -112,6 +125,7 @@ router.get("/employees", async (req, res) => {
       cycleEventsCount: cycleResults[e.id]?.eventsCount ?? null,
       cycleExcluded: exclusions.has(e.id),
       cycleExcludedReason: exclusions.get(e.id) ?? null,
+      inPreviousCycle: previousCycleMembers.has(e.id),
       linkedUserId: linked?.id ?? null,
       hasAccess: linked != null && linked.active,
     };

@@ -4,7 +4,7 @@ import type { Cycle } from "@workspace/api-client-react";
 import { fmtDate, evaluationOpensOn, todayBR, fmtOpensOn, eventPeriodPosition } from "@/lib/utils";
 import { WARNING, GOOD, AMBER, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT, INFO_TEXT } from "@/lib/premium-theme";
 import type { EventItem } from "./types";
-import { completedCriteriaCount } from "./criteria-rules";
+import { completedCriteriaCount, type AreaResponseCount } from "./criteria-rules";
 
 // Datas vêm como "YYYY-MM-DD": comparar como string evita o deslocamento de
 // fuso (new Date("YYYY-MM-DD") é meia-noite UTC = 21h do dia anterior no Brasil,
@@ -99,7 +99,7 @@ export function opensLabelFor(e: EventLike, cycle: CyclePeriod, todayStr: string
 }
 
 // Regras puras de "critério completo" e da aba da Central: em ./criteria-rules (testáveis sem o app).
-export { isCriterionComplete, completedCriteriaCount, queueTabFor, type QueueTabKind } from "./criteria-rules";
+export { isCriterionComplete, completedCriteriaCount, queueTabFor, areaResponseCounts, type QueueTabKind, type AreaResponseCount } from "./criteria-rules";
 
 /** "Aguardando RH" de verdade: a avaliação já devia ter aberto e os critérios não foram confirmados. */
 export const isPendingRH = (e: EventItem, todayStr: string = todayBR()) =>
@@ -187,13 +187,18 @@ export function fmtEventDate(dateStr: string | null | undefined, todayStr: strin
   return fmtDate(dateStr, sameYear && !forceYear ? undefined : { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycle: CyclePeriod = null) {
+/**
+ * `areaCounts` (ciclo por área): respostas por ÁREA — as cópias por área dos
+ * critérios multiárea contam uma a uma, a mesma conta da Central. Sem ele (fluxo
+ * antigo, ou antes de os dados chegarem) a barra conta critérios de origem.
+ */
+export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycle: CyclePeriod = null, areaCounts: AreaResponseCount | null = null) {
   const score = ev.teamScore ?? ev.averageScore ?? null;
   const concluded = ev.status === "closed";
   const total = ev.totalCriteria ?? 0;
   // Barra de avaliações: critérios completos pela regra única
   // (completedCriteriaCount: enviado ou publicado — o mesmo número da Central).
-  const evalTotal = total;
+  const evalTotal = areaCounts ? areaCounts.total : total;
   const fc = ev.fullyCalibrated ?? false;
   const partialPubTotal = ev.partialPublishedCount ?? 0;
   const calSaved = ev.calibratedCriteriaCount ?? 0;
@@ -204,7 +209,7 @@ export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycl
   const releasedAsFinal = !!ev.feedbackReleased && Math.max(0, partialPubTotal - (ev.finalCalibratedCriteria ?? 0)) === 0 && (ev.finalCalibratedCriteria ?? 0) < total;
   const finalPubCount = releasedAsFinal ? total : ev.finalCalibratedCriteria ?? 0;
   const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
-  const evalDone = releasedAsFinal ? total : completedCriteriaCount(ev);
+  const evalDone = areaCounts ? (releasedAsFinal ? areaCounts.total : areaCounts.done) : releasedAsFinal ? total : completedCriteriaCount(ev);
   const isPureHistorical = !!ev.isHistorical && calSaved === 0;
   const hasEvals = evalDone > 0;
   const hasAnyPublication = calSaved > 0 || finalPubCount > 0 || partialPubTotal > 0;
@@ -221,7 +226,9 @@ export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycl
   // "DD/MM" (ou "DD/MM/AA" a mais de 12 meses): o selo cabe na coluna Status.
   const opensLabel = opensOn ? fmtOpensOn(opensOn, todayStr) : null;
   const pendingRH = !nextCycle && isPendingRH(ev, todayStr) && !hasEvals && !hasAnyPublication;
-  const evalTooltip = `${evalDone} de ${evalTotal} critérios com avaliação completa · ${matrixSummary}`;
+  const evalTooltip = areaCounts
+    ? `${evalDone} de ${evalTotal} respostas das áreas · ${matrixSummary}`
+    : `${evalDone} de ${evalTotal} critérios com avaliação completa · ${matrixSummary}`;
 
   // Accent bar color
   const accentColor = notOpenYet || nextCycle ? "var(--status-info)"
@@ -237,7 +244,8 @@ export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycl
       : finalPubCount > 0 ? "Pub. Final"
       : partialOnlyCount > 0 ? "Pub. Parcial"
       : calSaved > 0 ? "Rascunho"
-      : "Avaliador";
+      // Antes de calibrar: média das respostas enviadas até agora — não é a nota oficial.
+      : "Prévia";
   const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0 ? GOOD_TEXT
     : finalPubCount > 0 || partialOnlyCount > 0 ? AMBER_TEXT
     : calSaved > 0 ? INFO_TEXT
@@ -282,5 +290,8 @@ export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycl
     score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,
     hasEvals, hasAnyPublication, missing, evaluationsHref, evalTooltip, accentColor,
     scoreLabel, scoreLabelColor, evalColor, dateStr, badge, notOpenYet, nextCycle, pendingRH, opensLabel,
+    // Prévia (sem calibração): só com ao menos uma resposta; com respostas parciais, "3/20".
+    isPreview: scoreLabel === "Prévia",
+    previewPartial: scoreLabel === "Prévia" && evalDone > 0 && evalDone < evalTotal ? `${evalDone}/${evalTotal}` : null,
   };
 }

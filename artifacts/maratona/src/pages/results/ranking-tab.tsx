@@ -79,11 +79,11 @@ export function RankingTab({ canViewDetail, cycleId, readOnly = false, minEvents
         {ranking && ranking.length > 0 && (
           <>
             <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--primary)" }}>
-              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota Média</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota média</span>
               <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="stat-avg-result">{fmtNum(avgResult, 1)}</span>
             </div>
             <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Competidores</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Colaboradores</span>
               <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED }} data-testid="stat-active-runners">{activeRunners}</span>
             </div>
           </>
