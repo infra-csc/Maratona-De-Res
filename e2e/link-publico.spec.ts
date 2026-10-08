@@ -57,7 +57,7 @@ test("link público: admin gera o link, freelancer avalia sem login e a nota che
 
       await fl.getByRole("textbox", { name: /Seu nome completo/ }).fill(FREELANCER);
       for (const c of CRITERIA) {
-        await fl.getByRole("group", { name: `Nota do critério ${c.name}` }).getByRole("button", { name: `Nota ${NOTAS[c.id]}`, exact: true }).click();
+        await fl.getByRole("group", { name: `Nota do critério ${c.name}` }).getByRole("button", { name: String(NOTAS[c.id]), exact: true }).click();
         await fl.locator(`#crit-${c.id}-comment`).fill(`E2E (link): ${c.name} observada em campo.`);
       }
       await fl.getByRole("button", { name: "Enviar Respostas", exact: true }).click();

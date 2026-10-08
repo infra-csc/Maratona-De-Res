@@ -24,7 +24,20 @@ export const cenoLabels = { epi: "EPI", estaiamentos: "Estaiamento e aterramento
 export function focusPending(targetId: string) {
   const el = document.getElementById(targetId);
   if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
   const focusable = el.matches("input, textarea, button") ? el : el.querySelector<HTMLElement>("input, textarea, button");
   focusable?.focus({ preventScroll: true });
+  // Destaque curto para o olho achar o campo (mesma animação da tela do avaliador).
+  const box = el.closest<HTMLElement>("[data-pending-box]") ?? el;
+  box.classList.add("eval-flash");
+  window.setTimeout(() => box.classList.remove("eval-flash"), 1200);
+}
+
+/** Rola até uma seção (índice / barra de progresso), respeitando "reduzir movimento". */
+export function scrollToSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
 }
