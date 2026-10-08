@@ -1,14 +1,16 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import type { EventConformity, EventConformityInput, UserSummary } from "@workspace/api-client-react";
-import { CheckCircle, Save, ShieldAlert, Link2, Copy, AlertCircle, Lock } from "lucide-react";
+import { CheckCircle2, Save, Link2, Copy, AlertCircle, Lock, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import type { PublicToken } from "@/lib/routing-api";
-import { CONDENSED, WARNING, AMBER, AMBER_TEXT } from "@/lib/premium-theme";
+import { cn } from "@/lib/utils";
 import { cenografiaItemsFor } from "./constants";
 import { ConformityLinkHistory } from "./conformity-link-history";
 import { ConformityRedirectPopover } from "./conformity-redirect-popover";
+import { MatrixHeader, MatrixQuestion, Segmented, matrixLabelCls, matrixTextareaCls } from "./conformity-bits";
 import { fmtDT, publicEvalBaseUrl } from "./helpers";
+import { Chip, btnPrimary, btnSmall } from "./ui";
 import type { ConformityEvalForm, SaveConformityFn, ToastFn } from "./types";
 
 interface CenografiaConformitySectionProps {
@@ -34,7 +36,12 @@ interface CenografiaConformitySectionProps {
   answeredByOther: { name: string | null; at: string | null } | null;
 }
 
-// ─── GRUPO 2: Cenografia ───
+const YES_NO = [
+  { value: true, label: "Sim", tone: "yes" as const },
+  { value: false, label: "Não", tone: "no" as const },
+];
+
+// ─── Matriz de Conformidade da Cenografia (parte final do formulário) ───
 export function CenografiaConformitySection({
   conformityEvalForm, setConformityEvalForm, myConformityData, conformityPublicTokenHistory, cenografiaUsers,
   redirectOpen, onRedirectOpenChange, redirectTargetId, onRedirectSelect, onOpenLinkDialog, saveConformity, isSaving, toast,
@@ -64,182 +71,188 @@ export function CenografiaConformitySection({
   const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport && !missingRequiredComments && textsDirty;
   const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
   const hasSentLink = (conformityPublicTokenHistory?.length ?? 0) > 0;
+  const conformes = cenografiaItems.filter(i => conformityEvalForm[i.key] === true).length;
+
+  const pendingCeno = (conformityPublicTokenHistory ?? []).find(t => !t.usedAt);
+  const answeredCeno = (conformityPublicTokenHistory ?? []).find(t => t.usedAt);
+  const linkAction = (() => {
+    if (pendingCeno) {
+      const pendingUrl = `${publicEvalBaseUrl()}/eval/${pendingCeno.id}`;
+      return (
+        <button type="button"
+          onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freela"}` }); else toast(COPY_FAILED_TOAST); }}
+          className={btnSmall}
+          title="Copiar link já enviado — só existe um link por evento"
+        >
+          <Copy size={14} aria-hidden /> Copiar link ({pendingCeno.recipientName ?? "freela"})
+        </button>
+      );
+    }
+    // Só esconde o botão se um link já foi usado E a conformidade
+    // realmente foi preenchida. Se o link foi usado mas a matriz
+    // seguiu vazia (0 itens), ainda é preciso poder reenviar — senão
+    // fica "sem como" responder a conformidade.
+    if (answeredCeno && filledCount > 0) return null;
+    return (
+      <button type="button" onClick={onOpenLinkDialog} className={btnSmall} title="Gerar link único para um freela responder o formulário de Cenografia">
+        <Link2 size={14} aria-hidden /> {answeredCeno ? "Reenviar link para freela" : "Link para freela"}
+      </button>
+    );
+  })();
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 px-1">
-        <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-          <ShieldAlert size={22} /> Matriz de Conformidade
-        </h3>
-        <div className="flex items-center gap-2 flex-wrap">
-          <ConformityRedirectPopover
-            open={redirectOpen}
-            onOpenChange={onRedirectOpenChange}
-            users={cenografiaUsers}
-            selectedUserId={redirectTargetId}
-            onSelectUser={onRedirectSelect}
-          />
-          {(() => {
-            const pendingCeno = (conformityPublicTokenHistory ?? []).find(t => !t.usedAt);
-            const answeredCeno = (conformityPublicTokenHistory ?? []).find(t => t.usedAt);
-            const cenoBase = publicEvalBaseUrl();
-            if (pendingCeno) {
-              const pendingUrl = `${cenoBase}/eval/${pendingCeno.id}`;
-              return (
-                <button type="button"
-                  onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freela"}` }); else toast(COPY_FAILED_TOAST); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors"
-                  title="Copiar link já enviado — só existe um link por evento"
-                >
-                  <Copy size={12} /> Copiar link ({pendingCeno.recipientName ?? "freela"})
-                </button>
-              );
-            }
-            // Só esconde o botão se um link já foi usado E a conformidade
-            // realmente foi preenchida. Se o link foi usado mas a matriz
-            // seguiu vazia (0 itens), ainda é preciso poder reenviar — senão
-            // fica "sem como" responder a conformidade.
-            if (answeredCeno && filledCount > 0) return null;
-            return (
-              <button type="button"
-                onClick={onOpenLinkDialog}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors"
-                title="Gerar link único para um freela responder o formulário de Cenografia"
-              >
-                <Link2 size={12} /> {answeredCeno ? "Reenviar link para freela" : "Link para freela"}
-              </button>
-            );
-          })()}
-        </div>
-      </div>
+    <div className="space-y-5">
+      <MatrixHeader
+        title="Matriz de Conformidade"
+        status={!hasSentLink && filledCount === cenografiaItems.length
+          ? <Chip tone="ok" icon={CheckCircle2}>{conformes}/{cenografiaItems.length} conformes</Chip>
+          : undefined}
+        description={hasSentLink
+          ? "Link enviado para um freela preencher a matriz. Acompanhe abaixo."
+          : "Sobre a equipe de Cenografia neste evento. Cada Sim/Não é salvo na hora; os textos, no botão “Salvar observações”."}
+        actions={<>
+          <ConformityRedirectPopover open={redirectOpen} onOpenChange={onRedirectOpenChange} users={cenografiaUsers} selectedUserId={redirectTargetId} onSelectUser={onRedirectSelect} />
+          {linkAction}
+        </>}
+      />
+
       {hasSentLink ? (
-        <>
-          <p className="text-sm text-muted-foreground px-1 -mt-1">
-            Link enviado para um freela preencher este formulário. Acompanhe abaixo.
-          </p>
-          <ConformityLinkHistory history={conformityPublicTokenHistory ?? []} />
-        </>
+        <ConformityLinkHistory history={conformityPublicTokenHistory ?? []} />
       ) : (
         <>
-      <p className="text-sm text-muted-foreground px-1 -mt-1">
-        Você foi designado para avaliar a conformidade da equipe de Cenografia neste evento.
-      </p>
-
-      {/* Perguntas Sim/Não (sem "Conduta" no ciclo novo) */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="divide-y divide-border">
-          {cenografiaItems.map(item => {
-            const val = conformityEvalForm[item.key];
-            const isNao = val === false;
-            return (
-              <div key={item.key} className="px-5 transition-colors border-l-4" style={isNao ? { backgroundColor: "rgba(229,72,77,0.08)", borderLeftColor: WARNING } : val === null ? { backgroundColor: "rgba(232,162,61,0.08)", borderLeftColor: AMBER } : { borderLeftColor: "transparent" }}>
-                <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
-                  <span className="text-sm font-bold text-foreground leading-snug flex-1 min-w-[200px]">{item.question}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isNao && <span className="text-[11px] font-black uppercase text-destructive whitespace-nowrap">-10 pts</span>}
-                    <div className="flex items-center border border-border rounded-lg overflow-hidden">
-                      <button type="button"
-                        onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: true })); saveConformity({ [item.key]: true }, "Resposta salva"); }}
-                        className={`px-3 py-1.5 text-[11px] font-black uppercase border-r border-border transition-all ${val === true ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                      >Sim</button>
-                      <button type="button"
-                        onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: false })); saveConformity({ [item.key]: false }, "Resposta salva"); }}
-                        className={`px-3 py-1.5 text-[11px] font-black uppercase transition-all ${val === false ? "bg-destructive text-destructive-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                      >Não</button>
-                    </div>
-                  </div>
-                </div>
-                {val !== null && (
-                  <div className="pb-3 space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-muted-foreground">
-                      Comentário {isNao ? <span className="text-destructive normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
-                    </label>
-                    <Textarea
-                      placeholder={isNao ? `Descreva o que aconteceu com ${item.label.toLowerCase()}...` : "Alguma observação? (opcional)"}
-                      value={conformityEvalForm[item.commentKey]}
-                      onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
-                      className="border border-border rounded-lg text-sm resize-none min-h-[64px]"
+          {/* Perguntas Sim/Não (sem "Conduta" no ciclo novo) */}
+          <div className="rounded-xl border border-border bg-card divide-y divide-border">
+            {cenografiaItems.map(item => {
+              const val = conformityEvalForm[item.key];
+              const isNao = val === false;
+              const qId = `ceno-q-${item.key}`;
+              const cId = `ceno-c-${item.key}`;
+              const missing = isNao && !conformityEvalForm[item.commentKey].trim();
+              return (
+                <MatrixQuestion
+                  key={item.key}
+                  id={qId}
+                  question={item.question}
+                  penalty={isNao}
+                  unanswered={val === null}
+                  control={
+                    <Segmented
+                      value={val}
+                      options={YES_NO}
+                      labelledBy={qId}
+                      onChange={(v) => { setConformityEvalForm(f => ({ ...f, [item.key]: v })); saveConformity({ [item.key]: v }, "Resposta salva"); }}
                     />
-                    {isNao && !conformityEvalForm[item.commentKey].trim() && (
-                      <p className="text-[11px] font-bold text-destructive">Comentário obrigatório quando a resposta é Não.</p>
-                    )}
-                  </div>
-                )}
+                  }
+                >
+                  {val !== null && (
+                    <>
+                      <label htmlFor={cId} className={matrixLabelCls}>
+                        Comentário {isNao ? <span className="text-[var(--status-danger-text)]">· obrigatório</span> : <span className="normal-case tracking-normal font-normal">(opcional)</span>}
+                      </label>
+                      <Textarea
+                        id={cId}
+                        placeholder={isNao ? `Descreva o que aconteceu com ${item.label.toLowerCase()}...` : "Alguma observação? (opcional)"}
+                        value={conformityEvalForm[item.commentKey]}
+                        aria-invalid={missing || undefined}
+                        onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
+                        className={cn(matrixTextareaCls, "min-h-[64px]", missing && "border-[var(--status-danger)]")}
+                      />
+                      {missing && <p className="mt-1.5 text-[12px] font-semibold text-[var(--status-danger-text)]">Comentário obrigatório quando a resposta é Não.</p>}
+                    </>
+                  )}
+                </MatrixQuestion>
+              );
+            })}
+
+            {/* Faltas/atrasos — texto livre sempre obrigatório */}
+            <div className="px-4 sm:px-5 py-4">
+              <label htmlFor="ceno-absences-report" className="text-[15px] font-semibold leading-snug text-foreground flex items-start gap-2">
+                <span aria-hidden className={cn("mt-[7px] w-1.5 h-1.5 shrink-0 rounded-full", absencesNeedsReport ? "bg-[var(--status-warn)]" : "bg-transparent")} />
+                <span>Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span className="text-[var(--status-danger-text)] font-normal text-[13px]">· obrigatório</span></span>
+              </label>
+              <div className="mt-3 pl-3.5">
+                <Textarea
+                  id="ceno-absences-report"
+                  placeholder={"Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso. Se ninguém faltou ou atrasou, escreva “Ninguém faltou ou atrasou”."}
+                  value={conformityEvalForm.absencesReport}
+                  aria-invalid={(triedSave && absencesNeedsReport) || undefined}
+                  onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
+                  className={cn(matrixTextareaCls, "min-h-[72px]", triedSave && absencesNeedsReport && "border-[var(--status-danger)]")}
+                />
+                {triedSave && absencesNeedsReport && <p className="mt-1.5 text-[12px] font-semibold text-[var(--status-danger-text)]">Especifique antes de salvar.</p>}
               </div>
-            );
-          })}
-        </div>
-        {filledCount === cenografiaItems.length && (
-          <div className="px-5 py-3 bg-secondary border-t border-border flex items-center gap-2">
-            <CheckCircle size={14} className="text-accent-text" />
-            <span className="text-xs font-bold uppercase text-accent-text">Itens preenchidos — {cenografiaItems.filter(i => conformityEvalForm[i.key] === true).length}/{cenografiaItems.length} conformes</span>
-          </div>
-        )}
-      </div>
+            </div>
 
-      {/* Absences question — texto livre sempre obrigatório */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-5 py-4 space-y-1">
-          <label htmlFor="ceno-absences-report" className="block text-sm font-black uppercase text-foreground">
-            Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span className="text-destructive">*</span> obrigatório
-          </label>
-          <Textarea
-            id="ceno-absences-report"
-            placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito. Se ninguém faltou/atrasou, escreva &quot;Ninguém faltou ou atrasou&quot;."
-            value={conformityEvalForm.absencesReport}
-            onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
-            className="border border-border rounded-lg text-sm resize-none min-h-[72px]"
-          />
-          {triedSave && absencesNeedsReport && <p className="text-[11px] font-bold text-destructive">Especifique antes de salvar.</p>}
-        </div>
-      </div>
-
-      {/* Standout question */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-5 py-4 space-y-3">
-          <label className="block text-sm font-black uppercase text-foreground">Algum profissional teve um desempenho fora da curva?</label>
-          <div className="flex gap-2">
-            <button type="button"
-              onClick={() => { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); saveConformity({ standoutResponse: false, standoutJustification: null }, "Resposta salva"); }}
-              className={`flex-1 px-4 py-2.5 text-xs font-black uppercase border border-border rounded-lg transition-all ${conformityEvalForm.standoutResponse === false ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-            >Não, dentro do padrão esperado</button>
-            <button type="button"
-              onClick={() => setConformityEvalForm(f => ({ ...f, standoutResponse: true }))}
-              className={`flex-1 px-4 py-2.5 text-xs font-black uppercase border border-border rounded-lg transition-all ${conformityEvalForm.standoutResponse === true ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-            >Sim, houve um grande destaque</button>
+            {/* Destaque */}
+            <div className="px-4 sm:px-5 py-4">
+              <p id="ceno-standout-q" className="text-[15px] font-semibold leading-snug text-foreground flex items-start gap-2">
+                <span aria-hidden className={cn("mt-[7px] w-1.5 h-1.5 shrink-0 rounded-full", conformityEvalForm.standoutResponse === null ? "bg-[var(--status-warn)]" : "bg-transparent")} />
+                <span>Algum profissional teve um desempenho fora da curva?</span>
+              </p>
+              <div role="group" aria-labelledby="ceno-standout-q" className="mt-3 pl-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {([
+                  { v: false, label: "Não, dentro do padrão esperado" },
+                  { v: true, label: "Sim, houve um grande destaque" },
+                ] as const).map(o => {
+                  const on = conformityEvalForm.standoutResponse === o.v;
+                  return (
+                    <button key={String(o.v)} type="button" aria-pressed={on}
+                      onClick={() => {
+                        if (o.v) setConformityEvalForm(f => ({ ...f, standoutResponse: true }));
+                        else { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); saveConformity({ standoutResponse: false, standoutJustification: null }, "Resposta salva"); }
+                      }}
+                      className={cn(
+                        "min-h-11 rounded-lg border px-4 py-2.5 text-left text-[14px] font-semibold leading-snug transition-[background-color,border-color,color] duration-150 flex items-center gap-2.5",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                        on ? (o.v ? "border-transparent bg-accent text-accent-foreground" : "border-transparent bg-primary text-primary-foreground") : "border-border bg-background text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <span aria-hidden className={cn("w-4 h-4 shrink-0 rounded-full border-2 flex items-center justify-center", on ? "border-current" : "border-muted-foreground/50")}>
+                        {on && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                      </span>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {conformityEvalForm.standoutResponse === true && (
+                <div className="mt-3 pl-3.5">
+                  <label htmlFor="ceno-standout-just" className={matrixLabelCls}>Detalhe o destaque <span className="text-[var(--status-danger-text)]">· obrigatório</span></label>
+                  <Textarea
+                    id="ceno-standout-just"
+                    placeholder="Nome do profissional e por que se destacou..."
+                    value={conformityEvalForm.standoutJustification}
+                    aria-invalid={standoutNeedsJustification || undefined}
+                    onChange={e => setConformityEvalForm(f => ({ ...f, standoutJustification: e.target.value }))}
+                    className={cn(matrixTextareaCls, "min-h-[72px]")}
+                  />
+                  {standoutNeedsJustification && <p className="mt-1.5 text-[12px] font-semibold text-[var(--status-danger-text)]">Descreva o destaque antes de salvar.</p>}
+                </div>
+              )}
+            </div>
           </div>
-          {conformityEvalForm.standoutResponse === true && (
-            <div className="space-y-1">
-              <label className="text-[11px] font-black uppercase text-accent-text">Detalhe o destaque <span>*</span> obrigatório</label>
-              <Textarea
-                placeholder="Nome do profissional e por que se destacou..."
-                value={conformityEvalForm.standoutJustification}
-                onChange={e => setConformityEvalForm(f => ({ ...f, standoutJustification: e.target.value }))}
-                className="border border-border rounded-lg text-sm resize-none min-h-[72px]"
-              />
-              {standoutNeedsJustification && <p className="text-[11px] font-bold text-destructive">Descreva o destaque antes de salvar.</p>}
+
+          {/* Salvar textos — só aparece quando há alterações */}
+          {textsDirty && (
+            <div role="status" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[var(--status-warn-bg)] px-4 py-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 duration-200">
+              <span className="text-[14px] font-semibold flex items-center gap-2 text-[var(--status-warn-text)]">
+                <AlertCircle size={15} aria-hidden className="shrink-0" /> Observações ainda não salvas
+              </span>
+              <button type="button" disabled={isSaving} aria-disabled={!canSaveTexts}
+                onClick={() => {
+                  if (!canSaveTexts) { setTriedSave(true); return; }
+                  const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
+                  cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
+                  saveConformity(payload as EventConformityInput, "Observações salvas");
+                }}
+                className={cn(btnPrimary, "aria-disabled:opacity-60")}
+              >
+                {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Save size={15} aria-hidden />} Salvar observações
+              </button>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Save text fields — só aparece quando há alterações */}
-      {textsDirty && (
-        <div className="flex items-center justify-between gap-3 rounded-lg px-4 py-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: `1px solid ${AMBER}` }}>
-          <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: AMBER_TEXT }}><AlertCircle size={12} /> Alterações não salvas</span>
-          <button type="button" disabled={isSaving} aria-disabled={!canSaveTexts}
-            onClick={() => {
-              if (!canSaveTexts) { setTriedSave(true); return; }
-              const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
-              cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
-              saveConformity(payload as EventConformityInput, "Observações salvas");
-            }}
-            className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black uppercase bg-primary text-accent-text rounded-lg disabled:opacity-40 aria-disabled:opacity-60 hover:opacity-90 transition-colors"
-          ><Save size={14} /> Salvar observações</button>
-        </div>
-      )}
         </>
       )}
-
     </div>
   );
 }
@@ -253,50 +266,45 @@ function CenografiaReadOnly({ data, items, answeredBy, history }: {
 }) {
   const answer = (v: boolean | null | undefined) => v === true ? "Sim" : v === false ? "Não" : "Não respondida";
   return (
-    <div className="space-y-4">
-      <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2 px-1" style={{ fontFamily: CONDENSED }}>
-        <ShieldAlert size={22} /> Matriz de Conformidade
-      </h3>
-      <div className="flex items-start gap-3 rounded-xl border border-border bg-secondary px-4 py-3">
-        <Lock size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-foreground">
-            Respondida{answeredBy.name ? ` por ${answeredBy.name}` : ""}{answeredBy.at ? ` em ${fmtDT(answeredBy.at)}` : ""}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            A Matriz de Conformidade deste evento já tem resposta e não pode ser alterada por aqui. Se algo precisar mudar, fale com o RH.
-          </p>
-        </div>
-      </div>
-      <dl className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
+    <div className="space-y-5">
+      <MatrixHeader
+        title="Matriz de Conformidade"
+        status={<Chip icon={Lock}>Só leitura</Chip>}
+        description={<>
+          <span className="font-semibold text-foreground">Respondida{answeredBy.name ? ` por ${answeredBy.name}` : ""}{answeredBy.at ? ` em ${fmtDT(answeredBy.at)}` : ""}.</span>{" "}
+          A matriz deste evento já tem resposta e não pode ser alterada por aqui. Se algo precisar mudar, fale com o RH.
+        </>}
+      />
+      <dl className="rounded-xl border border-border bg-card divide-y divide-border">
         {items.map(item => {
           const v = data?.[item.key];
           const comment = data?.[item.commentKey]?.trim();
           return (
-            <div key={item.key} className="px-5 py-3">
+            <div key={item.key} className="px-4 sm:px-5 py-4">
               <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-                <dt className="text-sm font-bold text-foreground leading-snug flex-1 min-w-[200px]">{item.question}</dt>
-                <dd className={`text-sm font-black uppercase ${v === false ? "text-destructive" : v === true ? "text-foreground" : "text-muted-foreground"}`}>
-                  {answer(v)}{v === false && <span className="ml-2 text-[11px]">-10 pts</span>}
+                <dt className="text-[15px] font-semibold text-foreground leading-snug flex-1 min-w-[200px]">{item.question}</dt>
+                <dd className="flex items-center gap-2">
+                  {v === false && <Chip tone="danger">-10 pts</Chip>}
+                  <span className={cn("font-condensed text-[16px] font-black uppercase", v === false ? "text-[var(--status-danger-text)]" : v === true ? "text-foreground" : "text-muted-foreground")}>{answer(v)}</span>
                 </dd>
               </div>
-              {comment && <dd className="mt-1 text-sm text-muted-foreground break-words">"{comment}"</dd>}
+              {comment && <dd className="mt-1.5 text-[14px] text-muted-foreground break-words">“{comment}”</dd>}
             </div>
           );
         })}
-        <div className="px-5 py-3">
-          <dt className="text-sm font-bold text-foreground">Alguém faltou ou atrasou por mais de 30 minutos?</dt>
-          <dd className="mt-1 text-sm text-muted-foreground break-words">{data?.absencesReport?.trim() || "Não respondida"}</dd>
+        <div className="px-4 sm:px-5 py-4">
+          <dt className="text-[15px] font-semibold text-foreground">Alguém faltou ou atrasou por mais de 30 minutos?</dt>
+          <dd className="mt-1.5 text-[14px] text-muted-foreground break-words">{data?.absencesReport?.trim() || "Não respondida"}</dd>
         </div>
-        <div className="px-5 py-3">
+        <div className="px-4 sm:px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-            <dt className="text-sm font-bold text-foreground leading-snug flex-1 min-w-[200px]">Algum profissional teve um desempenho fora da curva?</dt>
-            <dd className={`text-sm font-black uppercase ${data?.standoutResponse == null ? "text-muted-foreground" : "text-foreground"}`}>
+            <dt className="text-[15px] font-semibold text-foreground leading-snug flex-1 min-w-[200px]">Algum profissional teve um desempenho fora da curva?</dt>
+            <dd className={cn("font-condensed text-[16px] font-black uppercase", data?.standoutResponse == null ? "text-muted-foreground" : "text-foreground")}>
               {answer(data?.standoutResponse)}
             </dd>
           </div>
           {data?.standoutResponse === true && data.standoutJustification?.trim() && (
-            <dd className="mt-1 text-sm text-muted-foreground break-words">"{data.standoutJustification.trim()}"</dd>
+            <dd className="mt-1.5 text-[14px] text-muted-foreground break-words">“{data.standoutJustification.trim()}”</dd>
           )}
         </div>
       </dl>

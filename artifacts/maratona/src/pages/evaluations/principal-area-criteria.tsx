@@ -1,9 +1,9 @@
-import { Users } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Users, UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { useUsersByArea } from "@/lib/routing-api";
-import { CONDENSED } from "@/lib/premium-theme";
+import { cn } from "@/lib/utils";
 import { displayCriterionName } from "./helpers";
+import { Chip, DialogHeading, Eyebrow, btnSmall, dialogCls } from "./ui";
 import type { AreaAssignTarget, CriterionAssignmentRow, PrincipalAreaRow } from "./types";
 
 type AreaUser = NonNullable<ReturnType<typeof useUsersByArea>["data"]>[number];
@@ -39,68 +39,50 @@ export function PrincipalAreaCriteriaSection({
   if (areaCriteria.length === 0) return null;
   const areaNameById = new Map(myPrincipalAreas.map(a => [a.id, a.name]));
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2 px-1">
-        <Users size={22} />
-        <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Quesitos da Minha Área</h3>
-      </div>
-      <p className="text-sm text-muted-foreground px-1 -mt-1">
-        Como avaliador principal, você vê todos os quesitos da sua área neste evento e pode atribuir, tomar para si ou passar para outro colega.
-      </p>
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-border bg-secondary">
-              <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Critério</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Área</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Avaliador Atual</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {areaCriteria.map(a => {
-              const isMine = a.assignedToId === userId;
-              const isSubmitted = a.status === "submitted";
-              return (
-                <tr key={a.criterionId} className={isMine ? "bg-accent/10" : ""}>
-                  <td className="px-4 py-3 font-bold text-sm">{displayCriterionName(a.criterionName)}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{areaNameById.get(a.criterionAreaId!)}</td>
-                  <td className="px-4 py-3 text-sm">
-                    {a.assignedToName ?? <span className="text-muted-foreground/50">Sem avaliador</span>}
-                    {isSubmitted && <span className="ml-2 text-[11px] font-black uppercase text-accent-text">Enviada</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right w-px">
-                    {isSubmitted ? (
-                      <span className="text-[11px] text-muted-foreground">—</span>
-                    ) : (
-                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                        {!isMine && (
-                          <button
-                            type="button"
-                            data-testid={`button-take-criterion-${a.criterionId}`}
-                            onClick={() => onTakeCriterion(a.criterionId)}
-                            className="text-[11px] font-black uppercase border border-border rounded-lg px-2 py-1 hover:bg-primary hover:text-primary-foreground whitespace-nowrap"
-                          >
-                            Pegar para mim
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          data-testid={`button-assign-criterion-${a.criterionId}`}
-                          onClick={() => onAssignCriterion({ criterionId: a.criterionId, criterionName: a.criterionName ?? "", areaId: a.criterionAreaId! })}
-                          className="text-[11px] font-black uppercase border border-border rounded-lg px-2 py-1 hover:bg-secondary whitespace-nowrap"
-                        >
-                          Atribuir a...
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <section aria-labelledby="principal-area-title" className="rounded-2xl border border-border bg-card">
+      <header className="px-5 sm:px-7 pt-5 pb-4 border-b border-border">
+        <Eyebrow className="flex items-center gap-1.5"><Users size={13} aria-hidden /> Avaliador principal</Eyebrow>
+        <h3 id="principal-area-title" className="font-condensed mt-1.5 text-[22px] font-black uppercase leading-none text-foreground">Quesitos da minha área</h3>
+        <p className="mt-2 text-[14px] text-muted-foreground leading-relaxed max-w-2xl">
+          Você vê todos os quesitos da sua área neste evento e pode atribuir, tomar para si ou passar para outro colega.
+        </p>
+      </header>
+      <ul className="divide-y divide-border">
+        {areaCriteria.map(a => {
+          const isMine = a.assignedToId === userId;
+          const isSubmitted = a.status === "submitted";
+          return (
+            <li key={a.criterionId} className={cn("px-5 sm:px-7 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3", isMine && "bg-[var(--status-ok-bg)]")}>
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold text-foreground">{displayCriterionName(a.criterionName)}</p>
+                <p className="text-[13px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{areaNameById.get(a.criterionAreaId!)}</span>
+                  <span aria-hidden>·</span>
+                  <span>{a.assignedToName ?? "Sem avaliador"}{isMine ? " (você)" : ""}</span>
+                  {isSubmitted && <Chip tone="ok">Enviada</Chip>}
+                </p>
+              </div>
+              {!isSubmitted && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {!isMine && (
+                    <button type="button" data-testid={`button-take-criterion-${a.criterionId}`} onClick={() => onTakeCriterion(a.criterionId)} className={btnSmall}>
+                      Pegar para mim
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-testid={`button-assign-criterion-${a.criterionId}`}
+                    onClick={() => onAssignCriterion({ criterionId: a.criterionId, criterionName: a.criterionName ?? "", areaId: a.criterionAreaId! })}
+                    className={btnSmall}
+                  >
+                    Atribuir a...
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -116,28 +98,29 @@ interface AreaAssignDialogProps {
 export function AreaAssignDialog({ target, users, userId, onClose, onPickUser }: AreaAssignDialogProps) {
   return (
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Atribuir "{displayCriterionName(target?.criterionName)}"</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label className="text-xs uppercase text-muted-foreground">Escolha o avaliador da área</Label>
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {(users ?? []).map(u => (
-              <button
-                key={u.id}
-                type="button"
-                data-testid={`option-assign-user-${u.id}`}
-                onClick={() => onPickUser(u.id)}
-                className={`w-full text-left px-3 py-2 border border-border rounded-lg text-sm hover:bg-primary hover:text-primary-foreground ${u.id === userId ? "font-bold" : ""}`}
-              >
-                {u.name}{u.id === userId ? " (você)" : ""}
-              </button>
-            ))}
-            {users?.length === 0 && (
-              <p className="text-xs text-muted-foreground">Nenhum usuário ativo encontrado nesta área.</p>
-            )}
-          </div>
+      <DialogContent className={dialogCls}>
+        <DialogHeading
+          icon={UserPlus}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={`Atribuir "${displayCriterionName(target?.criterionName)}"`}
+          description="Escolha o avaliador da área que vai responder este quesito."
+        />
+        <div className="rounded-xl border border-border divide-y divide-border max-h-72 overflow-y-auto">
+          {(users ?? []).map(u => (
+            <button
+              key={u.id}
+              type="button"
+              data-testid={`option-assign-user-${u.id}`}
+              onClick={() => onPickUser(u.id)}
+              className="w-full min-h-12 text-left px-4 text-[15px] text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:bg-secondary"
+            >
+              <span className={u.id === userId ? "font-semibold" : ""}>{u.name}</span>{u.id === userId ? <span className="text-muted-foreground"> (você)</span> : ""}
+            </button>
+          ))}
+          {users?.length === 0 && (
+            <p className="px-4 py-6 text-center text-[14px] text-muted-foreground">Nenhum usuário ativo encontrado nesta área.</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

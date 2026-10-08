@@ -68,7 +68,7 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
       await loginPelaTela(av, AVALIADOR.cpf, testInfo);
       // Avaliador vive em /evaluations (HomeRoute redireciona).
       await expect(av).toHaveURL(/\/evaluations$/);
-      await expect(av.getByRole("heading", { level: 1, name: /Central de Avaliações/ })).toBeVisible();
+      await expect(av.getByRole("heading", { level: 1, name: "Avaliações", exact: true })).toBeVisible();
       const itemEvento = av.getByTestId(`evaluator-event-${TARGET_EVENT.id}`);
       await expect(itemEvento).toContainText("0/2");
       await checkA11y(av, "avaliacoes", testInfo);
