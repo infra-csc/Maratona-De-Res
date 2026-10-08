@@ -34,11 +34,11 @@ test("link público: admin gera o link, freelancer avalia sem login e a nota che
   await test.step("admin gera o Link Freelancer do questionário da avaliadora", async () => {
     // Ciclo por área: um Link por ÁREA, em nome de um avaliador da área (escolhido no diálogo).
     await page.getByRole("button", { name: /^Link para freela da área/ }).first().click();
-    await expect(page.getByText("Área: Operações")).toBeVisible();
-    await page.getByRole("combobox", { name: /em nome de quem o link responde/ }).selectOption({ label: AVALIADORA_LINK.name });
+    await expect(page.getByText("Formulário Operações")).toBeVisible();
+    await page.getByRole("combobox", { name: /Em nome de qual avaliador/ }).selectOption({ label: AVALIADORA_LINK.name });
     await page.getByRole("textbox", { name: "Para quem é o link" }).fill(FREELANCER);
     await page.getByRole("button", { name: "Gerar Link" }).click();
-    await expect(page.getByText("Link gerado — copie e envie")).toBeVisible();
+    await expect(page.getByText("Link pronto")).toBeVisible();
     await checkA11y(page, "link-freelancer-dialogo", testInfo, { inDialog: true });
     const campoLink = page.locator("input[readonly]").filter({ visible: true });
     linkUrl = await campoLink.inputValue();
@@ -90,13 +90,14 @@ test("link público: admin gera o link, freelancer avalia sem login e a nota che
     await menu(page, "Avaliações").click();
     // Com os 2 critérios respondidos, o evento sai de "Em aberto" e vai para "Concluídos".
     await expect(page.getByRole("button", { name: new RegExp(LINK_EVENT.name, "i") })).toHaveCount(0);
-    await page.getByRole("button", { name: /^Concluídos · \d+$/ }).click();
+    await page.getByRole("button", { name: /^Concluídos \d+$/ }).click();
     await page.getByRole("button", { name: new RegExp(LINK_EVENT.name, "i") }).click();
     await expect(page.getByRole("heading", { level: 2, name: LINK_EVENT.name })).toBeVisible();
-    await expect(page.getByText("2 de 2 respostas das áreas")).toBeVisible();
+    await expect(page.getByTestId("panel-progress")).toContainText("2/2");
+    await expect(page.getByTestId("panel-progress")).toContainText("respostas das áreas");
     // Ciclo por área: o painel diz quem respondeu (o link vale como resposta da área).
     await expect(page.getByText(`Respondido via link por ${FREELANCER}`).first()).toBeAttached();
-    await expect(page.getByText(`${FREELANCER} (link)`).first()).toBeVisible();
+    await expect(page.getByText(FREELANCER, { exact: true }).first()).toBeVisible();
   });
 
   expect(errosDePagina, "Erros de JavaScript não tratados nas páginas").toEqual([]);

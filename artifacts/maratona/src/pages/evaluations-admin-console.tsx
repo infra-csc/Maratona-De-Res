@@ -5,7 +5,7 @@ import {
   eventCriterionAssignmentsKey, patchCriterionAssignment, useGenerateCriterionAssignments,
 } from "@/lib/routing-api";
 import { fmtDate, plural, todayBR } from "@/lib/utils";
-import { CONDENSED } from "@/lib/premium-theme";
+import { CalendarX2, MousePointerClick } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { buildConformityRows, filterQueueEvents, readEventIdFromUrl } from "./evaluations-admin-console/helpers";
@@ -17,7 +17,9 @@ import { useConfirmResults, useSelectedEventDetail } from "./evaluations-admin-c
 import { useCriteriaManagement } from "./evaluations-admin-console/use-criteria-management";
 import { useLinkActions, useLinkDialogState } from "./evaluations-admin-console/use-links";
 import { useEvaluatorStats } from "./evaluations-admin-console/use-evaluator-stats";
-import { ConsoleHeader, KpiStrip } from "./evaluations-admin-console/console-header";
+import { ConsoleHeader, KpiStrip, type WeekendPulse } from "./evaluations-admin-console/console-header";
+import { ConsoleSkeleton, ViewSkeleton } from "./evaluations-admin-console/console-states";
+import { EmptyBlock, ErrorBlock, smoothScrollTo, surfaceCls } from "./evaluations-admin-console/console-ui";
 import { EventQueue } from "./evaluations-admin-console/event-queue";
 import { EventAssignmentPanel } from "./evaluations-admin-console/event-assignment-panel";
 import { ConformityAssignmentList } from "./evaluations-admin-console/conformity-assignment-list";
@@ -54,7 +56,8 @@ export function AdminEvaluationsConsole() {
   const [evaluatorFilter, setEvaluatorFilter] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [sort, setSort] = useState<QueueSort>("name");
+  // Por data: a fila sai agrupada por fim de semana (o mais antigo em aberto primeiro).
+  const [sort, setSort] = useState<QueueSort>("data");
   const [conformityFilter, setConformityFilter] = useState<ConformityFilter>("all");
   const [noEvaluatorFilter, setNoEvaluatorFilter] = useState(false);
   const [bulkAssignAreaId, setBulkAssignAreaId] = useState<number | null>(null);
@@ -77,7 +80,7 @@ export function AdminEvaluationsConsole() {
   } = linkState;
 
   // ---- Dados de todos os eventos + evento selecionado + enriquecimento ----
-  const { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode } = useConsoleData(selectedEventId, setSelectedEventId);
+  const { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode, cycle, loading, loadError, retry } = useConsoleData(selectedEventId, setSelectedEventId);
 
   const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? null;
   // Cabeçalho usado em todo texto copiado (links): "NOME DO EVENTO · dd/mm" —
@@ -111,9 +114,17 @@ export function AdminEvaluationsConsole() {
   const todayStr = todayBR();
   const currentWeekend = cycleWeekends.find(w => w.sat <= todayStr && todayStr <= w.sun)
     ?? cycleWeekends.filter(w => w.sat <= todayStr).at(-1) ?? null;
-  const currentWeekendDoneCount = currentWeekend
-    ? enrichedEvents.filter(e => e.isDone && !!e.startDate && e.startDate >= currentWeekend.sat && e.startDate <= currentWeekend.sun).length
-    : null;
+  const currentWeekendEvents = currentWeekend
+    ? enrichedEvents.filter(e => !!e.startDate && e.startDate >= currentWeekend.sat && e.startDate <= currentWeekend.sun)
+    : [];
+  const weekendActive = !!currentWeekend && filterDateFrom === currentWeekend.sat && filterDateTo === currentWeekend.sun;
+  const weekendPulse: WeekendPulse = currentWeekend ? {
+    label: currentWeekend.label,
+    isNow: currentWeekend.sat <= todayStr && todayStr <= currentWeekend.sun,
+    done: currentWeekendEvents.filter(e => e.isDone).length,
+    total: currentWeekendEvents.length,
+    active: weekendActive,
+  } : null;
 
   const areaOptions = [...new Set(enrichedEvents.flatMap(e => e.areaNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const evaluatorOptions = [...new Set(enrichedEvents.flatMap(e => e.evaluatorNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -130,6 +141,31 @@ export function AdminEvaluationsConsole() {
     const list = filterQueueEvents(eventsOfTab(next), queueFilters);
     setSelectedEventId(list[0]?.id ?? null);
   }
+
+  // Panorama → "fim de semana atual": filtra a fila por ele (ou limpa) e abre
+  // a primeira aba que tiver evento daquele fim de semana.
+  function toggleCurrentWeekend() {
+    if (!currentWeekend) return;
+    setView("assign");
+    if (weekendActive) { setFilterDateFrom(""); setFilterDateTo(""); return; }
+    setFilterDateFrom(currentWeekend.sat);
+    setFilterDateTo(currentWeekend.sun);
+    const f = { ...queueFilters, filterDateFrom: currentWeekend.sat, filterDateTo: currentWeekend.sun };
+    const nextTab = (["todo", "waiting", "done"] as const).find(t => filterQueueEvents(eventsOfTab(t), f).length > 0) ?? tab;
+    setTab(nextTab);
+    setSelectedEventId(filterQueueEvents(eventsOfTab(nextTab), f)[0]?.id ?? null);
+  }
+
+  // Celular/tablet (fila acima do painel): escolher um evento leva ao painel;
+  // "← Eventos" volta para a fila.
+  const queueRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const stacked = () => !window.matchMedia?.("(min-width: 1024px)").matches;
+  function selectEvent(id: number) {
+    setSelectedEventId(id);
+    if (stacked()) requestAnimationFrame(() => smoothScrollTo(panelRef.current));
+  }
+  function backToQueue() { smoothScrollTo(queueRef.current); }
 
   // Primeira carga: com ?eventId= (link "Avaliações" da tela de Eventos), a
   // fila abre na aba do evento, com ele selecionado; sem ele, no 1º evento de
@@ -241,15 +277,35 @@ export function AdminEvaluationsConsole() {
   const { pendingEvaluatorsCount, evaluatorCards, globalEvaluatorCards, globalAreaResponders, eventAreaResponders } =
     useEvaluatorStats({ enrichedEvents, selected, selectedDetail, conformityRows });
 
-  return (
-    <div className="space-y-5">
-      <ConsoleHeader view={view} setView={setView} isOperador={isOperador} areaMode={cycleAreaMode} />
+  const header = (
+    <ConsoleHeader view={view} setView={setView} isOperador={isOperador} areaMode={cycleAreaMode} cycleName={cycle?.name ?? null} />
+  );
 
+  return (
+    // A página (evaluations.tsx) envolve a Central com respiro próprio; a
+    // Central desfaz esse respiro para ter o topo fixo de ponta a ponta, como
+    // as telas de Avaliações e Calibração.
+    <div className="-m-6 md:-m-10 min-h-full bg-background text-foreground font-body">
+      {header}
+      <div className="px-4 md:px-6 py-5 md:py-6 space-y-5">
+      {loading ? (
+        <ConsoleSkeleton />
+      ) : loadError ? (
+        <ErrorBlock title="Não foi possível carregar os eventos" onRetry={retry} />
+      ) : enrichedEvents.length === 0 ? (
+        <div className={surfaceCls} data-testid="console-empty">
+          <EmptyBlock icon={CalendarX2} title="Nenhum evento no ciclo" className="py-16">
+            Quando houver eventos do ciclo atual liberados para avaliação, eles aparecem aqui com o progresso de cada área.
+          </EmptyBlock>
+        </div>
+      ) : (
+      <>
       <KpiStrip
         openCount={openCount}
-        selected={selected}
-        currentWeekendDoneCount={currentWeekendDoneCount}
+        weekend={weekendPulse}
+        onWeekend={toggleCurrentWeekend}
         pendingEvaluatorsCount={pendingEvaluatorsCount}
+        selectedUnassigned={selected?.unassigned ?? 0}
         noEvaluatorFilter={noEvaluatorFilter}
         setNoEvaluatorFilter={setNoEvaluatorFilter}
         setView={setView}
@@ -259,13 +315,10 @@ export function AdminEvaluationsConsole() {
         answeredCount={answeredCount}
       />
 
-      {enrichedEvents.length === 0 ? (
-        <div className="text-center py-20 rounded-xl font-bold uppercase" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
-          Nenhum evento liberado para avaliação no momento.
-        </div>
-      ) : view === "assign" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+      {view === "assign" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)] gap-5 items-start">
           {/* Coluna esquerda — fila de eventos */}
+          <div ref={queueRef} className="min-w-0 scroll-mt-[72px] md:scroll-mt-20 lg:sticky lg:top-[80px]">
           <EventQueue
             tab={tab}
             setTab={changeTab}
@@ -284,26 +337,28 @@ export function AdminEvaluationsConsole() {
             areaOptions={areaOptions}
             evaluatorOptions={evaluatorOptions}
             cycleWeekends={cycleWeekends}
+            currentWeekendSat={currentWeekend?.sat ?? null}
             queueEvents={queueEvents}
             baseTabCount={baseTab.length}
             hasFilters={hasFilters}
             selectedId={selected?.id ?? null}
-            setSelectedEventId={setSelectedEventId}
+            onSelect={selectEvent}
+            areaMode={cycleAreaMode}
           />
+          </div>
 
-          {/* Coluna direita — matriz de atribuição do evento selecionado */}
+          {/* Coluna direita — o evento selecionado */}
+          <div ref={panelRef} className="min-w-0 scroll-mt-[72px] md:scroll-mt-20">
           {!selected && (
-            <div data-testid="panel-empty" className="rounded-xl py-16 px-6 text-center" style={{ backgroundColor: "var(--card)", border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
-              <p className="text-[13px] font-bold uppercase" style={{ fontFamily: CONDENSED }}>
-                {baseTab.length === 0
+            <div data-testid="panel-empty" className="rounded-2xl border border-dashed border-border">
+              <EmptyBlock icon={MousePointerClick} className="py-16"
+                title={baseTab.length === 0
                   ? tab === "todo" ? "Nada a fazer agora" : tab === "waiting" ? "Nenhum evento a abrir" : "Nenhum evento concluído ainda"
-                  : "Escolha um evento na lista"}
-              </p>
-              <p className="text-[12px] mt-1">
+                  : "Escolha um evento na lista"}>
                 {baseTab.length === 0
                   ? tab === "todo" ? "Nenhum evento aberto está esperando avaliação." : "Esta aba não tem eventos neste ciclo."
-                  : "Os critérios e os avaliadores do evento aparecem aqui."}
-              </p>
+                  : "O progresso por área, quem já respondeu e a Matriz do evento aparecem aqui."}
+              </EmptyBlock>
             </div>
           )}
           {selected && (
@@ -330,10 +385,12 @@ export function AdminEvaluationsConsole() {
               openLinkDialog={openLinkDialog}
               setViewEvalCrit={setViewEvalCrit}
               allTokens={allTokens}
+              onBack={backToQueue}
               conformitySection={
                 <ConformityAssignmentList
                   selected={selected}
                   conformityRows={conformityRows}
+                  loading={!selectedDetail}
                   canManage={canManage}
                   canViewSubmissions={canViewSubmissions}
                   openConformityPicker={openConformityPicker}
@@ -349,9 +406,10 @@ export function AdminEvaluationsConsole() {
               }
             />
           )}
+          </div>
         </div>
       ) : view === "criterios" ? (
-        selected && selectedDetail && (
+        selected && (selectedDetail ? (
           <CriteriaView
             selected={selected}
             selectedDetail={selectedDetail}
@@ -360,7 +418,7 @@ export function AdminEvaluationsConsole() {
             mgmt={criteriaMgmt}
             isAdmin={user?.role === "admin"}
           />
-        )
+        ) : <ViewSkeleton />)
       ) : view === "table" ? (
         selected && (
           <TableView
@@ -398,6 +456,9 @@ export function AdminEvaluationsConsole() {
           eventAreaResponders={eventAreaResponders}
         />
       )}
+      </>
+      )}
+      </div>
 
       {/* ── Todos os links (batch) ─────────────────────────────────── */}
       {batchOpen && (

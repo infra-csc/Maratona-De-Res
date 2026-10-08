@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { useUsersByArea } from "@/lib/routing-api";
-import { Search, ChevronDown, Check } from "lucide-react";
+import { Search, ChevronsUpDown, Check, UserPlus, AlertCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DANGER_TEXT } from "@/lib/premium-theme";
+import { cn, fmtDate } from "@/lib/utils";
+import { Bone, FOCUS_RING, selectCls } from "./console-ui";
 
 /** Seletor de evento com busca (abas Critérios, Tabela e Avaliadores). */
-export function EventCombobox({ events, value, onChange, accentStyle }: {
-  events: { id: number; name: string }[];
+export function EventCombobox({ events, value, onChange, label = "Evento" }: {
+  events: { id: number; name: string; startDate?: string | null }[];
   value: number | null;
   onChange: (id: number) => void;
+  /** Rótulo acessível do seletor. */
+  label?: string;
+  /** @deprecated o seletor tem um visual só. */
   accentStyle?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -17,52 +21,56 @@ export function EventCombobox({ events, value, onChange, accentStyle }: {
   const filtered = search.trim()
     ? sorted.filter(ev => ev.name.toLowerCase().includes(search.toLowerCase()))
     : sorted;
-  const selectedName = events.find(e => e.id === value)?.name;
+  const current = events.find(e => e.id === value);
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setSearch(""); }}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black uppercase truncate max-w-xs transition-opacity hover:opacity-80"
-          style={{
-            border: accentStyle ? "1px solid var(--accent)" : "1px solid var(--border)",
-            color: accentStyle ? "var(--accent)" : "var(--foreground)",
-            backgroundColor: "transparent",
-            height: accentStyle ? "24px" : "28px",
-            minWidth: accentStyle ? "180px" : "200px",
-          }}
+          aria-label={`${label}: ${current?.name ?? "nenhum"} — trocar`}
+          data-testid="event-combobox"
+          className={cn(
+            "w-full sm:w-[360px] max-w-full min-h-11 lg:min-h-10 rounded-lg border border-border bg-card pl-3 pr-2.5 flex items-center gap-2 text-left transition-colors duration-150 hover:bg-secondary/60",
+            FOCUS_RING,
+          )}
         >
-          <span className="truncate flex-1 text-left">{selectedName ?? "Selecione um evento"}</span>
-          <ChevronDown size={11} className="shrink-0 opacity-60" />
+          <span className="min-w-0 flex-1 flex items-baseline gap-2">
+            <span className="font-condensed truncate text-[15px] font-black uppercase leading-tight text-foreground">{current?.name ?? "Selecione um evento"}</span>
+            {current?.startDate && <span className="shrink-0 text-[12.5px] tabular-nums text-muted-foreground">{fmtDate(current.startDate)}</span>}
+          </span>
+          <ChevronsUpDown size={15} className="shrink-0 text-muted-foreground" aria-hidden />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="p-0 w-80" style={{ maxHeight: "340px", display: "flex", flexDirection: "column" }}>
-        <div className="px-2.5 pt-2.5 pb-1.5" style={{ borderBottom: "1px solid var(--border)" }}>
-          <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-            <Search size={11} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
+      <PopoverContent align="start" className="p-0 w-[min(380px,calc(100vw-24px))] rounded-xl border-border bg-card overflow-hidden">
+        <div className="p-2 border-b border-border">
+          <div className="relative">
+            <Search size={15} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               autoFocus
+              aria-label="Buscar evento"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar evento..."
-              className="flex-1 bg-transparent text-[11px] font-bold uppercase outline-none placeholder:normal-case placeholder:font-normal"
-              style={{ color: "var(--foreground)" }}
+              placeholder="Buscar evento"
+              className="w-full h-10 rounded-lg bg-secondary/60 pl-8 pr-3 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
           </div>
         </div>
-        <div className="overflow-y-auto" style={{ maxHeight: "280px" }}>
+        <div className="max-h-[300px] overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <p className="px-3 py-4 text-center text-[11px]" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado.</p>
+            <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">Nenhum evento com esse nome.</p>
           ) : filtered.map(ev => (
             <button
               key={ev.id}
               type="button"
               onClick={() => { onChange(ev.id); setOpen(false); setSearch(""); }}
-              className="w-full text-left px-3 py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80 flex items-center justify-between gap-2"
-              style={{ backgroundColor: ev.id === value ? "var(--secondary)" : "transparent", color: "var(--foreground)" }}
+              className={cn(
+                "w-full text-left px-3 min-h-11 lg:min-h-9 py-1.5 flex items-center gap-2 transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:bg-secondary",
+                ev.id === value && "bg-secondary/70",
+              )}
             >
-              <span className="truncate">{ev.name}</span>
-              {ev.id === value && <Check size={12} className="shrink-0" style={{ color: "var(--primary)" }} />}
+              <span className="font-condensed min-w-0 flex-1 truncate text-[14px] font-bold uppercase text-foreground">{ev.name}</span>
+              {ev.startDate && <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{fmtDate(ev.startDate)}</span>}
+              <Check size={14} aria-hidden className={cn("shrink-0", ev.id === value ? "text-foreground" : "invisible")} />
             </button>
           ))}
         </div>
@@ -73,10 +81,11 @@ export function EventCombobox({ events, value, onChange, accentStyle }: {
 
 /** Picker inline de avaliadores de uma área — usado para atribuir critérios e a matriz de conformidade. */
 export function InlinePicker({ areaId, excludeId, onPick, disabled }: { areaId: number; excludeId?: number | null; onPick: (userId: number, name: string) => void; disabled?: boolean }) {
-  const { data: users, isLoading } = useUsersByArea(areaId);
+  const { data: users, isLoading, isError } = useUsersByArea(areaId);
   const candidates = (users ?? []).filter(u => u.id !== excludeId);
-  if (isLoading) return <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Carregando avaliadores...</p>;
-  if (candidates.length === 0) return <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador ativo nesta área.</p>;
+  if (isLoading) return <div className="flex gap-1.5" aria-label="Carregando avaliadores" role="status"><Bone className="h-9 w-32 rounded-lg" /><Bone className="h-9 w-28 rounded-lg" /></div>;
+  if (isError) return <p className="text-[13px] text-[var(--status-danger-text)] flex items-center gap-1.5"><AlertCircle size={14} aria-hidden /> Não foi possível carregar os avaliadores desta área.</p>;
+  if (candidates.length === 0) return <p className="text-[13px] text-muted-foreground">Nenhum outro avaliador ativo nesta área — cadastre em Usuários.</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {candidates.map(u => (
@@ -86,10 +95,12 @@ export function InlinePicker({ areaId, excludeId, onPick, disabled }: { areaId: 
           disabled={disabled}
           aria-busy={disabled || undefined}
           onClick={() => onPick(u.id, u.name)}
-          className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-wait"
-          style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}
+          className={cn(
+            "inline-flex items-center gap-1.5 min-h-11 lg:min-h-8 px-3 rounded-lg border border-border bg-card text-[13px] font-semibold text-foreground transition-colors duration-150 enabled:hover:bg-secondary enabled:hover:border-foreground/25 disabled:opacity-50 disabled:cursor-wait",
+            FOCUS_RING,
+          )}
         >
-          + {u.name}
+          <UserPlus size={14} aria-hidden className="text-muted-foreground" /> {u.name}
         </button>
       ))}
     </div>
@@ -114,23 +125,22 @@ export function AreaEvaluatorSelect({ areaId, areaName, value, onChange, id, com
     if (only && value == null) onChange(only.id, only.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [only?.id, value]);
-  if (isLoading) return <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>Carregando avaliadores de {areaName}…</p>;
-  if (isError) return <p className="text-[12px] font-bold" style={{ color: DANGER_TEXT }}>Não foi possível carregar os avaliadores de {areaName}.</p>;
+  if (isLoading) return <Bone className={cn("w-full rounded-lg", compact ? "h-11 lg:h-9" : "h-11")} />;
+  if (isError) return <p className="text-[13px] font-semibold text-[var(--status-danger-text)] flex items-center gap-1.5"><AlertCircle size={14} aria-hidden /> Não foi possível carregar os avaliadores de {areaName}.</p>;
   if (evaluators.length === 0) {
-    return <p className="text-[12px] font-bold" style={{ color: "var(--muted-foreground)" }} data-testid={`area-evaluator-none-${areaId}`}>Nenhum avaliador ativo em {areaName} — cadastre um em Usuários.</p>;
+    return <p className="text-[13px] text-muted-foreground" data-testid={`area-evaluator-none-${areaId}`}>Nenhum avaliador ativo em {areaName} — cadastre um em Usuários.</p>;
   }
   return (
     <select
       id={id}
-      aria-label={`Avaliador de ${areaName} em nome de quem o link responde`}
+      aria-label={id ? undefined : `Avaliador de ${areaName} em nome de quem o link responde`}
       data-testid={`area-evaluator-select-${areaId}`}
       value={value ?? ""}
       onChange={e => {
         const u = evaluators.find(x => x.id === Number(e.target.value));
         onChange(u ? u.id : null, u ? u.name : null);
       }}
-      className={`w-full min-w-0 rounded-lg px-3 ${compact ? "py-1.5 text-[12px]" : "py-2 text-sm"} font-bold`}
-      style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+      className={cn(selectCls, !compact && "lg:h-11 text-[15px] lg:text-[15px] px-3.5", value == null && "text-muted-foreground")}
     >
       <option value="">Escolha o avaliador…</option>
       {evaluators.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
