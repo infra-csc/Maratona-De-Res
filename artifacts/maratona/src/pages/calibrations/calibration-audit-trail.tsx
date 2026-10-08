@@ -1,6 +1,7 @@
-// Histórico de calibrações de um critério (sempre visível quando há registros).
-import { History } from "lucide-react";
-import { GOOD, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
+// Histórico de calibrações de um critério (trilha de auditoria): quem mudou a
+// nota, de quanto para quanto e quando. Recolhido por padrão — é registro.
+import { ChevronDown, History } from "lucide-react";
+import { Chip, Eyebrow } from "../evaluations/ui";
 import { fmtCalScore, formatDateTime } from "./helpers";
 import type { CalibrationAuditItem } from "./types";
 
@@ -9,41 +10,42 @@ export type CalibrationAuditTrailProps = {
   calAudit: CalibrationAuditItem[] | undefined;
 };
 
+function parse(json: string | null | undefined): { score?: number | string | null } | null {
+  if (!json) return null;
+  try { return JSON.parse(json); } catch { return null; }
+}
+
 export function CalibrationAuditTrail({ criterionId, calAudit }: CalibrationAuditTrailProps) {
-                                const auditEntries = (calAudit ?? []).filter(a => a.criterionId === criterionId);
-                                if (!auditEntries.length) return null;
-                                return (
-                                  <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                      <History size={8} style={{ color: "var(--muted-foreground)" }} />
-                                      <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                                        Histórico ({auditEntries.length})
-                                      </span>
-                                    </div>
-                                    {auditEntries.map(entry => {
-                                      const before = entry.beforeJson ? (() => { try { return JSON.parse(entry.beforeJson); } catch { return null; } })() : null;
-                                      const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
-                                      const isRecal = entry.action === "recalibrate_released";
-                                      const scoreText = after?.score != null
-                                        ? (before?.score != null ? `${fmtCalScore(before.score)} → ${fmtCalScore(after.score)}` : `→ ${fmtCalScore(after.score)}`)
-                                        : null;
-                                      return (
-                                        <div key={entry.id} className="flex items-center gap-1.5 flex-wrap px-1.5 py-1 rounded"
-                                          style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                                          <span className="shrink-0 text-[11px] font-black uppercase px-1 py-px rounded"
-                                            style={{ backgroundColor: isRecal ? "rgba(232,162,61,0.18)" : "rgba(154,176,0,0.14)", color: isRecal ? AMBER : GOOD }}>
-                                            {isRecal ? "Recal. pós-lib." : "Calibrou"}
-                                          </span>
-                                          <span className="text-[11px] font-bold">{entry.userName ?? "?"}</span>
-                                          {scoreText && (
-                                            <span className="text-[11px] font-black" style={{ color: GOOD_TEXT }}>{scoreText}</span>
-                                          )}
-                                          <span className="text-[11px] ml-auto" style={{ color: "var(--muted-foreground)" }}>
-                                            {formatDateTime(new Date(entry.createdAt))}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
+  const entries = (calAudit ?? []).filter(a => a.criterionId === criterionId);
+  if (!entries.length) return null;
+  return (
+    <details className="group/hist" data-testid={`cal-history-${criterionId}`}>
+      <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer select-none inline-flex items-center gap-2 min-h-9 -ml-1 px-1 rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <History size={14} aria-hidden />
+        <Eyebrow as="span" className="text-inherit">Histórico de calibração · {entries.length}</Eyebrow>
+        <ChevronDown size={14} aria-hidden className="transition-transform duration-200 group-open/hist:rotate-180" />
+      </summary>
+      <ol className="mt-1.5 ml-[7px] border-l border-border pl-4 space-y-2.5">
+        {entries.map(entry => {
+          const before = parse(entry.beforeJson);
+          const after = parse(entry.afterJson);
+          const isRecal = entry.action === "recalibrate_released";
+          const scoreText = after?.score != null
+            ? (before?.score != null ? `${fmtCalScore(before.score)} → ${fmtCalScore(after.score)}` : `→ ${fmtCalScore(after.score)}`)
+            : null;
+          return (
+            <li key={entry.id} className="relative text-[13px] leading-snug">
+              <span aria-hidden className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-border ring-2 ring-card" />
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Chip tone={isRecal ? "warn" : "neutral"} className="h-5 text-[11px]">{isRecal ? "Recalibrou após publicar" : "Calibrou"}</Chip>
+                <span className="font-semibold text-foreground">{entry.userName ?? "—"}</span>
+                {scoreText && <span className="font-condensed text-[15px] font-black tabular-nums text-foreground">{scoreText}</span>}
+                <span className="text-muted-foreground text-[12.5px] ml-auto">{formatDateTime(new Date(entry.createdAt))}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </details>
+  );
 }

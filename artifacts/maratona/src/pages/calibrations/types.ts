@@ -38,19 +38,3 @@ export type ConformityForm = {
   absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
 };
 
-// Paleta do seletor de eventos (claro/escuro).
-export type PickerPalette = {
-  bg: string;
-  card: string;
-  border: string;
-  text: string;
-  muted: string;
-  activeBg: string;
-  activeFg: string;
-  itemSel: string;
-  itemBorder: string;
-  shadow: string;
-  chipBorder: string;
-  chipText: string;
-  searchBorder: string;
-};

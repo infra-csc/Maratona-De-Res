@@ -1,17 +1,21 @@
-// Linha da tabela de calibração: critério (notas dos avaliadores, justificativa,
-// histórico e comentários), peso, média do avaliador, nota calibrada e status.
+// Um critério da calibração. À esquerda, a evidência (respostas por área,
+// justificativa, histórico e comentários); à direita, a decisão (peso, nota das
+// áreas, nota calibrada e publicação). No celular/tablet a decisão vem logo
+// abaixo do nome, antes da evidência.
 import type React from "react";
-import { Check, Save } from "lucide-react";
-import { CONDENSED, WARNING, GOOD } from "@/lib/premium-theme";
-import { fieldStyle, fmtCalScore } from "./helpers";
+import { AlertCircle, Check, Loader2, Save } from "lucide-react";
+import { cn, fmtNum, plural } from "@/lib/utils";
+import { displayCriterionName } from "@/lib/criterion-name";
+import type { AdminPublicToken } from "@/lib/routing-api";
+import { Chip, btnSmall } from "../evaluations/ui";
+import { fieldCls } from "./cal-ui";
+import { fmtCalScore } from "./helpers";
 import type { DerivedCriteria } from "./derive";
 import { EvaluatorScores } from "./evaluator-scores";
 import { CalibrationReasonEditor } from "./calibration-reason-editor";
 import { CalibrationAuditTrail } from "./calibration-audit-trail";
 import { CriterionComments } from "./criterion-comments";
-import { PendingPublishBadge, PublishStatusCell } from "./publish-status-cell";
-import { fmtNum } from "@/lib/utils";
-import type { AdminPublicToken } from "@/lib/routing-api";
+import { PublishStatusCell } from "./publish-status-cell";
 import type {
   AddCommentMutation,
   CalibrationAuditItem,
@@ -21,7 +25,6 @@ import type {
   PublishIntent,
   ToastFn,
 } from "./types";
-import { displayCriterionName } from "@/lib/criterion-name";
 
 // Props comuns a todas as linhas (estado e ações vêm do componente pai).
 export type CriterionRowSharedProps = {
@@ -64,205 +67,198 @@ export type CriterionRowSharedProps = {
 
 export type CriterionRowProps = CriterionRowSharedProps & { c: EventCriterion };
 
-export function CriterionRow({
-  c,
-  getMembers,
-  getAvgScore,
-  tokens,
-  getCalibration,
-  calScores,
-  setCalScores,
-  calReasons,
-  setCalReasons,
-  savedReasonIds,
-  setSavedReasonIds,
-  savingCritId,
-  savingAll,
-  saveCalibration,
-  calAudit,
-  calComments,
-  newCommentTexts,
-  setNewCommentTexts,
-  canFinalize,
-  addCommentMutation,
-  deleteCommentMutation,
-  toast,
-  canEditWeights,
-  weightEdits,
-  setWeightEdits,
-  savingWeightId,
-  updateWeightPending,
-  saveWeight,
-  publishIntents,
-  setPublishIntents,
-}: CriterionRowProps) {
-                        const members = getMembers(c.criterionId);
-                        const multiArea = members.length > 1;
-                        const answeredAreas = members.filter(m => m.answers.length > 0).length;
-                        const answerCount = members.reduce((n, m) => n + m.answers.length, 0);
-                        const avg = getAvgScore(c.criterionId);
-                        const cal = getCalibration(c.criterionId);
-                        // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
-                        const calVal = cal ? Number(cal.calibratedScore) : null;
-                        // Nota salva no padrão brasileiro ("8,5", não "8.5"); inteiro fica sem casas.
-                        const scoreVal = calScores[c.criterionId] ?? (calVal != null ? fmtCalScore(calVal) : "");
-                        const isSaving = savingCritId === c.criterionId;
-                        const isFinalPublished = !!c.finalPublishedAt;
-                        const peso = c.weightOverride ?? c.originalWeight ?? 0;
-                        const hasUnsaved = calScores[c.criterionId] !== undefined;
-                        const savedScore = calVal;
-                        const changedFromSaved = hasUnsaved && String(savedScore) !== calScores[c.criterionId];
-                        const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
-                        const reasonChanged = calReasons[c.criterionId] !== undefined && calReasons[c.criterionId] !== (cal?.calibrationReason ?? "");
+const LABEL = "font-condensed block text-[12px] font-bold uppercase tracking-[0.08em] leading-none text-muted-foreground mb-2";
 
-                        return (
-                          <tr
-                            data-testid={`row-cal-${c.criterionId}`}
-                            // Celular: a linha vira um bloco (critério em cima; peso, avaliador e calibrada lado a lado).
-                            className="transition-colors group max-sm:flex max-sm:flex-wrap max-sm:items-start"
-                            style={{ borderTop: "1px solid var(--border)" }}
-                          >
-                            {/* Critério */}
-                            <td className="px-3 py-2.5 align-top max-sm:block max-sm:w-full">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{displayCriterionName(c.criterionName)}</span>
-                                {/* No celular a coluna de status some: o selo vem para cá. */}
-                                {cal?.pendingPublish && <PendingPublishBadge className="sm:hidden" testId="badge-criterion-pending-publish-mobile" />}
-                                {/* Uma área só: o selo neutro da área. Multiárea: o detalhe por área vem logo abaixo. */}
-                                {multiArea ? (
-                                  <span className="text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{members.length} áreas · média das áreas</span>
-                                ) : c.responsibleAreaName && (
-                                  <span className="text-[11px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
-                                )}
-                              </div>
-                              {/* ── Detalhe por área: quem respondeu, nota, comentário, áudio ── */}
-                              <EvaluatorScores
-                                criterionId={c.criterionId}
-                                members={members}
-                                avg={avg}
-                                tokens={tokens}
-                                setCalReasons={setCalReasons}
-                              />
-                              {/* ── Justificativa da calibração (editável) ── */}
-                              <CalibrationReasonEditor
-                                criterionId={c.criterionId}
-                                cal={cal}
-                                calVal={calVal}
-                                reasonVal={reasonVal}
-                                reasonChanged={reasonChanged}
-                                isSaving={isSaving}
-                                savedReasonIds={savedReasonIds}
-                                setSavedReasonIds={setSavedReasonIds}
-                                setCalReasons={setCalReasons}
-                                saveCalibration={saveCalibration}
-                              />
+export function CriterionRow(props: CriterionRowProps) {
+  const {
+    c, getMembers, getAvgScore, tokens, getCalibration, calScores, setCalScores, calReasons, setCalReasons,
+    savedReasonIds, setSavedReasonIds, savingCritId, savingAll, saveCalibration, calAudit, calComments,
+    newCommentTexts, setNewCommentTexts, canFinalize, addCommentMutation, deleteCommentMutation, toast,
+    canEditWeights, weightEdits, setWeightEdits, savingWeightId, updateWeightPending, saveWeight,
+    publishIntents, setPublishIntents,
+  } = props;
+  const id = c.criterionId;
+  const name = displayCriterionName(c.criterionName);
+  const members = getMembers(id);
+  const multiArea = members.length > 1;
+  const answeredAreas = members.filter(m => m.answers.length > 0).length;
+  const answerCount = members.reduce((n, m) => n + m.answers.length, 0);
+  const avg = getAvgScore(id);
+  const cal = getCalibration(id);
+  // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
+  const calVal = cal ? Number(cal.calibratedScore) : null;
+  // Nota salva no padrão brasileiro ("8,5", não "8.5"); inteiro fica sem casas.
+  const scoreVal = calScores[id] ?? (calVal != null ? fmtCalScore(calVal) : "");
+  const isSaving = savingCritId === id;
+  const peso = c.weightOverride ?? c.originalWeight ?? 0;
+  const hasUnsaved = calScores[id] !== undefined;
+  const changedFromSaved = hasUnsaved && String(calVal) !== calScores[id];
+  const typed = calScores[id];
+  const invalid = typed !== undefined && typed !== "" && Number(typed) > 10;
+  const justSaved = savedReasonIds.has(id) && !hasUnsaved;
+  const reasonVal = calReasons[id] ?? (cal?.calibrationReason ?? "");
+  const reasonChanged = calReasons[id] !== undefined && calReasons[id] !== (cal?.calibrationReason ?? "");
+  const weightDirty = weightEdits[id] != null && Number(weightEdits[id].replace(",", ".")) !== Number(peso);
+  const savingWeight = savingWeightId === id && updateWeightPending;
 
-                              {/* ── Histórico de calibrações (sempre visível) ─ */}
-                              <CalibrationAuditTrail criterionId={c.criterionId} calAudit={calAudit} />
+  const scoreState: "invalid" | "dirty" | "saved" | "empty" = invalid ? "invalid" : changedFromSaved ? "dirty" : calVal != null ? "saved" : "empty";
+  const scoreHint = {
+    invalid: <span className="text-[var(--status-danger-text)] inline-flex items-center gap-1"><AlertCircle size={12} aria-hidden /> De 0 a 10</span>,
+    dirty: <span className="text-[var(--status-warn-text)]">Não salva</span>,
+    saved: <span className={cn("inline-flex items-center gap-1", justSaved ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}><Check size={12} aria-hidden /> {justSaved ? "Salva agora" : "Salva"}</span>,
+    empty: <span className="text-muted-foreground">Sem calibração</span>,
+  }[scoreState];
 
-                              {/* ── Comentários ─────────────────────────────── */}
-                              <CriterionComments
-                                criterionId={c.criterionId}
-                                calComments={calComments}
-                                newCommentTexts={newCommentTexts}
-                                setNewCommentTexts={setNewCommentTexts}
-                                canFinalize={canFinalize}
-                                addCommentMutation={addCommentMutation}
-                                deleteCommentMutation={deleteCommentMutation}
-                                toast={toast}
-                              />
-                            </td>
-                            {/* Peso */}
-                            <td className="px-2 py-2.5 text-center align-top max-sm:block max-sm:flex-1" onClick={e => e.stopPropagation()}>
-                              <span className="sm:hidden block text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Peso</span>
-                              {canEditWeights ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <input
-                                    data-testid={`input-weight-${c.criterionId}`}
-                                    aria-label={`Peso de ${displayCriterionName(c.criterionName)}`}
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={weightEdits[c.criterionId] ?? String(peso)}
-                                    onChange={e => setWeightEdits(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9.,]/g, "") }))}
-                                    className="h-6 w-10 px-1 rounded text-center text-xs font-black focus:outline-none"
-                                    style={fieldStyle}
-                                  />
-                                  {weightEdits[c.criterionId] != null && Number(weightEdits[c.criterionId].replace(",", ".")) !== Number(peso) && (
-                                    <button
-                                      data-testid={`button-save-weight-${c.criterionId}`}
-                                      type="button"
-                                      disabled={savingWeightId === c.criterionId && updateWeightPending}
-                                      onClick={() => saveWeight(c.criterionId, c.active)}
-                                      title="Salvar peso"
-                                      className="h-6 w-6 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
-                                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                    >
-                                      {savingWeightId === c.criterionId && updateWeightPending ? "·" : <Check size={10} />}
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-xs font-black">{peso}</span>
-                              )}
-                            </td>
-                            {/* Nota Avaliador */}
-                            <td className="px-2 py-2.5 text-center align-top max-sm:block max-sm:flex-1">
-                              <span className="sm:hidden block text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Avaliador</span>
-                              {/* Multiárea: quantas áreas responderam; a nota é a média das áreas (a mesma do servidor). */}
-                              {multiArea ? (
-                                <span className="block text-[11px] font-bold leading-tight mb-0.5" style={{ color: "var(--muted-foreground)" }} title={`${answeredAreas} de ${members.length} áreas responderam`}>
-                                  {answeredAreas}/{members.length} áreas
-                                </span>
-                              ) : answerCount > 1 ? (
-                                <span className="block text-[11px] font-bold leading-tight mb-0.5" style={{ color: "var(--muted-foreground)" }}>{answerCount} respostas</span>
-                              ) : null}
-                              <span className="text-sm font-black" style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>
-                                {avg != null ? fmtNum(avg, 2) : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}
-                              </span>
-                            </td>
-                            {/* Nota Calibrada inline */}
-                            <td className="px-2 py-2.5 align-top max-sm:block max-sm:flex-1" onClick={e => e.stopPropagation()}>
-                              <span className="sm:hidden block text-center text-[10px] font-black uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Calibrada</span>
-                              <div className="flex items-center justify-center gap-1">
-                                <input
-                                  data-testid={`input-cal-score-${c.criterionId}`}
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={scoreVal}
-                                  onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9]/g, "") }))}
-                                  placeholder="—"
-                                  className="h-7 w-12 px-1 rounded text-center text-sm font-black focus:outline-none"
-                                  style={{
-                                    border: changedFromSaved ? `2px solid ${WARNING}` : calVal != null ? `2px solid ${GOOD}` : "2px solid var(--border)",
-                                    backgroundColor: changedFromSaved ? "rgba(229,72,77,0.08)" : calVal != null ? "rgba(154,176,0,0.10)" : "var(--secondary)",
-                                    color: "var(--foreground)",
-                                  }}
-                                />
-                                {changedFromSaved && (
-                                  <button
-                                    data-testid={`button-save-cal-${c.criterionId}`}
-                                    type="button"
-                                    disabled={isSaving || savingAll}
-                                    onClick={() => void saveCalibration(c.criterionId)}
-                                    title="Salvar calibração"
-                                    className="h-7 w-7 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
-                                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                  >
-                                    {isSaving ? "·" : <Save size={11} />}
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                            {/* Status + seletor de intenção de publicação */}
-                            <PublishStatusCell
-                              c={c}
-                              cal={cal}
-                              avg={avg}
-                              isFinalPublished={isFinalPublished}
-                              canFinalize={canFinalize}
-                              publishIntents={publishIntents}
-                              setPublishIntents={setPublishIntents}
-                            />
-                          </tr>
-                        );
+  return (
+    <article
+      role="listitem"
+      data-testid={`row-cal-${id}`}
+      aria-labelledby={`cal-crit-name-${id}`}
+      className="p-4 sm:p-5 grid gap-x-6 gap-y-4 @2xl:grid-cols-[minmax(0,1fr)_252px] @4xl:grid-cols-[minmax(0,1fr)_288px] transition-colors duration-200"
+    >
+      {/* Nome e selos */}
+      <header className="min-w-0 @2xl:col-start-1">
+        <h3 id={`cal-crit-name-${id}`} className="font-condensed text-[21px] font-black uppercase leading-[1.05] tracking-[-0.005em] text-foreground break-words">{name}</h3>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {multiArea
+            ? <Chip title="Critério de várias áreas: a nota é a média das áreas que responderam">{members.length} áreas · média das áreas</Chip>
+            : c.responsibleAreaName && <Chip>{c.responsibleAreaName}</Chip>}
+          {!c.active && <Chip tone="warn" title="Critério desativado neste evento, mas com calibração salva">Desativado no evento</Chip>}
+          {Number(peso) === 0 && <Chip title="Peso 0: o critério não entra na nota do evento">Fora da nota · peso 0</Chip>}
+        </div>
+      </header>
+
+      {/* Decisão: peso, nota das áreas, nota calibrada e publicação */}
+      <div className="min-w-0 rounded-xl bg-secondary/45 p-3 @2xl:p-0 @2xl:pl-6 @2xl:rounded-none @2xl:bg-transparent @2xl:col-start-2 @2xl:row-start-1 @2xl:row-span-2 @2xl:border-l @2xl:border-border">
+        <div className="grid grid-cols-[60px_minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
+          {/* Peso */}
+          <div className="min-w-0">
+            {canEditWeights ? (
+              <>
+                <label htmlFor={`cal-weight-${id}`} className={LABEL}>Peso</label>
+                <input
+                  id={`cal-weight-${id}`}
+                  data-testid={`input-weight-${id}`}
+                  aria-label={`Peso de ${name}`}
+                  type="text"
+                  inputMode="decimal"
+                  value={weightEdits[id] ?? String(peso)}
+                  onChange={e => setWeightEdits(prev => ({ ...prev, [id]: e.target.value.replace(/[^0-9.,]/g, "") }))}
+                  className={cn(fieldCls, "w-full h-11 px-2 text-center font-condensed text-[19px] font-black tabular-nums", weightDirty && "border-[var(--status-warn)] bg-[var(--status-warn-bg)]")}
+                />
+              </>
+            ) : (
+              <>
+                <span className={LABEL}>Peso</span>
+                <span className="font-condensed block h-11 leading-[44px] text-[19px] font-black tabular-nums text-foreground">{peso}</span>
+              </>
+            )}
+          </div>
+
+          {/* Nota das áreas (avaliadores) */}
+          <div className="min-w-0" title="Nota enviada pela área; no critério de várias áreas, a média das áreas que responderam">
+            <span className={LABEL}>Áreas</span>
+            <span className={cn("font-condensed block h-11 leading-[44px] text-[22px] font-black tabular-nums",
+              calVal != null ? "text-muted-foreground line-through decoration-2 decoration-muted-foreground/60" : "text-foreground")}>
+              {avg != null ? fmtNum(avg, 2) : "—"}
+            </span>
+            <span className="block text-[12px] leading-tight text-muted-foreground mt-1">
+              {multiArea ? `${answeredAreas}/${members.length} áreas` : answerCount > 1 ? plural(answerCount, "resposta") : answerCount === 1 ? "1 área" : "Sem resposta"}
+            </span>
+          </div>
+
+          {/* Nota calibrada */}
+          <div className="min-w-0">
+            <label htmlFor={`cal-score-${id}`} className={cn(LABEL, "text-foreground")}>Calibrada</label>
+            <input
+              id={`cal-score-${id}`}
+              data-testid={`input-cal-score-${id}`}
+              type="text"
+              inputMode="numeric"
+              value={scoreVal}
+              onChange={e => setCalScores(prev => ({ ...prev, [id]: e.target.value.replace(/[^0-9]/g, "") }))}
+              onKeyDown={e => { if (e.key === "Enter" && changedFromSaved && !invalid && !isSaving && !savingAll) void saveCalibration(id); }}
+              placeholder="—"
+              aria-invalid={invalid || undefined}
+              aria-describedby={`cal-score-hint-${id}`}
+              className={cn(fieldCls, "w-full h-11 px-2 text-center font-condensed text-[22px] font-black tabular-nums",
+                scoreState === "invalid" && "border-[var(--status-danger)] bg-[var(--status-danger-bg)] focus:ring-[var(--status-danger)]/25",
+                scoreState === "dirty" && "border-[var(--status-warn)] bg-[var(--status-warn-bg)]",
+                scoreState === "saved" && "border-[var(--status-ok)] bg-[var(--status-ok-bg)]",
+                scoreState === "empty" && "border-dashed")}
+            />
+            <span id={`cal-score-hint-${id}`} className="block text-[12px] leading-tight font-semibold mt-1" aria-live="polite">{scoreHint}</span>
+          </div>
+        </div>
+
+        {(changedFromSaved || weightDirty) && (
+          <div className="mt-3 flex flex-col gap-2 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 duration-150">
+            {changedFromSaved && (
+              <button
+                data-testid={`button-save-cal-${id}`}
+                type="button"
+                disabled={isSaving || savingAll || invalid}
+                onClick={() => void saveCalibration(id)}
+                title="Salvar a nota calibrada (não publica)"
+                className={cn(btnSmall, "w-full bg-primary text-primary-foreground border-primary enabled:hover:bg-primary enabled:hover:opacity-90")}
+              >
+                {isSaving ? <><Loader2 size={14} className="animate-spin" aria-hidden /> Salvando…</> : <><Save size={14} aria-hidden /> Salvar nota calibrada</>}
+              </button>
+            )}
+            {weightDirty && (
+              <button
+                data-testid={`button-save-weight-${id}`}
+                type="button"
+                disabled={savingWeight}
+                onClick={() => saveWeight(id, c.active)}
+                title="Salvar peso"
+                className={cn(btnSmall, "w-full")}
+              >
+                {savingWeight ? <><Loader2 size={14} className="animate-spin" aria-hidden /> Salvando peso…</> : <><Check size={14} aria-hidden /> Salvar peso</>}
+              </button>
+            )}
+          </div>
+        )}
+
+        <PublishStatusCell
+          c={c}
+          cal={cal}
+          avg={avg}
+          isFinalPublished={!!c.finalPublishedAt}
+          canFinalize={canFinalize}
+          publishIntents={publishIntents}
+          setPublishIntents={setPublishIntents}
+        />
+      </div>
+
+      {/* Evidência e registro */}
+      <div className="min-w-0 @2xl:col-start-1 space-y-4">
+        <EvaluatorScores criterionId={id} members={members} avg={avg} tokens={tokens} setCalReasons={setCalReasons} />
+        <CalibrationReasonEditor
+          criterionId={id}
+          cal={cal}
+          calVal={calVal}
+          reasonVal={reasonVal}
+          reasonChanged={reasonChanged}
+          isSaving={isSaving}
+          savedReasonIds={savedReasonIds}
+          setSavedReasonIds={setSavedReasonIds}
+          setCalReasons={setCalReasons}
+          saveCalibration={saveCalibration}
+        />
+        <CalibrationAuditTrail criterionId={id} calAudit={calAudit} />
+        <CriterionComments
+          criterionId={id}
+          criterionName={name}
+          calComments={calComments}
+          newCommentTexts={newCommentTexts}
+          setNewCommentTexts={setNewCommentTexts}
+          canFinalize={canFinalize}
+          addCommentMutation={addCommentMutation}
+          deleteCommentMutation={deleteCommentMutation}
+          toast={toast}
+        />
+      </div>
+    </article>
+  );
 }

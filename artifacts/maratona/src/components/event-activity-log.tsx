@@ -1,20 +1,22 @@
+// Log de atividades do evento (avaliações, calibrações, comentários, matriz,
+// publicações), em linha do tempo. Usado na tela de Calibração.
 import { useState } from "react";
-import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History, ShieldCheck, Send } from "lucide-react";
+import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, ShieldCheck, Send, ChevronDown, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useGetEventActivityLog, getGetEventActivityLogQueryKey } from "@workspace/api-client-react";
-import { CONDENSED } from "@/lib/premium-theme";
-import { fmtNum } from "@/lib/utils";
+import { cn, fmtNum } from "@/lib/utils";
 import { displayCriterionName } from "@/lib/criterion-name";
 
-const KIND_CFG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  eval:          { icon: <Star size={9} />,            color: "#9ab000", bg: "rgba(154,176,0,0.14)" },
-  calibration:   { icon: <Sliders size={9} />,         color: "#6366f1", bg: "rgba(99,102,241,0.13)" },
-  cal_comment:   { icon: <MessagesSquare size={9} />,  color: "#e8a23d", bg: "rgba(232,162,61,0.14)" },
-  event_comment: { icon: <MessageSquare size={9} />,   color: "#64748b", bg: "rgba(100,116,139,0.14)" },
-  conformity:    { icon: <ShieldCheck size={9} />,     color: "#06b6d4", bg: "rgba(6,182,212,0.13)" },
-  audit:         { icon: <ClipboardCheck size={9} />,  color: "#94a3b8", bg: "rgba(148,163,184,0.13)" },
-  publish:       { icon: <Send size={9} />,            color: "#f59e0b", bg: "rgba(245,158,11,0.13)" },
-  publish_final: { icon: <Send size={9} />,            color: "#10b981", bg: "rgba(16,185,129,0.13)" },
+// Cor = tipo do registro (sempre junto do rótulo, nunca sozinha).
+const KIND_CFG: Record<string, { icon: React.ReactNode; tone: string }> = {
+  eval:          { icon: <Star size={12} />,           tone: "bg-[var(--status-ok-bg)] text-[var(--status-ok-text)]" },
+  calibration:   { icon: <Sliders size={12} />,        tone: "bg-[var(--status-info-bg)] text-[var(--status-info-text)]" },
+  cal_comment:   { icon: <MessagesSquare size={12} />, tone: "bg-secondary text-foreground" },
+  event_comment: { icon: <MessageSquare size={12} />,  tone: "bg-secondary text-foreground" },
+  conformity:    { icon: <ShieldCheck size={12} />,    tone: "bg-secondary text-foreground" },
+  audit:         { icon: <ClipboardCheck size={12} />, tone: "bg-secondary text-muted-foreground" },
+  publish:       { icon: <Send size={12} />,           tone: "bg-[var(--status-warn-bg)] text-[var(--status-warn-text)]" },
+  publish_final: { icon: <Send size={12} />,           tone: "bg-primary text-primary-foreground" },
 };
 
 function fmtDTShort(iso: string) {
@@ -29,7 +31,7 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
   const PAGE = 30;
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useGetEventActivityLog(eventId, {
+  const { data, isLoading, isError, refetch } = useGetEventActivityLog(eventId, {
     query: { queryKey: getGetEventActivityLogQueryKey(eventId), enabled: canView && expanded, staleTime: 30_000 },
   });
 
@@ -40,82 +42,62 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
   const hasMore = entries.length > visible.length;
 
   return (
-    <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+    <section className="rounded-2xl border border-border bg-card overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
-        className="w-full px-5 py-3 flex items-center gap-2 hover:opacity-80 transition-opacity"
-        style={{ borderBottom: expanded ? "1px solid var(--border)" : "none" }}
+        aria-expanded={expanded}
+        aria-controls={`activity-log-${eventId}`}
+        className="w-full min-h-12 px-5 py-3 flex items-center gap-2.5 text-left hover:bg-secondary/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <Activity size={16} style={{ color: "var(--accent-text)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
-          Log de Atividades
-        </span>
-        {data && (
-          <span className="ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-            style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-            {entries.length}
-          </span>
-        )}
-        <History size={12} className="ml-auto"
-          style={{ color: "var(--muted-foreground)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+        <Activity size={16} aria-hidden className="text-foreground" />
+        <span className="font-condensed text-[12px] font-bold uppercase tracking-[0.08em] leading-none text-foreground">Log de atividades</span>
+        {data && <span className="font-condensed text-[13px] font-bold tabular-nums text-muted-foreground">{entries.length}</span>}
+        <span className="hidden xl:inline text-[13px] text-muted-foreground">Tudo o que aconteceu no evento, do mais recente ao mais antigo</span>
+        <ChevronDown size={16} aria-hidden className={cn("ml-auto text-muted-foreground transition-transform duration-200", expanded && "rotate-180")} />
       </button>
 
       {expanded && (
-        <div className="p-4">
+        <div id={`activity-log-${eventId}`} className="border-t border-border px-5 py-4 motion-safe:animate-in motion-safe:fade-in-0 duration-150">
           {isLoading ? (
-            <p className="text-center text-xs py-6" style={{ color: "var(--muted-foreground)" }}>Carregando…</p>
+            <p className="flex items-center justify-center gap-2 text-[13px] py-6 text-muted-foreground"><Loader2 size={14} className="animate-spin" aria-hidden /> Carregando…</p>
+          ) : isError ? (
+            <p className="text-center text-[13px] py-6 text-muted-foreground">
+              Não foi possível carregar o log.{" "}
+              <button type="button" onClick={() => { void refetch(); }} className="font-semibold text-foreground underline underline-offset-2">Tentar de novo</button>
+            </p>
           ) : entries.length === 0 ? (
-            <p className="text-center text-xs py-6" style={{ color: "var(--muted-foreground)" }}>Nenhuma atividade registrada.</p>
+            <p className="text-center text-[13px] py-6 text-muted-foreground">Nenhuma atividade registrada.</p>
           ) : (
-            <div className="space-y-px">
+            <ol className="space-y-0">
               {visible.map((e, i) => {
                 const cfg = KIND_CFG[e.kind] ?? KIND_CFG.audit;
                 return (
-                  <div key={e.id} className="flex items-start gap-2.5 py-1.5 px-1 rounded hover:bg-secondary/50 transition-colors">
-                    <div className="flex flex-col items-center shrink-0 mt-0.5">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold shrink-0"
-                        style={{ backgroundColor: cfg.bg, color: cfg.color }}>
-                        {cfg.icon}
-                      </span>
-                      {i < visible.length - 1 && (
-                        <div className="w-px flex-1 mt-0.5" style={{ backgroundColor: "var(--border)", minHeight: 8 }} />
-                      )}
+                  <li key={e.id} className="flex items-start gap-3">
+                    <div className="flex flex-col items-center shrink-0 self-stretch">
+                      <span className={cn("w-7 h-7 rounded-full flex items-center justify-center", cfg.tone)} aria-hidden>{cfg.icon}</span>
+                      {i < visible.length - 1 && <span className="w-px flex-1 bg-border my-1 min-h-3" aria-hidden />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] font-black uppercase px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: cfg.bg, color: cfg.color }}>
-                          {e.label}
-                        </span>
-                        {e.userName && (
-                          <span className="text-[11px] font-bold truncate">{e.userName}</span>
-                        )}
-                        {e.criterionName && (
-                          <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>· {displayCriterionName(e.criterionName)}</span>
-                        )}
-                        {e.score != null && (
-                          <span className="text-[11px] font-black" style={{ color: cfg.color }}>→ {fmtNum(e.score, 2)}</span>
-                        )}
-                        <span className="ml-auto text-[11px] shrink-0 whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
-                          {fmtDTShort(e.createdAt)}
-                        </span>
+                    <div className="flex-1 min-w-0 pb-3.5">
+                      <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
+                        <span className="text-[13.5px] font-semibold text-foreground">{e.label}</span>
+                        {e.userName && <span className="text-[13px] text-foreground">{e.userName}</span>}
+                        {e.criterionName && <span className="text-[13px] text-muted-foreground">· {displayCriterionName(e.criterionName)}</span>}
+                        {e.score != null && <span className="font-condensed text-[15px] font-black tabular-nums text-foreground">→ {fmtNum(e.score, 2)}</span>}
+                        <span className="ml-auto text-[12px] text-muted-foreground whitespace-nowrap tabular-nums">{fmtDTShort(e.createdAt)}</span>
                       </div>
-                      {e.detail && (
-                        <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>"{e.detail}"</p>
-                      )}
+                      {e.detail && <p className="text-[13px] mt-0.5 leading-snug text-muted-foreground break-words">“{e.detail}”</p>}
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-              {hasMore && (
-                <button type="button" onClick={() => setPage(p => p + 1)}
-                  className="w-full text-center text-[11px] font-black uppercase py-2 mt-1 rounded hover:opacity-70 transition-opacity"
-                  style={{ color: "var(--muted-foreground)", border: "1px dashed var(--border)" }}>
-                  Ver mais ({entries.length - visible.length} restantes)
-                </button>
-              )}
-            </div>
+            </ol>
+          )}
+          {hasMore && (
+            <button type="button" onClick={() => setPage(p => p + 1)}
+              className="font-condensed w-full min-h-11 mt-1 rounded-lg border border-dashed border-border text-[13px] font-bold uppercase tracking-[0.05em] text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+              Ver mais · {entries.length - visible.length} restantes
+            </button>
           )}
         </div>
       )}

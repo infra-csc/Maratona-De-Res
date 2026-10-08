@@ -129,6 +129,9 @@ test("fluxo principal: avaliar, calibrar e confirmar o evento gera o bônus da c
     await expect(c2.getByTestId(`status-published-${CRITERIA[1].id}`)).toContainText("Não publicado");
     await expect(page.getByTestId("text-pending-publish")).toHaveText(/1 falta publicar/i);
     await page.getByTestId("button-publish-all").click();
+    // Confirmação mostra o que vai valer (critério, nota e parcial/final).
+    await expect(page.getByTestId("dialog-confirm-publish")).toContainText("Final");
+    await page.getByTestId("button-confirm-publish").click();
     await expect(page.getByText(/^Publicado/).first()).toBeVisible();
     await expect(page.getByTestId("text-pending-publish")).toHaveCount(0);
     await expect(c2.getByTestId("badge-criterion-pending-publish")).toHaveCount(0);

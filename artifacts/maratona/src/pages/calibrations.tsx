@@ -5,14 +5,16 @@ import { useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useAllPublicTokens } from "@/lib/routing-api";
-import { Target } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
 import { getCycleWeekends, weekendsEnd } from "@/lib/utils";
-import { CONDENSED, BODY, usePremiumTheme } from "@/lib/premium-theme";
+import { BODY } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
-import { calibrationEventChip, filterCalibratableEvents, getPickerPalette, SAVED_REASON_FEEDBACK_MS } from "./calibrations/helpers";
+import { filterCalibratableEvents, SAVED_REASON_FEEDBACK_MS } from "./calibrations/helpers";
 import { deriveCriteria, deriveDirtyState, eventScorePreview } from "./calibrations/derive";
-import { EventScoreStrip } from "./calibrations/event-score-strip";
+import { EventHero } from "./calibrations/event-hero";
+import { PublishConfirmDialog, type PublishItem } from "./calibrations/publish-confirm-dialog";
+import { CalibrationEmptyState, CalibrationLoading, CalibrationError, NoCriteria, DiscardEditsDialog } from "./calibrations/page-states";
+import { displayCriterionName } from "@/lib/criterion-name";
 import { useCalibrationSaveFlow } from "./calibrations/use-calibration-save-flow";
 import { useConformity } from "./calibrations/use-conformity";
 import { CalibrationHeader } from "./calibrations/calibration-header";
@@ -28,10 +30,8 @@ import type { EventPickerProps } from "./calibrations/event-picker";
 export default function CalibrationsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { isDark } = usePremiumTheme();
   const canFinalize = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
 
-  const pk = getPickerPalette(isDark);
   const qc = useQueryClient();
   const search = useSearch();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
@@ -62,6 +62,9 @@ export default function CalibrationsPage() {
   // Intenção de publicação por critério: "partial" | "final"
   const [publishIntents, setPublishIntents] = useState<Record<number, "partial" | "final">>({});
   const [publishingAll, setPublishingAll] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+  const [pendingSwitchId, setPendingSwitchId] = useState<number | null>(null);
+  function switchEvent(eventId: number) { setSelectedEventId(eventId); setCalScores({}); setCalReasons({}); setWeightEdits({}); }
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated" | "pendingPub">("all");
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [newCommentTexts, setNewCommentTexts] = useState<Record<number, string>>({});
@@ -69,12 +72,12 @@ export default function CalibrationsPage() {
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
-  const { data: events } = useGetEvents();
+  const { data: events, isLoading: eventsLoading, isError: eventsError, refetch: refetchEvents } = useGetEvents();
   const { data: cycle } = useGetCurrentCycle();
-  const { data: criteria } = useGetEventCriteria(selectedEventId!, {
+  const { data: criteria, isLoading: criteriaLoading, isError: criteriaError, refetch: refetchCriteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["ec", selectedEventId] as unknown[] },
   });
-  const { data: evaluations } = useGetEvaluations(
+  const { data: evaluations, isLoading: evaluationsLoading, isError: evaluationsError, refetch: refetchEvaluations } = useGetEvaluations(
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: ["evals", selectedEventId] as unknown[] } }
   );
@@ -84,7 +87,7 @@ export default function CalibrationsPage() {
   const deleteCommentMutation = useDeleteCalibrationComment(selectedEventId ?? 0);
 
   const calQKey = getGetCalibrationsQueryKey({ eventId: selectedEventId ?? undefined });
-  const { data: calibrations } = useGetCalibrations(
+  const { data: calibrations, isLoading: calibrationsLoading, isError: calibrationsError, refetch: refetchCalibrations } = useGetCalibrations(
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: calQKey } }
   );
@@ -220,17 +223,20 @@ export default function CalibrationsPage() {
   const feedbackReleasedAtDate = feedback?.feedbackReleasedAt ? new Date(feedback.feedbackReleasedAt) : null;
   const partialPublishedAtDate = feedback?.partialPublishedAt ? new Date(feedback.partialPublishedAt) : null;
 
-  const currentPubBadge = pickedEvent ? calibrationEventChip(pickedEvent) : null;
-
   const pickerProps: EventPickerProps = {
-    pk,
     eventPickerOpen,
+    eventsLoading,
     setEventPickerOpen,
     calibratableEvents,
     filteredCalibratableEvents,
     pickedEvent,
     selectedEventId,
-    onSelectEvent: (eventId: number) => { setSelectedEventId(eventId); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); },
+    onSelectEvent: (eventId: number) => {
+      setEventPickerOpen(false);
+      // Trocar de evento descarta o que foi digitado e não salvo: pergunta antes.
+      if (eventId !== selectedEventId && totalDirtyCount > 0) { setPendingSwitchId(eventId); return; }
+      switchEvent(eventId);
+    },
     eventStatusFilter,
     setEventStatusFilter,
     eventSearchText,
@@ -282,104 +288,134 @@ export default function CalibrationsPage() {
     setPublishIntents,
   };
 
+  // Publicar: confirmação com o que vai valer. Se há algo digitado e não salvo
+  // (ou nada calibrado), o próprio fluxo orienta com o aviso de sempre.
+  const calibratedForPublish = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
+  const publishItems: PublishItem[] = calibratedForPublish.map(c => {
+    const cal = getCalibration(c.criterionId);
+    return { id: c.criterionId, name: displayCriterionName(c.criterionName), score: cal?.calibratedScore ?? null, intent: publishIntents[c.criterionId] ?? "partial", pending: !!cal?.pendingPublish };
+  });
+  function onPublishClick() {
+    if (unsavedEditsCount > 0 || calibratedForPublish.length === 0) { void handlePublishAll(); return; }
+    setPublishConfirmOpen(true);
+  }
+  async function confirmPublish() {
+    await handlePublishAll();
+    setPublishConfirmOpen(false);
+  }
+
+  // Nota oficial só existe depois de publicar (parcial ou final): antes disso o
+  // número do feedback é uma conta com o rascunho e não vale para ninguém.
+  const hasPublication = !!pickedEvent && (!!pickedEvent.isHistorical || (pickedEvent.finalCalibratedCriteria ?? 0) > 0 || (pickedEvent.partialPublishedCount ?? 0) > 0);
+  const teamCount = fullEvent?.participants ? fullEvent.participants.filter(p => p.confirmed !== false && p.countsForScore !== false).length : null;
+  const eventDataLoading = !!selectedEventId && (criteriaLoading || calibrationsLoading || evaluationsLoading);
+  const eventDataError = !!selectedEventId && (criteriaError || calibrationsError || evaluationsError);
+  const retryEventData = () => { void refetchCriteria(); void refetchCalibrations(); void refetchEvaluations(); };
+  const pendingSwitchEvent = pendingSwitchId != null ? calibratableEvents.find(e => e.id === pendingSwitchId) : undefined;
+
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+    <div className="min-h-full bg-background text-foreground" style={{ fontFamily: BODY }}>
+      <CalibrationHeader pickerProps={pickerProps} cycleName={cycle?.name ?? null} />
 
-      {/* ── COMPACT STICKY HEADER ── */}
-      <CalibrationHeader
-        pickerProps={pickerProps}
-        showPubBadge={!!(pickedEvent && currentPubBadge)}
-        alreadyReleased={alreadyReleased}
-        allCriteriaFinalPublished={allCriteriaFinalPublished}
-        partialPublishedAtDate={partialPublishedAtDate}
-        feedbackReleasedAtDate={feedbackReleasedAtDate}
-        pendingCount={pendingCount}
-      />
-
-      <div className="p-4">
-        {/* ── PLACEHOLDER: nenhum evento selecionado ── */}
+      <div className="px-4 md:px-6 py-5 md:py-6">
         {!selectedEventId && (
-          <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl" style={{ border: "1px dashed var(--border)" }}>
-            <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-5" style={{ backgroundColor: "var(--secondary)" }}>
-              <Target style={{ color: "var(--muted-foreground)" }} size={32} />
-            </div>
-            <h2 data-testid="text-page-title" className="text-xl font-black uppercase tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>Área de Calibração</h2>
-            <p className="text-sm max-w-sm" style={{ color: "var(--muted-foreground)" }}>Use o seletor no topo para escolher um evento e calibrar os critérios.</p>
-          </div>
+          eventsError
+            ? <CalibrationError title="Não foi possível carregar os eventos" onRetry={() => { void refetchEvents(); }} />
+            : <CalibrationEmptyState events={calibratableEvents} loading={eventsLoading} onOpenPicker={() => setEventPickerOpen(true)} onSelect={pickerProps.onSelectEvent} />
         )}
 
-        {selectedEventId && (
-        <div className="flex flex-col lg:flex-row gap-4 items-start">
-
-          {/* ── RIGHT SIDEBAR: Context always visible ── */}
-          <CalibrationSidebar
-            selectedEventId={selectedEventId}
-            pickedEvent={pickedEvent}
-            feedback={feedback}
-            fullEvent={fullEvent}
-            teamPanelOpen={teamPanelOpen}
-            setTeamPanelOpen={setTeamPanelOpen}
-            conformityState={conformityState}
-            eventComments={eventComments}
-          />
-
-          {/* ── LEFT COLUMN: Calibrations table ── */}
-          {/* w-full: na coluna (celular) com items-start, sem largura a coluna crescia até a largura da tabela e o "Publicar" saía da tela. */}
-          <div className="w-full flex-1 min-w-0 space-y-3 lg:order-1">
-
-            {/* ── COMPACT ACTION BAR ── */}
-          {displayActiveCriteria.length === 0 ? (
-            <div className="rounded-xl text-center py-10 font-bold uppercase text-sm" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
-              Nenhum critério ativo para este evento.
-            </div>
-          ) : (
-            <>
-              <CalibrationActionBar
-                autoFillableCount={autoFillableCriteria.length}
-                canFinalize={canFinalize}
-                savingAutoFill={savingAutoFill}
-                savingAll={savingAll}
-                publishingAll={publishingAll}
-                autoFillFromEvaluator={autoFillFromEvaluator}
-                finalPublishedCount={finalPublishedCount}
-                scorableCount={scorableActiveCriteria.length}
-                criterionFilter={criterionFilter}
-                setCriterionFilter={setCriterionFilter}
-                alreadyReleased={alreadyReleased}
-                allCriteriaFinalPublished={allCriteriaFinalPublished}
+        {selectedEventId && pickedEvent && (
+          <div className="space-y-5">
+          {/* Grade própria: a coluna de contexto fica presa só enquanto os critérios rolam. */}
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px] items-start">
+            {/* Coluna principal: evento, barra de trabalho e critérios */}
+            <div className="min-w-0 space-y-4">
+              <EventHero
+                event={pickedEvent}
+                teamCount={teamCount}
+                average={eventScore.average}
+                calibrated={eventScore.calibrated}
+                feedback={feedback}
+                hasPublication={hasPublication}
+                finalReleased={alreadyReleased || allCriteriaFinalPublished}
                 feedbackReleasedAtDate={feedbackReleasedAtDate}
                 partialPublishedAtDate={partialPublishedAtDate}
-                totalDirtyCount={totalDirtyCount}
-                unsavedEditsCount={unsavedEditsCount}
-                pendingPublishCount={pendingPublishCount}
-                handleSaveAll={handleSaveAll}
-                handlePublishAll={handlePublishAll}
+                dataState={eventDataError ? "error" : eventDataLoading ? "loading" : "ready"}
               />
 
-              <EventScoreStrip average={eventScore.average} calibrated={eventScore.calibrated} />
+              {eventDataError ? (
+                <CalibrationError title="Não foi possível carregar os critérios deste evento" onRetry={retryEventData} />
+              ) : eventDataLoading ? (
+                <CalibrationLoading />
+              ) : displayActiveCriteria.length === 0 ? (
+                <NoCriteria eventId={selectedEventId} />
+              ) : (
+                <>
+                  <CalibrationActionBar
+                    autoFillableCount={autoFillableCriteria.length}
+                    canFinalize={canFinalize}
+                    savingAutoFill={savingAutoFill}
+                    savingAll={savingAll}
+                    publishingAll={publishingAll}
+                    autoFillFromEvaluator={autoFillFromEvaluator}
+                    finalPublishedCount={finalPublishedCount}
+                    scorableCount={scorableActiveCriteria.length}
+                    totalCount={displayActiveCriteria.length}
+                    calibratedCount={displayActiveCriteria.length - pendingCount}
+                    totalDirtyCount={totalDirtyCount}
+                    pendingPublishCount={pendingPublishCount}
+                    handleSaveAll={handleSaveAll}
+                    onPublishClick={onPublishClick}
+                  />
+                  <CriteriaTable
+                    filteredActiveCriteria={filteredActiveCriteria}
+                    displayActiveCount={displayActiveCriteria.length}
+                    calibratedCount={displayActiveCriteria.length - pendingCount}
+                    pendingPublishCount={pendingPublishCount}
+                    rowProps={rowProps}
+                    criterionFilter={criterionFilter}
+                    setCriterionFilter={setCriterionFilter}
+                    autoFillableCount={autoFillableCriteria.length}
+                    canAutoFill={canFinalize}
+                    autoFillBusy={savingAutoFill || savingAll || publishingAll}
+                    savingAutoFill={savingAutoFill}
+                    onAutoFill={() => { void autoFillFromEvaluator(); }}
+                  />
+                </>
+              )}
+            </div>
 
-              {/* ── CRITERIA TABLE ── */}
-              <CriteriaTable
-                filteredActiveCriteria={filteredActiveCriteria}
-                displayActiveCount={displayActiveCriteria.length}
-                rowProps={rowProps}
-              />
+            {/* Contexto: equipe, Matriz de Conformidade, comentários do evento */}
+            <CalibrationSidebar
+              selectedEventId={selectedEventId}
+              fullEvent={fullEvent}
+              teamPanelOpen={teamPanelOpen}
+              setTeamPanelOpen={setTeamPanelOpen}
+              conformityState={conformityState}
+              eventComments={eventComments}
+            />
 
-
-            </>
-          )}
-          </div>{/* end left column */}
-        </div>
-        )}
-
-        {selectedEventId && (
-          <div className="mt-4">
+          </div>
             <EventActivityLog eventId={selectedEventId} />
           </div>
         )}
-
       </div>
 
+      <PublishConfirmDialog
+        open={publishConfirmOpen}
+        onOpenChange={setPublishConfirmOpen}
+        publishing={publishingAll}
+        items={publishItems}
+        eventName={pickedEvent?.name}
+        onConfirm={() => { void confirmPublish(); }}
+      />
+      <DiscardEditsDialog
+        open={pendingSwitchId != null}
+        count={totalDirtyCount}
+        targetName={pendingSwitchEvent?.name}
+        onCancel={() => setPendingSwitchId(null)}
+        onConfirm={() => { if (pendingSwitchId != null) switchEvent(pendingSwitchId); setPendingSwitchId(null); }}
+      />
     </div>
   );
 }

@@ -1,8 +1,10 @@
 // Justificativa da calibração (editável), com indicadores "Salvo"/"Não salvo"
 // e auto-save ao perder o foco quando já existe calibração.
 import type React from "react";
-import { AlertCircle, Check, Clock, Save } from "lucide-react";
-import { AMBER, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
+import { AlertCircle, Check, Loader2, Save } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Eyebrow, btnSmall } from "../evaluations/ui";
+import { fieldCls } from "./cal-ui";
 import { fmtCalScore, formatDateTime } from "./helpers";
 import type { CalibrationRecord } from "./derive";
 
@@ -19,97 +21,69 @@ export type CalibrationReasonEditorProps = {
   saveCalibration: (critId: number) => Promise<void>;
 };
 
+function grow(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
 export function CalibrationReasonEditor({
-  criterionId,
-  cal,
-  calVal,
-  reasonVal,
-  reasonChanged,
-  isSaving,
-  savedReasonIds,
-  setSavedReasonIds,
-  setCalReasons,
-  saveCalibration,
+  criterionId, cal, calVal, reasonVal, reasonChanged, isSaving, savedReasonIds, setSavedReasonIds, setCalReasons, saveCalibration,
 }: CalibrationReasonEditorProps) {
+  const fieldId = `cal-reason-${criterionId}`;
+  const justSaved = savedReasonIds.has(criterionId) && !reasonChanged;
   return (
-                              <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[11px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)" }} title={cal ? "Calibração salva: só vale para o colaborador depois de publicada" : undefined}>{cal ? "Calibração salva" : "Calibração"}</span>
-                                  {cal?.calibratedByName && (
-                                    <span className="text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
-                                  )}
-                                  {calVal != null && (
-                                    <span className="text-[11px] font-black" style={{ color: GOOD_TEXT }}>→ {fmtCalScore(calVal)}</span>
-                                  )}
-                                  {cal?.calibratedAt && (
-                                    <span className="text-[11px] flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }}>
-                                      <Clock size={8} /> {formatDateTime(new Date(cal.calibratedAt))}
-                                    </span>
-                                  )}
-                                  {/* ── Indicador de salvo ── */}
-                                  {savedReasonIds.has(criterionId) && !reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[11px] font-black uppercase" style={{ color: GOOD_TEXT }}>
-                                      <Check size={9} /> Salvo
-                                    </span>
-                                  )}
-                                  {/* ── Indicador de não salvo ── */}
-                                  {reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[11px] font-black uppercase" style={{ color: AMBER_TEXT }}>
-                                      <AlertCircle size={9} /> Não salvo
-                                    </span>
-                                  )}
-                                </div>
-                                <textarea
-                                  data-testid={`input-cal-reason-inline-${criterionId}`}
-                                  rows={1}
-                                  value={reasonVal}
-                                  onClick={e => e.stopPropagation()}
-                                  onChange={e => {
-                                    setSavedReasonIds(prev => { const n = new Set(prev); n.delete(criterionId); return n; });
-                                    setCalReasons(prev => ({ ...prev, [criterionId]: e.target.value }));
-                                    e.target.style.height = "auto";
-                                    e.target.style.height = e.target.scrollHeight + "px";
-                                  }}
-                                  onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-                                  onBlur={e => {
-                                    e.stopPropagation();
-                                    // Auto-save ao perder foco quando há uma calibração existente e razão mudou.
-                                    // O indicador "Salvo" é ligado por saveCalibration só após sucesso.
-                                    if (reasonChanged && cal && !isSaving) {
-                                      void saveCalibration(criterionId);
-                                    }
-                                  }}
-                                  placeholder="Escreva a justificativa e clique fora para salvar…"
-                                  className="w-full px-2 py-1.5 text-[11px] rounded resize-none leading-snug overflow-hidden transition-colors focus:outline-none"
-                                  style={{
-                                    border: reasonChanged ? `1px solid ${AMBER}` : "1px solid var(--border)",
-                                    backgroundColor: reasonChanged ? "rgba(232,162,61,0.08)" : reasonVal ? "rgba(154,176,0,0.06)" : "var(--secondary)",
-                                    color: "var(--foreground)",
-                                  }}
-                                />
-                                {/* Ação manual quando não há calibração ainda ou usuário quer salvar explicitamente */}
-                                {reasonChanged && (
-                                  <div className="mt-1 flex items-center gap-2">
-                                    {cal ? (
-                                      <button
-                                        type="button"
-                                        disabled={isSaving}
-                                        onClick={e => {
-                                          e.stopPropagation();
-                                          void saveCalibration(criterionId);
-                                        }}
-                                        className="px-2.5 py-1 rounded font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1"
-                                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                      >
-                                        <Save size={10} /> Salvar justificativa
-                                      </button>
-                                    ) : (
-                                      <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}>
-                                        <AlertCircle size={10} /> Salve a nota calibrada primeiro para gravar a justificativa.
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+    <div>
+      <div className="flex items-center gap-2 mb-2 min-h-5">
+        <Eyebrow as="span"><label htmlFor={fieldId}>Justificativa da calibração</label></Eyebrow>
+        <span className="ml-auto text-[12px] font-semibold" aria-live="polite">
+          {isSaving ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 size={12} className="animate-spin" aria-hidden /> Salvando…</span>
+          ) : reasonChanged ? (
+            <span className="inline-flex items-center gap-1 text-[var(--status-warn-text)]"><AlertCircle size={12} aria-hidden /> Não salvo</span>
+          ) : justSaved ? (
+            <span className="inline-flex items-center gap-1 text-[var(--status-ok-text)] motion-safe:animate-in motion-safe:fade-in-0 duration-200"><Check size={12} aria-hidden /> Salvo</span>
+          ) : null}
+        </span>
+      </div>
+      <textarea
+        id={fieldId}
+        data-testid={`input-cal-reason-inline-${criterionId}`}
+        rows={2}
+        value={reasonVal}
+        onChange={e => {
+          setSavedReasonIds(prev => { const n = new Set(prev); n.delete(criterionId); return n; });
+          setCalReasons(prev => ({ ...prev, [criterionId]: e.target.value }));
+          grow(e.target);
+        }}
+        onFocus={e => grow(e.target)}
+        onBlur={() => {
+          // Auto-save ao perder foco quando há uma calibração existente e razão mudou.
+          // O indicador "Salvo" é ligado por saveCalibration só após sucesso.
+          if (reasonChanged && cal && !isSaving) void saveCalibration(criterionId);
+        }}
+        placeholder={cal ? "Por que a nota foi calibrada? Salva sozinha ao sair do campo." : "Por que a nota foi calibrada?"}
+        className={cn(fieldCls, "w-full min-h-[64px] px-3 py-2.5 text-[14px] leading-relaxed resize-none overflow-hidden",
+          reasonChanged && "border-[var(--status-warn)] bg-[var(--status-warn-bg)]")}
+      />
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {cal ? (
+          <p className="text-[12.5px] text-muted-foreground" title="Calibração salva: só vale para o colaborador depois de publicada">
+            <span className="font-semibold text-foreground">Calibração salva</span>
+            {cal.calibratedByName && <> · {cal.calibratedByName}</>}
+            {calVal != null && <> <span className="font-semibold text-foreground tabular-nums">→ {fmtCalScore(calVal)}</span></>}
+            {cal.calibratedAt && <> · {formatDateTime(new Date(cal.calibratedAt))}</>}
+          </p>
+        ) : reasonChanged ? (
+          <p className="text-[12.5px] text-muted-foreground inline-flex items-center gap-1.5">
+            <AlertCircle size={13} aria-hidden /> Salve a nota calibrada para gravar a justificativa junto.
+          </p>
+        ) : null}
+        {reasonChanged && cal && (
+          <button type="button" disabled={isSaving} onClick={() => void saveCalibration(criterionId)} className={cn(btnSmall, "ml-auto")}>
+            <Save size={14} aria-hidden /> Salvar justificativa
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
