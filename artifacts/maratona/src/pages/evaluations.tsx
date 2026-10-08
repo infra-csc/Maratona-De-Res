@@ -801,7 +801,53 @@ export default function EvaluationsPage() {
 
               <div className="space-y-8 min-w-0">
                 {/* Critérios */}
+                {(() => {
+                  // Matriz de Conformidade junto com o formulário da área (Cenografia / Ferramentas).
+                  const ferramentasNode = isFerramentasEvaluatorForEvent ? (
+                  <FerramentasConformitySection
+                      conformityEvalForm={conformityEvalForm}
+                      setConformityEvalForm={setConformityEvalForm}
+                      myConformityData={myConformityData}
+                      ferramentasPublicTokenHistory={ferramentasPublicTokenHistory}
+                      ferramentasUsers={ferramentasUsers}
+                      redirectOpen={redirectFerramentasOpen}
+                      onRedirectOpenChange={setRedirectFerramentasOpen}
+                      redirectTargetId={redirectFerramentasTargetId}
+                      onRedirectSelect={(userId) => { setRedirectFerramentasTargetId(userId); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                      onOpenLinkDialog={() => openConformityLinkDialog("ferramentas")}
+                      saveConformity={saveConformity}
+                      isSaving={conformityEvalMutation.isPending}
+                      toast={toast}
+                    />
+                  ) : null;
+                  const cenografiaNode = isConformityEvaluatorForEvent ? (
+                  <CenografiaConformitySection
+                      conformityEvalForm={conformityEvalForm}
+                      setConformityEvalForm={setConformityEvalForm}
+                      myConformityData={myConformityData}
+                      conformityPublicTokenHistory={conformityPublicTokenHistory}
+                      cenografiaUsers={cenografiaUsers}
+                      redirectOpen={redirectConformityOpen}
+                      onRedirectOpenChange={setRedirectConformityOpen}
+                      redirectTargetId={redirectConformityTargetId}
+                      onRedirectSelect={(userId) => { setRedirectConformityTargetId(userId); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                      onOpenLinkDialog={() => openConformityLinkDialog("cenografia")}
+                      saveConformity={saveConformity}
+                      isSaving={conformityEvalMutation.isPending}
+                      toast={toast}
+                      withoutConduta={withoutConduta}
+                      answeredByOther={cenografiaAnsweredByOther}
+                    />
+                  ) : null;
+                  const groupAreas = new Set(myAreaGroups.map(g => g.areaId));
+                  const matrixByArea = new Map<number, React.ReactNode>();
+                  const orphans: React.ReactNode[] = [];
+                  if (cenografiaNode) { if (groupAreas.has(CENOGRAFIA_AREA_ID)) matrixByArea.set(CENOGRAFIA_AREA_ID, cenografiaNode); else orphans.push(<div key="ceno">{cenografiaNode}</div>); }
+                  if (ferramentasNode) { if (groupAreas.has(FERRAMENTAS_AREA_ID)) matrixByArea.set(FERRAMENTAS_AREA_ID, ferramentasNode); else orphans.push(<div key="ferr">{ferramentasNode}</div>); }
+                  return (
                 <CriteriaColumn
+                  matrixByArea={matrixByArea}
+                  matrixOrphans={orphans.length > 0 ? <>{orphans}</> : undefined}
                   myCriteria={myCriteria}
                   myAreaGroups={myAreaGroups}
                   areaMode={areaMode}
@@ -825,46 +871,9 @@ export default function EvaluationsPage() {
                   onDiscardDraft={handleDiscardDraft}
                   isDiscarding={discardDraft.isPending}
                 />
+                  );
+                })()}
 
-                {/* ─── GRUPO 1: Ferramentas e Case (Cenografia) ─── */}
-                {isFerramentasEvaluatorForEvent && (
-                  <FerramentasConformitySection
-                    conformityEvalForm={conformityEvalForm}
-                    setConformityEvalForm={setConformityEvalForm}
-                    myConformityData={myConformityData}
-                    ferramentasPublicTokenHistory={ferramentasPublicTokenHistory}
-                    ferramentasUsers={ferramentasUsers}
-                    redirectOpen={redirectFerramentasOpen}
-                    onRedirectOpenChange={setRedirectFerramentasOpen}
-                    redirectTargetId={redirectFerramentasTargetId}
-                    onRedirectSelect={(userId) => { setRedirectFerramentasTargetId(userId); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
-                    onOpenLinkDialog={() => openConformityLinkDialog("ferramentas")}
-                    saveConformity={saveConformity}
-                    isSaving={conformityEvalMutation.isPending}
-                    toast={toast}
-                  />
-                )}
-
-                {/* ─── GRUPO 2: Cenografia ─── */}
-                {isConformityEvaluatorForEvent && (
-                  <CenografiaConformitySection
-                    conformityEvalForm={conformityEvalForm}
-                    setConformityEvalForm={setConformityEvalForm}
-                    myConformityData={myConformityData}
-                    conformityPublicTokenHistory={conformityPublicTokenHistory}
-                    cenografiaUsers={cenografiaUsers}
-                    redirectOpen={redirectConformityOpen}
-                    onRedirectOpenChange={setRedirectConformityOpen}
-                    redirectTargetId={redirectConformityTargetId}
-                    onRedirectSelect={(userId) => { setRedirectConformityTargetId(userId); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
-                    onOpenLinkDialog={() => openConformityLinkDialog("cenografia")}
-                    saveConformity={saveConformity}
-                    isSaving={conformityEvalMutation.isPending}
-                    toast={toast}
-                    withoutConduta={withoutConduta}
-                    answeredByOther={cenografiaAnsweredByOther}
-                  />
-                )}
               </div>
 
               {/* Resumo (lado direito quando cabe; senão, depois do formulário) */}

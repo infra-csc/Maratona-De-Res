@@ -11,7 +11,8 @@ import { getCycleWeekends, weekendsEnd } from "@/lib/utils";
 import { CONDENSED, BODY, usePremiumTheme } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 import { calibrationEventChip, filterCalibratableEvents, getPickerPalette, SAVED_REASON_FEEDBACK_MS } from "./calibrations/helpers";
-import { deriveCriteria, deriveDirtyState } from "./calibrations/derive";
+import { deriveCriteria, deriveDirtyState, eventScorePreview } from "./calibrations/derive";
+import { EventScoreStrip } from "./calibrations/event-score-strip";
 import { useCalibrationSaveFlow } from "./calibrations/use-calibration-save-flow";
 import { useConformity } from "./calibrations/use-conformity";
 import { CalibrationHeader } from "./calibrations/calibration-header";
@@ -134,6 +135,13 @@ export default function CalibrationsPage() {
   const { pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount } =
     deriveDirtyState({ displayActiveCriteria, getCalibration, calScores, calReasons, weightEdits, publishIntents });
   const scoredCriteria = displayActiveCriteria.filter(c => getAvgScore(c.criterionId) != null);
+  // Nota do evento (média das avaliações e, se houver, com a calibração).
+  const eventScore = eventScorePreview({
+    criteria: displayActiveCriteria,
+    getMembers,
+    calibrationOf: id => { const v = getCalibration(id)?.calibratedScore; return v != null ? Number(v) : null; },
+    pendingScore,
+  });
   // Auto-preenche calibrações para critérios que têm nota do avaliador mas ainda
   // não têm calibração — útil após importar avaliações via formulário.
   const autoFillableCriteria = scoredCriteria.filter(c => !getCalibration(c.criterionId));
@@ -347,6 +355,8 @@ export default function CalibrationsPage() {
                 handleSaveAll={handleSaveAll}
                 handlePublishAll={handlePublishAll}
               />
+
+              <EventScoreStrip average={eventScore.average} calibrated={eventScore.calibrated} />
 
               {/* ── CRITERIA TABLE ── */}
               <CriteriaTable

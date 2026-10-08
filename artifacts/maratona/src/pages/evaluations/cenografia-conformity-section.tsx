@@ -68,7 +68,7 @@ export function CenografiaConformitySection({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 px-1">
         <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-          <ShieldAlert size={22} /> Cenografia
+          <ShieldAlert size={22} /> Matriz de Conformidade
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
           <ConformityRedirectPopover
@@ -255,7 +255,7 @@ function CenografiaReadOnly({ data, items, answeredBy, history }: {
   return (
     <div className="space-y-4">
       <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2 px-1" style={{ fontFamily: CONDENSED }}>
-        <ShieldAlert size={22} /> Cenografia
+        <ShieldAlert size={22} /> Matriz de Conformidade
       </h3>
       <div className="flex items-start gap-3 rounded-xl border border-border bg-secondary px-4 py-3">
         <Lock size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />

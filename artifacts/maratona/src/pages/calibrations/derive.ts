@@ -150,3 +150,42 @@ export function deriveDirtyState(params: {
 
   return { pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount };
 }
+
+/**
+ * Nota do evento na Calibração (0–100), com a MESMA conta do servidor
+ * (mergeEventScopedCriteria + calculateEventResult): por critério com peso,
+ * a média das ÁREAS que avaliaram; média ponderada pelos pesos × 10.
+ *  - `average`: só as avaliações enviadas;
+ *  - `calibrated`: com a calibração (a digitada agora ou a salva) no lugar da
+ *    nota de cada área — o que a nota vira se a calibração for publicada.
+ * Antes do desconto da Matriz de Conformidade (vale só na nota oficial).
+ */
+export function eventScorePreview(params: {
+  criteria: { criterionId: number; weightOverride?: number | string | null; originalWeight?: number | string | null }[];
+  getMembers: (critId: number) => { criterionId: number; avg: number | null }[];
+  calibrationOf: (critId: number) => number | null;
+  pendingScore: (critId: number) => number | null;
+}): { average: number | null; calibrated: number | null; hasCalibration: boolean } {
+  let avgW = 0, avgSum = 0, calW = 0, calSum = 0, hasCalibration = false;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  for (const c of params.criteria) {
+    const w = Number(c.weightOverride ?? c.originalWeight ?? 0);
+    if (!(w > 0)) continue;
+    const members = params.getMembers(c.criterionId);
+    const typed = params.pendingScore(c.criterionId);
+    const avgs = members.map(m => m.avg).filter((v): v is number => v != null);
+    if (avgs.length > 0) { avgSum += mean(avgs) * w; avgW += w; }
+    const used = members.map(m => {
+      const cal = typed ?? params.calibrationOf(m.criterionId);
+      if (cal != null) hasCalibration = true;
+      return cal ?? m.avg;
+    }).filter((v): v is number => v != null);
+    if (used.length > 0) { calSum += mean(used) * w; calW += w; }
+  }
+  const r = (x: number) => Math.round(x * 10 * 100) / 100;
+  return {
+    average: avgW > 0 ? r(avgSum / avgW) : null,
+    calibrated: hasCalibration && calW > 0 ? r(calSum / calW) : null,
+    hasCalibration,
+  };
+}

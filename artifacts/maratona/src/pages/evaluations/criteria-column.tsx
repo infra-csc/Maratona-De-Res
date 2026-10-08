@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Evaluation, EventCriterion, MyAreaCriterion } from "@workspace/api-client-react";
 import { Building2, Flag, Target, CornerDownRight, Link2, Users } from "lucide-react";
 import { CONDENSED } from "@/lib/premium-theme";
@@ -26,6 +27,14 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
   closingEval: (criterionId: number) => Evaluation | undefined;
   onRedirectArea: (group: AreaGroup) => void;
   onOpenPublicLink: (group: AreaGroup, areaEligible: number[]) => void;
+  /**
+   * Matriz de Conformidade DENTRO do formulário (dono, 07/10: "tem que ser
+   * junto, para a pessoa ver que tem que avaliar tudo"): por área do
+   * formulário (Cenografia → matriz da Cenografia; Ferramentas → guarda de
+   * equipamentos). A de uma área sem critério para mim vem em `matrixOrphans`.
+   */
+  matrixByArea?: Map<number, ReactNode>;
+  matrixOrphans?: ReactNode;
 }
 
 // Coluna "Critérios de Avaliação": formulários por área com os cartões de
@@ -34,6 +43,7 @@ export function CriteriaColumn({
   myCriteria, myAreaGroups, areaMode, publicLinkEligibleCriteria, criterionAssignments, sharedCriterionIds, comments,
   getEval, currentScore, currentAudio, isSaving, progressPct, criterionInfo, closingEval, onRedirectArea, onOpenPublicLink,
   onScoreClick, onCommentChange, onAudioChange, onSaveDraft, onDiscardDraft, isDiscarding,
+  matrixByArea, matrixOrphans,
 }: CriteriaColumnProps) {
   return (
     <div className="space-y-4">
@@ -43,7 +53,7 @@ export function CriteriaColumn({
         </h3>
       </div>
 
-      {myCriteria.length === 0 ? (
+      {myCriteria.length === 0 && !matrixOrphans ? (
         <div data-testid="notice-no-area-criteria" className="text-center py-12 bg-card border border-border rounded-lg px-6">
           <div className="w-14 h-14 border border-border rounded-lg bg-secondary text-muted-foreground flex items-center justify-center mx-auto mb-4">
             <Building2 size={24} />
@@ -123,9 +133,15 @@ export function CriteriaColumn({
                       />
                     );
                   })}
+                  {matrixByArea?.get(g.areaId) && (
+                    <div data-testid={`form-matrix-${g.areaId}`} className="pt-8 border-t border-dashed border-border">
+                      {matrixByArea.get(g.areaId)}
+                    </div>
+                  )}
                 </div>
               );
             })}
+            {matrixOrphans}
           </div>
 
           {/* Sprint goal footer */}
