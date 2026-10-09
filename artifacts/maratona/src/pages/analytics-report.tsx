@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { useCycleScope } from "@/components/cycle-select";
-import { useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey, type AnalyticsOverview } from "@workspace/api-client-react";
+import { useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey, useGetRankingTotal, getGetRankingTotalQueryKey, type AnalyticsOverview } from "@workspace/api-client-react";
 import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
 import { EmptyState, LoadingState } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { fmtDate, fmtNum } from "@/lib/utils";
+import { cn, fmtDate, fmtNum } from "@/lib/utils";
+import { faixaBonusSplit } from "@/lib/faixa-bonus-split";
+import { btnGhost, btnPrimary } from "./events/events-ui";
 import { bonusSplit } from "@/lib/bonus-split";
 import { funnelSteps } from "@/lib/bonus-funnel";
 import { displayCriterionName } from "@/lib/criterion-name";
@@ -117,7 +119,7 @@ function summaryLines(d: AnalyticsOverview): string[] {
   out.push(`${plural(k.eligible, isAll ? "participação elegível" : "pessoa elegível", isAll ? "participações elegíveis" : "pessoas elegíveis")} ao bônus e ${plural(k.withBonus, "com bônus", "com bônus")}${closed || isAll ? "" : " hoje"}, somando ${bonusSplit(k, brl, { label: "", detail: "" }).sentence}. ${plural(k.reachedMinEvents, isAll ? "participação atingiu" : "pessoa atingiu", isAll ? "participações atingiram" : "pessoas atingiram")} ${/^\d+$/.test(minText) ? `o mínimo de ${minText} eventos` : minText}.`);
   const weakest = d.criteria[0];
   const strongest = d.criteria[d.criteria.length - 1];
-  if (weakest && strongest && weakest !== strongest) out.push(`Critério mais fraco: ${weakest.name} (${n1(weakest.avgScore)}); mais forte: ${strongest.name} (${n1(strongest.avgScore)}).`);
+  if (weakest && strongest && weakest !== strongest && Math.abs(strongest.avgScore - weakest.avgScore) >= 0.05) out.push(`Critério mais fraco: ${displayCriterionName(weakest.name)}${weakest.area ? ` (${weakest.area})` : ""}, ${n1(weakest.avgScore)}; mais forte: ${displayCriterionName(strongest.name)}${strongest.area ? ` (${strongest.area})` : ""}, ${n1(strongest.avgScore)}.`);
   const worst = [...d.conformity].filter(c => c.naoPct != null && c.nao > 0).sort((a, b) => (b.naoPct ?? 0) - (a.naoPct ?? 0))[0];
   if (worst) out.push(`Na matriz de conformidade, "${worst.label}" teve mais "Não": ${n1(worst.naoPct)}% das respostas.`);
   if (k.avgCalibrationShift != null) out.push(`A calibração moveu as notas em média ${k.avgCalibrationShift > 0 ? "+" : ""}${n1(k.avgCalibrationShift)} ${Math.abs(k.avgCalibrationShift) === 1 ? "ponto" : "pontos"} em ${plural(k.calibratedCriteria, "critério", "critérios")}.`);
@@ -169,21 +171,26 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
   const firstPaying = paying[0];
   const maxTrend = Math.max(1, ...data.scoreTrend.map(t => t.avgScore));
   const maxFaixa = Math.max(1, ...data.faixas.map(f => f.count));
+  // Bônus por faixa: oficial (ciclo fechado) × projetado (ciclo aberto), nunca numa coluna só.
+  const isAllScope = data.scope?.kind === "all";
+  const closedScope = !isAllScope && data.scope?.status === "closed";
+  const rankingTotal = useGetRankingTotal({ query: { queryKey: getGetRankingTotalQueryKey(), staleTime: 60_000, enabled: isAllScope } });
+  const split = isAllScope ? faixaBonusSplit(rankingTotal.data, data.faixas) : null;
 
   return (
-    <div className="px-4 md:px-6 py-6" style={{ fontFamily: BODY }}>
+    <div className="px-4 md:px-6 py-5 md:py-6" style={{ fontFamily: BODY }}>
       {/* Barra de ações (fora do papel) */}
-      <div className="no-print max-w-[860px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href={backHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
+      <div className="no-print max-w-[860px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-2">
+        <Link href={backHref} className={btnGhost}>
           <ArrowLeft size={14} aria-hidden /> Voltar para Análises
         </Link>
         <div className="flex items-center gap-3">
-          <span className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>Na janela de impressão, escolha "Salvar como PDF".</span>
-          <Button onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} aria-hidden /> Imprimir / salvar PDF</Button>
+          <span className="hidden md:inline text-[12.5px] text-muted-foreground">Na janela de impressão, escolha "Salvar como PDF".</span>
+          <button type="button" onClick={() => window.print()} data-testid="button-print-report" className={cn(btnPrimary, "min-h-11 lg:min-h-9 px-3.5 text-[13px]")}><Printer size={15} aria-hidden /> Imprimir / salvar PDF</button>
         </div>
       </div>
 
-      <article className="max-w-[860px] mx-auto rounded-xl px-6 md:px-10 py-8 space-y-8" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} data-testid="analytics-report">
+      <article className="max-w-[860px] mx-auto rounded-2xl border border-border bg-card px-5 md:px-10 py-8 space-y-8 print:border-0 print:p-0" data-testid="analytics-report">
         {/* Cabeçalho do documento */}
         <header className="space-y-2 pb-4" style={{ borderBottom: "2px solid var(--foreground)" }}>
           <p className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.12em", color: "var(--accent-text)" }}>Maratona de Resultados · Relatório do ciclo</p>
@@ -222,7 +229,7 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
           <Table head={["Fim de semana", "Nota média", "Eventos"]} rows={data.scoreTrend.map(t => [t.label, <span key="v"><Bar value={t.avgScore} max={maxTrend} />{n1(t.avgScore)}</span>, t.events])} />
         </Section>
 
-        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada quando existe; senão, média dos avaliadores. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) aparece uma vez por área; na nota do evento as duas entram pela média.">
+        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada quando existe; senão, média dos avaliadores. Critério avaliado por várias áreas aparece numa linha só (área “Todas as áreas”), com a média das áreas — como entra na nota do evento.">
           <Table head={["Critério", "Área", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]} align={["l", "l", "r", "r", "r", "r"]}
             rows={data.criteria.map(c => [displayCriterionName(c.name), c.area ?? "—", <span key="v"><Bar value={c.avgScore} max={100} />{n1(c.avgScore)}</span>, n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])} />
         </Section>
@@ -231,9 +238,17 @@ function Report({ data, backHref }: { data: AnalyticsOverview; backHref: string 
           <Table head={["Item", "Respostas", "Não", "% Não"]} rows={data.conformity.map(c => [c.label, c.answered, c.nao, c.naoPct == null ? "—" : `${n1(c.naoPct)}%`])} />
         </Section>
 
-        <Section title="Faixas e bônus" lead="Onde cada colaborador do ranking está hoje e o bônus projetado dos elegíveis." breakBefore>
-          <Table head={["Faixa", "Nota", "Colaboradores", "Bônus projetado"]} align={["l", "r", "r", "r"]}
-            rows={data.faixas.map(f => [f.name, f.minScore != null ? `${lim(f.minScore)}–${lim(f.maxScore)}` : "—", <span key="v"><Bar value={f.count} max={maxFaixa} />{f.count}</span>, f.bonusTotal > 0 ? brl(f.bonusTotal) : "—"])} />
+        <Section title="Faixas e bônus" breakBefore
+          lead={isAllScope ? "Resultados de todos os ciclos por faixa (cada pessoa conta uma vez por ciclo) e o bônus dos elegíveis: oficial (ciclos fechados) e projetado (ciclo aberto), separados."
+            : closedScope ? "Em que faixa cada colaborador do ranking terminou o ciclo e o bônus oficial dos elegíveis."
+            : "Onde cada colaborador do ranking está hoje e o bônus projetado dos elegíveis (muda até o fechamento)."}>
+          {isAllScope && split ? (
+            <Table head={["Faixa", "Nota", "Participações", "Bônus oficial", "Bônus projetado"]} align={["l", "r", "r", "r", "r"]}
+              rows={data.faixas.map(f => { const s = split.get(f.name); return [f.name, f.minScore != null ? `${lim(f.minScore)}–${lim(f.maxScore)}` : "—", <span key="v"><Bar value={f.count} max={maxFaixa} />{f.count}</span>, s && s.official > 0 ? brl(s.official) : "—", s && s.projected > 0 ? brl(s.projected) : "—"]; })} />
+          ) : (
+            <Table head={["Faixa", "Nota", isAllScope ? "Participações" : "Colaboradores", isAllScope ? "Bônus (oficial + projetado)" : closedScope ? "Bônus oficial" : "Bônus projetado"]} align={["l", "r", "r", "r"]}
+              rows={data.faixas.map(f => [f.name, f.minScore != null ? `${lim(f.minScore)}–${lim(f.maxScore)}` : "—", <span key="v"><Bar value={f.count} max={maxFaixa} />{f.count}</span>, f.bonusTotal > 0 ? brl(f.bonusTotal) : "—"])} />
+          )}
           {(() => {
             const isAll = data.scope?.kind === "all";
             const funnel = funnelSteps(data.funnel, { isAll, minEvents: isAll ? null : k.minEvents });

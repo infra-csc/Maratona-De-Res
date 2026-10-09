@@ -4,9 +4,8 @@ import {
   useGetScoreTimeline, getGetScoreTimelineQueryKey,
   type EventsReport, type QuarterlyResult, type RankingDetail,
 } from "@workspace/api-client-react";
-import { ArrowRight, Award, AlertTriangle, CalendarClock, History, Info, ListChecks, Table2, TrendingUp, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { EmptyState, LoadingState, StatTile, StatusBadge } from "@/components/shared";
+import { ArrowRight, Award, AlertTriangle, CalendarClock, History, Info, ListChecks, TrendingUp, Trophy } from "lucide-react";
+import { btnSmall } from "../dashboard/dashboard-ui";
 import { CONDENSED, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
 import {
@@ -14,7 +13,8 @@ import {
   type CriterionCompare, type Faixa, type Impact, type PersonEvent,
 } from "./derive";
 import { CriteriaDumbbell, EventsChart, EvolutionChart, FaixaRuler, TeamStrip, entryTitle, type ScaleMarker } from "./charts";
-import { Card, FaixaChip, SmallLabel } from "./ui";
+import { BlockSkeleton, Card, EmptyState, FaixaChip, KpiStrip, SmallLabel, StatTile, StatusBadge, TH_CLS } from "./ui";
+import { Segmented } from "../calibrations/cal-ui";
 
 const dmy = (iso: string | null | undefined) => (iso ? fmtDate(iso.slice(0, 10), { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
@@ -81,7 +81,7 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
   return (
     <div className="space-y-5" data-testid="person-analysis">
       {/* ── Identidade + nota + régua ── */}
-      <section className="rounded-xl p-4 sm:p-6 flex flex-col gap-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} aria-label="Resumo do colaborador">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 flex flex-col gap-5" aria-label="Resumo do colaborador">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <SmallLabel>{[detail.employee.functionName, detail.employee.department].filter(Boolean).join(" · ") || "Colaborador"}</SmallLabel>
@@ -139,7 +139,7 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
       </section>
 
       {/* ── Indicadores ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <KpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         <StatTile label="Média bruta" value={n1(gross)} detail={s.scoreSum != null ? `Soma ${fmtNum(s.scoreSum, 2)} ÷ ${plural(n, "evento", "eventos")}` : storedOnly ? "Gravada no ciclo" : "Sem evento na nota"} />
         <StatTile label="Eventos participados" data-testid="person-participated"
           value={<>{participated ?? "—"}<span className="text-[16px] font-bold" style={{ color: "var(--muted-foreground)" }}> / {minEvents ?? "—"}</span></>}
@@ -150,10 +150,10 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
           detail={s.penaltyPoints > 0 ? (impact.verified ? `${signed(-impact.lostPoints)} na nota final` : plural(detail.penalties.length, "lançamento", "lançamentos")) : "Nenhuma no ciclo"} />
         <StatTile label="Méritos" value={<span style={{ color: s.meritPoints > 0 ? GOOD_TEXT : undefined }}>{s.meritPoints > 0 ? `+${pts(s.meritPoints)}` : "0"}</span>}
           detail={s.meritPoints > 0 ? (impact.verified ? `${signed(impact.gainedPoints)} na nota final` : plural(detail.merits.length, "lançamento", "lançamentos")) : "Nenhum no ciclo"} />
-        <StatTile label="Bônus do ciclo" value={bd ? brl(bd.totalValue) : brl(s.bonusValue ?? null)}
+        <StatTile label={past ? "Bônus do ciclo" : "Bônus projetado"} value={bd ? brl(bd.totalValue) : brl(s.bonusValue ?? null)}
           detail={bd ? (bd.applied ? `${brl(bd.baseValue)} base + ${brl(bd.extraValue)} extra` : eligible === false ? "Não elegível" : "Faixa sem bônus") : undefined} />
         <StatTile label="Posição" value={rank ? `${rank.position}º` : "—"} detail={rank ? `de ${rank.total} no ranking` : "Fora do ranking do ciclo"} />
-      </div>
+      </KpiStrip>
 
       {/* ── Conta + custo das penalidades ── */}
       <div className="grid gap-5 lg:grid-cols-2 items-start">
@@ -169,10 +169,10 @@ export function PersonView({ detail, rows, faixas, minEvents: minEventsOverview,
         <LaunchesCard detail={detail} n={n} />
         <Card title="Critérios nos eventos dele" subtitle="Média de cada critério nos eventos confirmados de que participou, comparada com todos os eventos confirmados do ciclo. A nota do critério é do time do evento, não só dele.">
           {reportLoading ? (
-            <LoadingState lines={4} label="Carregando os critérios" />
+            <BlockSkeleton label="Carregando os critérios" />
           ) : reportError || !report ? (
             <EmptyState compact icon={AlertTriangle} title="Não foi possível carregar os critérios" description="O relatório por evento não respondeu. Tente de novo em instantes."
-              action={<Button variant="outline" size="sm" onClick={onRetryReport}>Tentar de novo</Button>} />
+              action={<button type="button" className={btnSmall} onClick={onRetryReport}>Tentar de novo</button>} />
           ) : criteria.length === 0 ? (
             <EmptyState compact icon={ListChecks} title="Sem critérios avaliados" description="Nenhum evento dele com critérios avaliados e resultados confirmados." />
           ) : (
@@ -365,12 +365,9 @@ function EventsCard({ events, counted, teamEventAvg, faixas, name, launchesByEve
     <Card
       title="Nota evento a evento"
       subtitle="Nota oficial de cada evento confirmado que entrou na nota dele, em ordem de data, e como a média foi se formando."
-      action={events.length > 0 ? (
-        <button type="button" onClick={() => setShowTable(v => !v)} aria-pressed={showTable}
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", fontFamily: CONDENSED }}>
-          <Table2 size={13} aria-hidden /> {showTable ? "Ver gráfico" : "Ver tabela"}
-        </button>
+      action={events.length > 0 && counted.length > 0 ? (
+        <Segmented<"grafico" | "tabela"> size="sm" label="Ver os eventos como" value={showTable ? "tabela" : "grafico"} onChange={v => setShowTable(v === "tabela")}
+          options={[{ value: "grafico", label: "Gráfico", testId: "person-events-chart" }, { value: "tabela", label: "Tabela", testId: "person-events-table" }]} />
       ) : undefined}
     >
       {events.length === 0 ? (
@@ -427,12 +424,11 @@ function Highlight({ label, value, detail, color }: { label: string; value: stri
 function EventsTable({ events, launchesByEvent }: { events: PersonEvent[]; launchesByEvent: Map<string, { pen: number; mer: number }> }) {
   return (
     <div className="overflow-x-auto -mx-1">
-      <table className="w-full text-[12.5px] min-w-[640px]">
+      <table className="w-full text-[13.5px] min-w-[640px]">
         <thead>
           <tr>
             {["Data", "Evento", "Nota", "Faixa do evento", "Matriz", "Média até aqui", "Situação"].map((h, i) => (
-              <th key={h} className={`py-2 px-2 text-[11px] font-bold uppercase whitespace-nowrap ${i >= 2 && i <= 5 && i !== 3 ? "text-right" : "text-left"}`}
-                style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>{h}</th>
+              <th key={h} scope="col" className={`${TH_CLS} text-muted-foreground ${i >= 2 && i <= 5 && i !== 3 ? "text-right" : "text-left"}`}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -586,7 +582,7 @@ function TeamCompareCard({ detail, rows, faixas, teamAvg, onPick, n, final, part
         <thead>
           <tr>
             {["", "Ele", "Média da equipe", "Diferença"].map((h, i) => (
-              <th key={i} className={`py-2 px-2 text-[11px] font-bold uppercase ${i === 0 ? "text-left" : "text-right"}`} style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>{h}</th>
+              <th key={i} scope="col" className={`${TH_CLS} text-muted-foreground ${i === 0 ? "text-left" : "text-right"}`}>{h || <span className="sr-only">Indicador</span>}</th>
             ))}
           </tr>
         </thead>
@@ -628,14 +624,15 @@ function EvolutionCard({ employeeId, name, final, faixas, cycleId }: { employeeI
       title="Evolução da nota final"
       subtitle="A nota depois de cada mudança no ciclo: evento que entrou, penalidade, mérito, publicação de calibração. Linhas pontilhadas: início de cada faixa."
       action={cycleId ? undefined :
-        <Link href={`/linha-do-tempo?colaborador=${employeeId}`} className="shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <Link href={`/linha-do-tempo?colaborador=${employeeId}`} className="shrink-0 inline-flex items-center gap-1.5 min-h-11 lg:min-h-8 px-3 rounded-lg text-[12.5px] tracking-[0.05em] font-bold uppercase transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={{ border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: CONDENSED }} data-testid="link-person-timeline">
           <History size={13} aria-hidden /> Linha do tempo
         </Link>
       }
     >
-      {q.isLoading ? <LoadingState lines={4} label="Carregando a evolução" /> : q.isError ? (
-        <EmptyState compact icon={TrendingUp} title="Não foi possível carregar a evolução" description="Tente de novo em instantes." />
+      {q.isLoading ? <BlockSkeleton label="Carregando a evolução" /> : q.isError ? (
+        <EmptyState compact icon={TrendingUp} title="Não foi possível carregar a evolução" description="Tente de novo em instantes."
+          action={<button type="button" className={btnSmall} onClick={() => void q.refetch()}>Tentar de novo</button>} />
       ) : entries.length === 0 ? (
         <EmptyState compact icon={TrendingUp} title="Ainda sem mudanças registradas" description="A evolução aparece quando um evento entrar na nota ou houver lançamento." />
       ) : (

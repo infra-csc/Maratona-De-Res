@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import type { QuarterlyResult } from "@workspace/api-client-react";
-import { ChevronRight, Search, SearchX, Users } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { EmptyState, StatTile, StatusBadge } from "@/components/shared";
+import { Link } from "wouter";
+import { ArrowRight, ChevronRight, SearchX, Users } from "lucide-react";
+import { SearchField, btnSecondary } from "../results/results-ui";
 import { CONDENSED, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { brl, impactOfRow, mean, n1, plural, pts, signed, type Faixa, type Impact } from "./derive";
 import { TeamStrip } from "./charts";
-import { Card, FaixaChip, Pill } from "./ui";
+import { Card, EmptyState, FaixaChip, KpiStrip, Pill, StatTile, StatusBadge, TH_BTN, TH_CLS } from "./ui";
 
 type Filter = "todos" | "penalidade" | "merito" | "faixa" | "elegiveis";
 type SortKey = "pos" | "name" | "faixa" | "final" | "gross" | "events" | "penalty" | "merit" | "lost" | "bonus";
@@ -94,19 +94,20 @@ export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: 
     : { key, dir: key === "name" || key === "pos" ? 1 : -1 });
 
   if (all.length === 0) {
-    return <EmptyState icon={Users} title="Ninguém no ranking deste ciclo ainda" description="A análise por colaborador aparece quando houver eventos com resultados confirmados e o ciclo for recalculado." />;
+    return <EmptyState icon={Users} title="Ninguém no ranking deste ciclo ainda" description="A análise por colaborador aparece quando houver eventos com resultados confirmados e o ciclo for recalculado."
+      action={readOnly ? undefined : <Link href="/evaluations" className={btnSecondary}>Acompanhar as avaliações <ArrowRight size={15} aria-hidden /></Link>} />;
   }
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="person-team-kpis">
+      <KpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" data-testid="person-team-kpis">
         <StatTile hero label="Nota média" value={n1(teamAvg)} detail={`${plural(all.length, "colaborador", "colaboradores")} no ranking`} />
         <StatTile label="Com penalidade" value={withPenalty.length} detail={withPenalty.length ? `${pts(penaltyPts)} pontos lançados no total` : "Nenhuma penalidade no ciclo"} />
         <StatTile label="Faixa perdida por penalidade" value={lostFaixa.length} detail={lostFaixa.length ? "Sem as penalidades, estariam numa faixa acima" : "Ninguém mudou de faixa por penalidade"} />
         <StatTile label="Com mérito" value={counts.merito} detail="Ganharam pontos por mérito" />
         <StatTile label="Elegíveis ao bônus" value={`${eligible.length}/${all.length}`} detail={minEvents != null ? `Mínimo de ${minEvents} eventos participados` : "Mínimo de eventos indisponível"} />
         <StatTile label={readOnly ? "Bônus do ciclo" : "Bônus projetado"} value={brl(bonusTotal)} detail={bonusLost > 0 ? `${brl(bonusLost)} a menos por penalidades` : "Nenhum real perdido por penalidades"} />
-      </div>
+      </KpiStrip>
 
       <Card title="A equipe numa linha" subtitle="Cada ponto é uma pessoa, pela nota final do ciclo; o fundo mostra as faixas e a linha tracejada, a média da equipe. Clique num ponto para abrir a análise.">
         <TeamStrip people={all.map(r => ({ id: r.q.employeeId, name: r.q.employeeName, final: r.q.finalResult, color: r.q.platoonColor ?? null }))}
@@ -121,10 +122,7 @@ export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: 
         subtitle="Nota, eventos, penalidades, méritos e bônus de cada um no ciclo (valores do último recálculo). O efeito das penalidades é quanto a nota final subiria sem elas."
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="relative w-full sm:w-[280px]">
-            <Search size={14} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-            <Input aria-label="Buscar colaborador" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar pelo nome…" className="h-9 pl-8" data-testid="input-person-search" />
-          </div>
+          <SearchField value={q} onChange={setQ} label="Buscar colaborador" placeholder="Buscar pelo nome…" testId="input-person-search" className="w-full sm:w-[280px]" />
           <div role="group" aria-label="Filtrar" className="flex flex-wrap gap-1.5">
             {([
               ["todos", "Todos"], ["penalidade", "Com penalidade"], ["merito", "Com mérito"], ["faixa", "Perderam faixa"], ["elegiveis", "Elegíveis"],
@@ -140,7 +138,7 @@ export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: 
           <>
             {/* Tabela: telas largas */}
             <div className="hidden lg:block overflow-x-auto -mx-1">
-              <table className="w-full text-[13px]" data-testid="table-person-team">
+              <table className="w-full text-[13.5px]" data-testid="table-person-team">
                 <thead>
                   <tr>
                     {([
@@ -151,15 +149,14 @@ export function TeamView({ rows, faixas, minEvents, onPick, readOnly = false }: 
                       const active = sort.key === key;
                       return (
                         <th key={key} aria-sort={active ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
-                          className={`py-2 px-2 text-[11px] font-bold uppercase whitespace-nowrap ${align === "right" ? "text-right" : "text-left"}`}
-                          style={{ fontFamily: CONDENSED, color: active ? "var(--foreground)" : "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
-                          <button type="button" onClick={() => toggle(key)} className={`inline-flex items-center gap-1 uppercase font-bold hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded ${align === "right" ? "flex-row-reverse" : ""}`}>
-                            {label}<span aria-hidden className="text-[10px]">{active ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
+                          scope="col" className={`${TH_CLS} ${active ? "text-foreground" : "text-muted-foreground"} ${align === "right" ? "text-right" : "text-left"}`}>
+                          <button type="button" onClick={() => toggle(key)} className={`${TH_BTN} ${align === "right" ? "flex-row-reverse" : ""}`}>
+                            {label}<span aria-hidden className="text-[10px] opacity-70">{active ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
                           </button>
                         </th>
                       );
                     })}
-                    <th className="w-8" style={{ borderBottom: "1px solid var(--border)" }}><span className="sr-only">Abrir</span></th>
+                    <th className="w-8 border-b border-border"><span className="sr-only">Abrir</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -248,7 +245,7 @@ const Dash = () => <span style={{ color: "var(--muted-foreground)" }}>—</span>
 function MiniStat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10.5px] font-bold uppercase truncate" style={{ fontFamily: CONDENSED, letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>{label}</dt>
+      <dt className="font-condensed text-[11.5px] font-bold uppercase tracking-[0.06em] truncate text-muted-foreground">{label}</dt>
       <dd className="font-bold tabular-nums truncate" style={{ color }}>{value}</dd>
     </div>
   );
