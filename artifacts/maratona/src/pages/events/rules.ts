@@ -174,7 +174,11 @@ export function filterAndSortEvents(all: EventItem[], { search, filterDateFrom, 
 }
 
 /** Badge de status; `next` = destino do próximo passo quando indica uma pendência acionável. */
-export type EventBadge = { bg: string; fg: string; label: string; title?: string; next?: { href: string; title: string } };
+export type EventBadge = {
+  bg: string; fg: string; label: string; title?: string; next?: { href: string; title: string };
+  /** Tom do selo no sistema visual (Chip): a cor sempre vem junto do texto. */
+  tone: "neutral" | "ok" | "warn" | "danger" | "info";
+};
 
 /** Valores derivados de um evento para desenhar a linha da tabela (e o cartão no celular). */
 /**
@@ -265,26 +269,26 @@ export function deriveEventRow(ev: EventItem, todayStr: string = todayBR(), cycl
   // usava outra fórmula e eventos com "Pub. Final" sumiam do filtro.
   // `next` = destino do próximo passo quando o badge indica uma pendência acionável.
   const badge: EventBadge = ev.isHistorical || isPubFinal(ev)
-    ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Pub. Final" }
+    ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Pub. Final", tone: "ok" }
     : nextCycle
-    ? { bg: "var(--status-info-bg)", fg: INFO_TEXT, label: NEXT_CYCLE_BADGE, title: NEXT_CYCLE_NOTICE }
+    ? { bg: "var(--status-info-bg)", fg: INFO_TEXT, label: NEXT_CYCLE_BADGE, title: NEXT_CYCLE_NOTICE, tone: "info" }
     : notOpenYet
-    ? { bg: "var(--status-info-bg)", fg: INFO_TEXT, label: `Abre em ${opensLabel}`, title: `A avaliação abre sozinha em ${opensOn ? fmtEventDate(opensOn, todayStr, true) : opensLabel}, o dia seguinte ao evento. Não depende do RH.` }
+    ? { bg: "var(--status-info-bg)", fg: INFO_TEXT, label: `Abre em ${opensLabel}`, title: `A avaliação abre sozinha em ${opensOn ? fmtEventDate(opensOn, todayStr, true) : opensLabel}, o dia seguinte ao evento. Não depende do RH.`, tone: "info" }
     : pendingRH
-    ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Aguardando RH", next: { href: evaluationsHref, title: "Aguardando RH: a avaliação já devia ter aberto — confira os critérios (pesos) e os avaliadores em Avaliações" } }
+    ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Aguardando RH", next: { href: evaluationsHref, title: "Aguardando RH: a avaliação já devia ter aberto — confira os critérios (pesos) e os avaliadores em Avaliações" }, tone: "danger" }
         : partialOnlyCount > 0
-          ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Pub. Parcial" }
+          ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Pub. Parcial", tone: "warn" }
           : (calSaved > 0 || fc)
-            ? { bg: "rgba(91,141,239,0.14)", fg: INFO_TEXT, label: "Rascunho" }
+            ? { bg: "rgba(91,141,239,0.14)", fg: INFO_TEXT, label: "Rascunho", tone: "info" }
           : concluded
-            ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Concluído" }
+            ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Concluído", tone: "ok" }
             : evalDone === evalTotal && evalTotal > 0
-              ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Avaliado" }
+              ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Avaliado", tone: "ok" }
               : missing.length > 0
-                ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Sem Avaliador", next: { href: evaluationsHref, title: `Sem avaliador em: ${missing.join(", ")}. Atribuir em Avaliações` } }
+                ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Sem Avaliador", next: { href: evaluationsHref, title: `Sem avaliador em: ${missing.join(", ")}. Atribuir em Avaliações` }, tone: "danger" }
                 : evalDone > 0 || evalTotal > 0
-                  ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Em Avaliação" }
-                  : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
+                  ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Em Avaliação", tone: "warn" }
+                  : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando", tone: "neutral" };
 
   return {
     score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,

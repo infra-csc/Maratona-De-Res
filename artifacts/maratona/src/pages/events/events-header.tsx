@@ -1,6 +1,9 @@
-// Cabeçalho da tela: título, seletor de ciclo, contadores rápidos e botões de ação.
+// Topo da tela (o único h1, seletor de ciclo e ações) e o panorama do ciclo:
+// quantos eventos, quantos abertos e o que falta publicar — num relance.
 import type { ReactNode } from "react";
-import { CONDENSED, AMBER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
+import { ArrowRight, CalendarCog } from "lucide-react";
+import { cn, plural } from "@/lib/utils";
+import { Eyebrow, FOCUS_RING, btnGhost, surfaceCls } from "./events-ui";
 import { hasPartialPublication, isPubFinal, type CycleEventCounts } from "./rules";
 import type { EventItem } from "./types";
 
@@ -9,10 +12,6 @@ type EventsHeaderProps = {
   title?: string;
   /** Seletor de ciclo (atual, anteriores e Total geral). */
   cycleSlot: ReactNode;
-  /** Todos os eventos do ciclo (sem filtro), base dos contadores. */
-  events: EventItem[];
-  /** Contagens pela regra única (countCycleEvents): total, fora do período e abertos — as mesmas de Ciclos e da Central. */
-  counts: CycleEventCounts;
   /** Só admin vê "Unificar Datas". */
   showNormalize: boolean;
   normalizePending: boolean;
@@ -21,56 +20,141 @@ type EventsHeaderProps = {
   children?: ReactNode;
 };
 
-export function EventsHeader({ title = "Eventos do Ciclo", cycleSlot, events: all, counts, showNormalize, normalizePending, onNormalizePreview, children }: EventsHeaderProps) {
+/**
+ * Topo fixo no tablet e no desktop, como em Avaliações, Calibração e Central:
+ * título, ciclo e as ações da tela.
+ */
+export function EventsHeader({ title = "Eventos do Ciclo", cycleSlot, showNormalize, normalizePending, onNormalizePreview, children }: EventsHeaderProps) {
   return (
-    <div className="px-4 sm:px-6 py-4 flex items-center gap-x-5 gap-y-3 shrink-0 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
-      <div className="shrink-0">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] block" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Gerenciar</span>
-        <h1 data-testid="text-page-title" className="font-black uppercase text-2xl tracking-tight leading-none mt-0.5" style={{ fontFamily: CONDENSED }}>{title}</h1>
-      </div>
-
-      <div className="w-full sm:w-auto shrink-0">{cycleSlot}</div>
-
-      {/* Quick stats — no celular, 4 colunas iguais na largura toda (antes a
-          faixa passava da tela e cortava "Pub. Final"). */}
-      <div className="grid w-full grid-cols-4 rounded-lg border py-2 sm:flex sm:w-auto sm:shrink-0 sm:items-stretch sm:rounded-none sm:border-y-0 sm:border-r-0 sm:py-0 sm:pl-5"
-        style={{ borderColor: "var(--border)" }}>
-        {[
-          {
-            val: counts.stored, label: "Eventos", color: "var(--foreground)", testId: "events-stat-total",
-            note: counts.afterEnd > 0 ? `${counts.afterEnd} fora do período` : null,
-            title: counts.afterEnd > 0 ? `${counts.stored} na lista: ${counts.inPeriod} do período do ciclo e ${counts.afterEnd} fora do período (do próximo ciclo)` : undefined,
-          },
-          {
-            val: counts.open, label: "Abertos", color: "var(--accent-text)", testId: "events-stat-open", note: null,
-            title: "Abertos: ainda não fechados, do período do ciclo e com a avaliação já aberta (a partir do dia seguinte ao fim do evento) — a mesma conta de Ciclos e da Central de Avaliações",
-          },
-          { val: all.filter(e => hasPartialPublication(e)).length, label: "Pub. Parcial", color: AMBER_TEXT, testId: "events-stat-partial", note: null, title: undefined },
-          { val: all.filter(e => isPubFinal(e)).length, label: "Pub. Final", color: GOOD_TEXT, testId: "events-stat-final", note: null, title: undefined },
-        ].map((s, i) => (
-          <div key={i} data-testid={s.testId} title={s.title} className="min-w-0 px-1 sm:px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
-            <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
-            <span className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>{s.label}</span>
-            {s.note && <span className="block text-[10px] leading-tight mt-0.5" style={{ color: "var(--muted-foreground)" }}>({s.note})</span>}
-          </div>
-        ))}
-      </div>
-
-      {/* Action buttons */}
-      <div className="ml-auto flex items-center gap-2.5 shrink-0">
-        {showNormalize && (
-          <button
-            onClick={onNormalizePreview}
-            title="Mostra a prévia das datas que mudariam antes de aplicar"
-            disabled={normalizePending}
-            className="h-9 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors disabled:opacity-50 hover:opacity-80"
-            style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
-          >
-            {normalizePending ? "..." : "Unificar Datas"}
-          </button>
-        )}
-        {children}
-      </div>
+    <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 lg:flex lg:gap-5">
+      <h1 data-testid="text-page-title" className="order-1 min-w-0 font-condensed text-[24px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground truncate">
+        {title}
+      </h1>
+      <div className="order-3 col-span-2 lg:order-2 w-full lg:w-auto min-w-0">{cycleSlot}</div>
+      {(showNormalize || children) && (
+        <div className="order-2 lg:order-3 lg:ml-auto flex items-center gap-1.5 lg:gap-2 shrink-0">
+          {showNormalize && (
+            <button
+              type="button"
+              onClick={onNormalizePreview}
+              title="Unificar datas: mostra a prévia das datas que mudariam antes de aplicar"
+              aria-label="Unificar datas"
+              disabled={normalizePending}
+              aria-busy={normalizePending || undefined}
+              className={cn(btnGhost, "px-2.5 sm:px-3")}
+            >
+              <CalendarCog size={16} aria-hidden />
+              <span className="hidden sm:inline">{normalizePending ? "Verificando…" : "Unificar datas"}</span>
+            </button>
+          )}
+          {children}
+        </div>
+      )}
     </div>
+  );
+}
+
+type CellTone = "neutral" | "ok" | "warn" | "info";
+const VALUE_TONE: Record<CellTone, string> = {
+  neutral: "text-foreground",
+  ok: "text-[var(--status-ok-text)]",
+  warn: "text-[var(--status-warn-text)]",
+  info: "text-[var(--status-info-text)]",
+};
+
+/** Uma célula do panorama. Com `onClick` vira atalho para o filtro (aria-pressed). */
+function Cell({ label, value, sub, tone = "neutral", onClick, pressed, testId, title, className }: {
+  label: ReactNode; value: ReactNode; sub: ReactNode; tone?: CellTone;
+  onClick?: () => void; pressed?: boolean; testId?: string; title?: string; className?: string;
+}) {
+  const body = (
+    <>
+      <Eyebrow as="span" className={cn("block", pressed && "text-foreground")}>{label}</Eyebrow>
+      <span className={cn("mt-2 block font-condensed text-[28px] lg:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums", VALUE_TONE[tone])}>{value}</span>
+      <span className="mt-1.5 hidden sm:block text-[12.5px] leading-snug text-muted-foreground">{sub}</span>
+      {onClick && (
+        <span className={cn("mt-2 hidden sm:inline-flex items-center gap-1 font-condensed text-[12px] font-bold uppercase tracking-[0.06em]", pressed ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
+          {pressed ? "Filtro ativo · limpar" : "Filtrar a lista"}
+          <ArrowRight size={12} aria-hidden className="transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
+        </span>
+      )}
+    </>
+  );
+  const cls = cn("min-w-0 bg-card px-4 py-3.5 lg:px-5 lg:py-4 text-left", className);
+  if (!onClick) return <div data-testid={testId} title={title} className={cls}>{body}</div>;
+  return (
+    <button type="button" data-testid={testId} title={title} onClick={onClick} aria-pressed={pressed}
+      className={cn(cls, "group transition-colors duration-150 hover:bg-secondary/50", pressed && "bg-secondary/70 hover:bg-secondary/70", FOCUS_RING, "focus-visible:ring-inset focus-visible:ring-offset-0")}>
+      {body}
+    </button>
+  );
+}
+
+/**
+ * Panorama do ciclo: total (com os de fora do período), abertos e a situação da
+ * publicação. As três últimas células filtram a lista pelo chip equivalente.
+ */
+export function EventsPanorama({ events: all, counts, cardFilter, setCardFilter }: {
+  /** Todos os eventos do ciclo (sem filtro), base dos contadores. */
+  events: EventItem[];
+  /** Contagens pela regra única (countCycleEvents): as mesmas de Ciclos e da Central. */
+  counts: CycleEventCounts;
+  cardFilter: string | null;
+  setCardFilter: (v: string | null) => void;
+}) {
+  const pendingPub = all.filter(e => (e.pendingPublishCount ?? 0) > 0).length;
+  const partial = all.filter(e => hasPartialPublication(e)).length;
+  const final = all.filter(e => isPubFinal(e)).length;
+  const toggle = (key: string) => setCardFilter(cardFilter === key ? null : key);
+  return (
+    <section aria-label="Panorama do ciclo" className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 lg:grid-cols-5 gap-px bg-border")}>
+      <Cell
+        className="col-span-2 lg:col-span-1"
+        testId="events-stat-total"
+        label="Eventos"
+        value={counts.stored}
+        title={counts.afterEnd > 0 ? `${counts.stored} na lista: ${counts.inPeriod} do período do ciclo e ${counts.afterEnd} fora do período (do próximo ciclo)` : undefined}
+        sub={counts.afterEnd > 0
+          ? <>{counts.inPeriod} do período · <span data-testid="events-stat-after-end">{counts.afterEnd} fora do período</span></>
+          : "Todos do período do ciclo."}
+      />
+      <Cell
+        testId="events-stat-open"
+        label="Abertos"
+        value={counts.open}
+        title="Abertos: ainda não fechados, do período do ciclo e com a avaliação já aberta (a partir do dia seguinte ao fim do evento) — a mesma conta de Ciclos e da Central de Avaliações"
+        sub={counts.notOpenYet > 0 ? `Avaliação aberta. Mais ${counts.notOpenYet} abre${counts.notOpenYet === 1 ? "" : "m"} depois do evento.` : "Avaliação aberta e ainda não fechados."}
+      />
+      <Cell
+        testId="events-stat-pending-pub"
+        label="Falta publicar"
+        value={pendingPub}
+        tone={pendingPub > 0 ? "warn" : "neutral"}
+        title="Eventos com calibração salva e ainda não publicada: só vale na nota depois de publicar"
+        sub={pendingPub > 0 ? `${plural(pendingPub, "evento com calibração salva", "eventos com calibração salva")}.` : "Nada salvo esperando publicação."}
+        onClick={() => toggle("pendingPub")}
+        pressed={cardFilter === "pendingPub"}
+      />
+      <Cell
+        testId="events-stat-partial"
+        label="Pub. parcial"
+        value={partial}
+        tone={partial > 0 ? "warn" : "neutral"}
+        title="Publicação parcial: nem todos os critérios têm publicação final"
+        sub="Nem todos os critérios com publicação final."
+        onClick={() => toggle("partialPub")}
+        pressed={cardFilter === "partialPub"}
+      />
+      <Cell
+        testId="events-stat-final"
+        label="Pub. final"
+        value={final}
+        tone={final > 0 ? "ok" : "neutral"}
+        title="Publicação final: todos os critérios publicados"
+        sub="Todos os critérios publicados: fechados."
+        onClick={() => toggle("fullyEval")}
+        pressed={cardFilter === "fullyEval"}
+      />
+    </section>
   );
 }

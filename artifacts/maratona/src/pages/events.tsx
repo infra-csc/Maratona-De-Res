@@ -4,17 +4,17 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useGetEvents, getGetEventsQueryKey, useNormalizeEventDates } from "@workspace/api-client-react";
 import type { NormalizeDatesResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCycleWeekends, weekendsEnd, todayBR } from "@/lib/utils";
+import { getCycleWeekends, weekendsEnd, todayBR, cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar } from "lucide-react";
+import { CalendarX2, SearchX, X } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
-import { CONDENSED } from "@/lib/premium-theme";
 import { readUrlFilters, DEFAULT_SORT } from "./events/url-filters";
 import { filterAndSortEvents, countCycleEvents } from "./events/rules";
+import { Bone, EmptyBlock, ErrorBlock, btnGhost, btnSmall, surfaceCls } from "./events/events-ui";
 import { serverErrorMessage } from "./events/form-bits";
-import { EventsHeader } from "./events/events-header";
-import { EventsFilterBar, WeekendChipsRow } from "./events/events-filters";
+import { EventsHeader, EventsPanorama } from "./events/events-header";
+import { EventsFilterBar, WeekendChipsRow, chipFilters } from "./events/events-filters";
 import { EventsTable, EventsLegend } from "./events/events-table";
 import { areaCountsOf } from "./events/use-area-counts";
 import { CreateEventDialog, EditEventDialog } from "./events/event-form-dialogs";
@@ -58,7 +58,7 @@ export default function EventsPage() {
   const scope = useCycleScope();
   const { readOnly } = scope;
   const queryKey = getGetEventsQueryKey(scope.params);
-  const { data: events, isLoading } = useGetEvents(
+  const { data: events, isLoading, isError, refetch } = useGetEvents(
     scope.params,
     { query: { queryKey, refetchInterval: readOnly ? false : 60000, refetchOnWindowFocus: !readOnly } }
   );
@@ -110,19 +110,27 @@ export default function EventsPage() {
     const targetIdx = idx >= 0 ? idx : cycleWeekends.length - 1;
     const chip = weekendRowRef.current.children[targetIdx] as HTMLElement | undefined;
     if (chip) chip.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
-  }, [cycle?.startDate]);
+    // Roda de novo quando a faixa aparece (ela só existe depois que os eventos carregam).
+  }, [cycle?.startDate, isLoading, cycleWeekends.length]);
 
   const dateRange = { filterDateFrom, filterDateTo, setFilterDateFrom, setFilterDateTo, hasDateFilter };
 
+  // Contagem de cada situação com a busca e o período atuais (o número no chip).
+  const listParams = { search, filterDateFrom, filterDateTo, sortBy, todayStr };
+  const chipCounts = Object.fromEntries(chipFilters.map(f => [f.key ?? "all", filterAndSortEvents(all, { ...listParams, cardFilter: f.key }).length]));
+  // Eventos de cada fim de semana (a mesma regra do filtro de período).
+  const weekendCount = (w: { sat: string; sun: string }) => all.filter(ev => ev.endDate >= w.sat && ev.startDate <= w.sun).length;
+  const currentWeekend = cycleWeekends.find(w => w.sat <= todayStr && todayStr <= w.sun) ?? null;
+  // O operador não vê nota (a API já manda vazio): a coluna sai.
+  const showScore = !hasRole(user, "operador");
+  const hasAnyFilter = !!(search.trim() || cardFilter || hasDateFilter);
+  const clearFilters = () => { setSearch(""); setCardFilter(null); setFilterDateFrom(""); setFilterDateTo(""); };
+
   return (
     <div className="min-h-full flex flex-col min-w-0">
-
-      {/* ── Header ── */}
       <EventsHeader
         title={scope.isAll ? "Eventos · Total Geral" : "Eventos do Ciclo"}
         cycleSlot={<CycleSelect scope={scope} />}
-        events={all}
-        counts={counts}
         showNormalize={!readOnly && user?.role === "admin"}
         normalizePending={normalizeDatesMutation.isPending}
         onNormalizePreview={() => normalizeDatesMutation.mutate({ data: { dryRun: true } })}
@@ -130,78 +138,84 @@ export default function EventsPage() {
         {canCreate && <CreateEventDialog />}
       </EventsHeader>
 
-      {readOnly && (
-        <div className="px-4 sm:px-6 pt-4">
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-4 max-w-[1680px] w-full mx-auto">
+        {readOnly && (
           <CycleScopeNotice
             scope={scope}
             allHelp={<>Eventos de <strong>todos os ciclos</strong>, cada um com o selo do seu ciclo na coluna Data. Para criar, editar ou confirmar eventos, volte ao ciclo atual.</>}
           />
-        </div>
-      )}
-
-      {/* ── Filter bar ── */}
-      <EventsFilterBar
-        search={search}
-        setSearch={setSearch}
-        cardFilter={cardFilter}
-        setCardFilter={setCardFilter}
-        datePopoverOpen={datePopoverOpen}
-        setDatePopoverOpen={setDatePopoverOpen}
-        {...dateRange}
-      />
-
-      {/* ── Weekend chips row ── */}
-      {cycleWeekends.length > 0 && (
-        <WeekendChipsRow weekends={cycleWeekends} weekendRowRef={weekendRowRef} {...dateRange} />
-      )}
-
-      {/* ── Content ── */}
-      <div className="flex-1 overflow-auto px-4 sm:px-6 py-5">
-        {isLoading ? (
-          <div className="space-y-1">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-14 rounded-lg animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Calendar size={40} className="mb-4 opacity-20" />
-            <h3 className="text-lg font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Nenhum evento encontrado</h3>
-            <p className="italic mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>Ajuste os filtros ou sincronize via integração.</p>
-            {cardFilter !== null && (
-              <button
-                onClick={() => setCardFilter(null)}
-                className="mt-4 px-4 py-2 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                style={{ border: "1px solid var(--border)" }}
-              >
-                Limpar filtro
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            {!readOnly && cardFilter === "unconfirmed" && user?.role === "admin" && (
-              <BulkConfirmBanner events={filtered} hasDateFilter={hasDateFilter} />
-            )}
-            <EventsTable
-              events={filtered}
-              user={user}
-              sortBy={sortBy}
-              setSortBy={setSortBy}
-              readOnly={readOnly}
-              cycleLabelOf={scope.isAll ? (ev => cycleNameById.get(ev.cycleId) ?? null) : undefined}
-              cycleOf={ev => cycleById.get(ev.cycleId) ?? null}
-              areaCountsOf={areaCountsOf}
-              onEdit={(ev) => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-              onMerge={(ev) => setMergeForEvent({ id: ev.id, name: ev.name })}
-              onDelete={(ev) => setDeleteTarget({ id: ev.id, name: ev.name })}
-            />
-          </>
         )}
 
-        {/* Legend + count */}
-        {!isLoading && filtered.length > 0 && (
-          <EventsLegend shown={filtered.length} total={all.length} scopeLabel={scope.isAll ? "em todos os ciclos" : "no ciclo"} afterEnd={counts.afterEnd} />
+        {isLoading ? (
+          <EventsSkeleton />
+        ) : isError ? (
+          <ErrorBlock title="Não foi possível carregar os eventos" onRetry={() => { void refetch(); }} />
+        ) : (
+          <>
+            <EventsPanorama events={all} counts={counts} cardFilter={cardFilter} setCardFilter={setCardFilter} />
+
+            <div className="space-y-3">
+              <EventsFilterBar
+                search={search}
+                setSearch={setSearch}
+                cardFilter={cardFilter}
+                setCardFilter={setCardFilter}
+                datePopoverOpen={datePopoverOpen}
+                setDatePopoverOpen={setDatePopoverOpen}
+                chipCounts={chipCounts}
+                {...dateRange}
+              />
+              {cycleWeekends.length > 0 && (
+                <WeekendChipsRow weekends={cycleWeekends} weekendRowRef={weekendRowRef} countOf={weekendCount} currentSat={currentWeekend?.sat ?? null} {...dateRange} />
+              )}
+            </div>
+
+            {all.length === 0 ? (
+              <div className={cn(surfaceCls, "border-dashed")}>
+                <EmptyBlock icon={CalendarX2} title={scope.isAll ? "Nenhum evento registrado" : "Nenhum evento neste ciclo"} testId="events-empty">
+                  {canCreate ? "Crie um evento pelo botão Novo evento ou sincronize pela Integração." : "Os eventos aparecem aqui quando forem criados ou sincronizados pela Integração."}
+                </EmptyBlock>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className={surfaceCls}>
+                <EmptyBlock icon={SearchX} title="Nenhum evento encontrado" testId="events-no-results"
+                  action={hasAnyFilter ? <button type="button" onClick={clearFilters} className={btnSmall}><X size={14} aria-hidden /> Limpar filtros</button> : undefined}>
+                  Nenhum evento bate com a busca e os filtros escolhidos.
+                </EmptyBlock>
+              </div>
+            ) : (
+              <>
+                {!readOnly && cardFilter === "unconfirmed" && user?.role === "admin" && (
+                  <BulkConfirmBanner events={filtered} hasDateFilter={hasDateFilter} />
+                )}
+                {hasAnyFilter && (
+                  <div className="flex items-center justify-between gap-3 -mb-1" aria-live="polite">
+                    <span className="text-[13.5px] text-muted-foreground">
+                      <b className="font-semibold text-foreground tabular-nums">{filtered.length}</b> de {all.length} eventos com os filtros
+                    </span>
+                    <button type="button" onClick={clearFilters} className={cn(btnGhost, "-mr-3")}><X size={14} aria-hidden /> Limpar filtros</button>
+                  </div>
+                )}
+                <EventsTable
+                  events={filtered}
+                  user={user}
+                  sortBy={sortBy}
+                  setSortBy={setSortBy}
+                  readOnly={readOnly}
+                  showScore={showScore}
+                  weekends={cycleWeekends}
+                  currentSat={currentWeekend?.sat ?? null}
+                  cycleLabelOf={scope.isAll ? (ev => cycleNameById.get(ev.cycleId) ?? null) : undefined}
+                  cycleOf={ev => cycleById.get(ev.cycleId) ?? null}
+                  areaCountsOf={areaCountsOf}
+                  onEdit={(ev) => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
+                  onMerge={(ev) => setMergeForEvent({ id: ev.id, name: ev.name })}
+                  onDelete={(ev) => setDeleteTarget({ id: ev.id, name: ev.name })}
+                />
+                <EventsLegend shown={filtered.length} total={all.length} scopeLabel={scope.isAll ? "em todos os ciclos" : "no ciclo"} afterEnd={counts.afterEnd} />
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -217,6 +231,34 @@ export default function EventsPage() {
       <DeleteEventDialog event={deleteTarget} onClose={() => setDeleteTarget(null)} />
 
       <EditEventDialog event={editingEvent} onClose={() => setEditingEvent(null)} />
+    </div>
+  );
+}
+
+/** Carregando: o esqueleto do panorama, dos filtros e de algumas linhas. */
+function EventsSkeleton() {
+  return (
+    <div role="status" aria-label="Carregando eventos" className="space-y-4">
+      <div className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 lg:grid-cols-5 gap-px bg-border")}>
+        {[0, 1, 2, 3, 4].map(i => (
+          <div key={i} className={cn("bg-card px-4 py-4 lg:px-5 space-y-2.5", i === 0 && "col-span-2 lg:col-span-1")}>
+            <Bone className="h-3 w-20" /><Bone className="h-8 w-14" /><Bone className="h-3 w-32 hidden sm:block" />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2"><Bone className="h-11 lg:h-9 w-full lg:w-72 rounded-lg" /><Bone className="h-11 lg:h-9 flex-1 rounded-lg hidden lg:block" /></div>
+      <div className={cn(surfaceCls, "divide-y divide-border")}>
+        {[0, 1, 2, 3, 4].map(i => (
+          <div key={i} className="px-5 py-4 flex items-center gap-6">
+            <div className="flex-1 space-y-2"><Bone className="h-4 w-2/3 max-w-[320px]" /><Bone className="h-3 w-40" /></div>
+            <Bone className="h-4 w-14 hidden lg:block" />
+            <Bone className="h-2 w-24 hidden lg:block" />
+            <Bone className="h-2 w-24 hidden lg:block" />
+            <Bone className="h-6 w-24 rounded-md" />
+          </div>
+        ))}
+      </div>
+      <span className="sr-only">Carregando eventos…</span>
     </div>
   );
 }

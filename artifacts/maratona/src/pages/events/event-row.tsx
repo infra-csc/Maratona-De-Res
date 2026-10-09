@@ -1,19 +1,19 @@
 // Um evento da lista: a LINHA da tabela (telas largas) e o CARTÃO (celular e
 // tablet) — os dois com os mesmos dados: nome, data (+ selo de período), barras,
 // nota, status (com atalho para o próximo passo) e o menu de ações por papel.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import type { Cycle, User } from "@workspace/api-client-react";
-import { ChevronRight, Users, GitMerge, SlidersHorizontal, Trash2, Pencil, MoreHorizontal, ClipboardList, Info } from "lucide-react";
+import { ArrowRight, ChevronRight, ClipboardList, GitMerge, Info, Maximize2, MoreHorizontal, Pencil, SlidersHorizontal, Trash2, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { hasRole } from "@/lib/auth-context";
-import { fmtDate, fmtNum, eventPeriodPosition } from "@/lib/utils";
-import { CONDENSED, GOOD, AMBER, AMBER_TEXT, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
-import { MiniBar, CalBar } from "./bars";
+import { cn, fmtDate, fmtNum, eventPeriodPosition, plural } from "@/lib/utils";
+import { MiniBar, CalBar, type BarTone } from "./bars";
 import { deriveEventRow, NEXT_CYCLE_BADGE, NEXT_CYCLE_NOTICE, type AreaResponseCount, type EventBadge } from "./rules";
 import type { EventItem } from "./types";
 import { EventDetailsDialog, type EventDetailsKind } from "./event-details-dialog";
+import { Chip, Eyebrow, FOCUS_RING, btnSmall, iconBtn, menuItemCls, weekdayShort } from "./events-ui";
 
 export type EventRowActions = {
   onEdit: (ev: EventItem) => void;
@@ -33,27 +33,53 @@ type EventRowProps = EventRowActions & {
   eventCycle?: Cycle | null;
   /** Ciclo por área: respostas por área (a mesma conta da Central); null = conta por critério. */
   areaCounts?: AreaResponseCount | null;
+  /** Coluna/valor de Nota (o operador não vê nota: a API já manda vazio e a coluna sai). */
+  showScore?: boolean;
 };
 
 const PREVIEW_TITLE = "Média das avaliações enviadas até agora; a nota oficial sai da calibração publicada";
 
 /** Nota da linha/cartão: oficial (publicada) ou "Prévia" (só com ao menos uma resposta; parcial mostra "3/20"). */
-function ScoreBlock({ score, fc, label, labelColor, isPreview, previewPartial, hasEvals, big }: {
-  score: number | null; fc: boolean; label: string; labelColor: string; isPreview: boolean; previewPartial: string | null; hasEvals: boolean; big?: boolean;
+function ScoreBlock({ score, fc, label, labelColor, isPreview, previewPartial, hasEvals, align = "center" }: {
+  score: number | null; fc: boolean; label: string; labelColor: string; isPreview: boolean; previewPartial: string | null; hasEvals: boolean; align?: "center" | "right";
 }) {
-  if (score == null || (isPreview && !hasEvals)) return <span className="text-sm italic opacity-40" aria-label="Sem nota">—</span>;
+  if (score == null || (isPreview && !hasEvals)) {
+    return <span className="font-condensed text-[15px] font-bold text-muted-foreground/70" aria-label="Sem nota" title="Sem nota ainda">—</span>;
+  }
   return (
-    <div title={isPreview ? PREVIEW_TITLE : undefined}>
-      <span className={`font-black ${big ? "text-xl" : "text-lg"} leading-none block`} style={{ fontFamily: CONDENSED, color: fc && !isPreview ? GOOD_TEXT : isPreview ? "var(--muted-foreground)" : "var(--foreground)" }}>
+    <span className={cn("inline-flex flex-col gap-1", align === "right" ? "items-end" : "items-center")} title={isPreview ? PREVIEW_TITLE : undefined}>
+      <span className={cn("font-condensed text-[22px] font-black leading-none tabular-nums tracking-[-0.01em]",
+        isPreview ? "text-muted-foreground" : fc ? "text-[var(--status-ok-text)]" : "text-foreground")}>
         {fmtNum(score, 1)}
       </span>
-      <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: isPreview ? "var(--muted-foreground)" : labelColor }}>{label}</span>
-      {previewPartial && <span className="block text-[11px] font-semibold tabular-nums" style={{ color: "var(--muted-foreground)" }} title="Respostas das áreas até agora">{previewPartial}</span>}
-    </div>
+      <span className="font-condensed text-[11.5px] font-bold uppercase tracking-[0.05em] leading-none whitespace-nowrap" style={{ color: isPreview ? "var(--muted-foreground)" : labelColor }}>{label}</span>
+      {previewPartial && <span className="font-condensed text-[11.5px] font-bold leading-none tabular-nums text-muted-foreground" title="Respostas das áreas até agora">{previewPartial}</span>}
+    </span>
   );
 }
 
 const FULL: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+/** Gatilho de popover com cara de selo — área de toque maior sem mexer no desenho. */
+function ChipTrigger({ testId, label, children }: { testId: string; label: string; children: ReactNode }) {
+  return (
+    <PopoverTrigger asChild>
+      <button type="button" data-testid={testId} aria-label={label}
+        className={cn("inline-flex w-fit rounded-md py-2.5 -my-2.5 lg:py-0 lg:my-0 transition-opacity hover:opacity-80", FOCUS_RING)}>
+        {children}
+      </button>
+    </PopoverTrigger>
+  );
+}
+
+function ExplainPopover({ title, children, align = "start" }: { title: string; children: ReactNode; align?: "start" | "end" }) {
+  return (
+    <PopoverContent align={align} sideOffset={6} className="font-body w-[min(320px,calc(100vw-32px))] rounded-xl border-border bg-popover text-popover-foreground p-4 shadow-lg text-[13.5px] leading-snug">
+      <Eyebrow as="p" className="text-foreground mb-2">{title}</Eyebrow>
+      {children}
+    </PopoverContent>
+  );
+}
 
 /**
  * Selo "Fora do período" com a explicação acessível no toque e no teclado
@@ -72,22 +98,13 @@ export function PeriodBadge({ ev, cycle, hideAfter = false }: { ev: EventItem; c
     : `Este evento começa em ${fmtDate(ev.startDate, FULL)}, antes do início do ciclo "${cycle.name}" (${fmtDate(cycle.startDate, FULL)}). Ele continua contando neste ciclo.`;
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={`badge-outside-cycle-${ev.id}`}
-          aria-label={`${label}: ver explicação`}
-          className="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-bold uppercase whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          style={{ fontFamily: CONDENSED, backgroundColor: after ? "var(--status-info-bg)" : "var(--secondary)", color: after ? "var(--status-info-text)" : "var(--muted-foreground)", border: after ? "none" : "1px solid var(--border)" }}
-        >
-          {label} <Info size={10} aria-hidden />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(320px,calc(100vw-32px))] text-[12.5px] leading-snug" style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)" }}>
-        <p className="font-bold uppercase text-[11px] mb-1" style={{ fontFamily: CONDENSED, letterSpacing: "0.04em" }}>{label}</p>
-        {after && <p className="font-semibold mb-1" style={{ color: "var(--status-info-text)" }}>{NEXT_CYCLE_NOTICE}</p>}
-        <p data-testid={`text-outside-cycle-${ev.id}`}>{text}</p>
-      </PopoverContent>
+      <ChipTrigger testId={`badge-outside-cycle-${ev.id}`} label={`${label}: ver explicação`}>
+        <Chip tone={after ? "info" : "neutral"} icon={Info}>{label}</Chip>
+      </ChipTrigger>
+      <ExplainPopover title={label}>
+        {after && <p className="font-semibold mb-1.5 text-[var(--status-info-text)]">{NEXT_CYCLE_NOTICE}</p>}
+        <p data-testid={`text-outside-cycle-${ev.id}`} className="text-muted-foreground">{text}</p>
+      </ExplainPopover>
     </Popover>
   );
 }
@@ -101,25 +118,16 @@ function afterPeriodText(ev: EventItem, cycle: Cycle) {
  * Selo ÚNICO do evento do próximo ciclo na coluna Status: "Próximo ciclo",
  * com a frase única e o detalhe das datas no toque/teclado (popover).
  */
-function NextCycleStatusBadge({ ev, badge, cycle }: { ev: EventItem; badge: EventBadge; cycle: Cycle | null | undefined }) {
+function NextCycleStatusBadge({ ev, cycle }: { ev: EventItem; cycle: Cycle | null | undefined }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={`badge-status-${ev.id}`}
-          aria-label={`${NEXT_CYCLE_BADGE}: ver explicação`}
-          className="text-[11px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          style={{ backgroundColor: badge.bg, color: badge.fg }}
-        >
-          {NEXT_CYCLE_BADGE} <Info size={10} aria-hidden />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(320px,calc(100vw-32px))] text-[12.5px] leading-snug" style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)" }}>
-        <p className="font-bold uppercase text-[11px] mb-1" style={{ fontFamily: CONDENSED, letterSpacing: "0.04em" }}>{NEXT_CYCLE_BADGE}</p>
-        <p className="font-semibold mb-1" style={{ color: "var(--status-info-text)" }} data-testid={`text-next-cycle-${ev.id}`}>{NEXT_CYCLE_NOTICE}</p>
-        {cycle && <p data-testid={`text-outside-cycle-${ev.id}`}>{afterPeriodText(ev, cycle)}</p>}
-      </PopoverContent>
+      <ChipTrigger testId={`badge-status-${ev.id}`} label={`${NEXT_CYCLE_BADGE}: ver explicação`}>
+        <Chip tone="info" icon={Info}>{NEXT_CYCLE_BADGE}</Chip>
+      </ChipTrigger>
+      <ExplainPopover title={NEXT_CYCLE_BADGE} align="end">
+        <p className="font-semibold mb-1.5 text-[var(--status-info-text)]" data-testid={`text-next-cycle-${ev.id}`}>{NEXT_CYCLE_NOTICE}</p>
+        {cycle && <p data-testid={`text-outside-cycle-${ev.id}`} className="text-muted-foreground">{afterPeriodText(ev, cycle)}</p>}
+      </ExplainPopover>
     </Popover>
   );
 }
@@ -127,130 +135,112 @@ function NextCycleStatusBadge({ ev, badge, cycle }: { ev: EventItem; badge: Even
 function CycleLabelBadge({ ev, cycleLabel }: { ev: EventItem; cycleLabel: string }) {
   return (
     <span data-testid={`badge-event-cycle-${ev.id}`} title={`Evento do ciclo ${cycleLabel}`}
-      className="mt-1 block w-fit max-w-full break-words leading-tight rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+      className="font-condensed inline-flex w-fit max-w-full items-center min-h-6 px-2 rounded-md border border-border text-[12px] font-bold uppercase tracking-[0.05em] leading-tight text-muted-foreground break-words">
       {cycleLabel}
     </span>
   );
 }
 
 function StatusBadgeView({ ev, badge, readOnly, nextCycle = false, cycle = null }: { ev: EventItem; badge: EventBadge; readOnly: boolean; nextCycle?: boolean; cycle?: Cycle | null }) {
-  if (nextCycle) return <NextCycleStatusBadge ev={ev} badge={badge} cycle={cycle} />;
+  if (nextCycle) return <NextCycleStatusBadge ev={ev} cycle={cycle} />;
   if (badge.next && !readOnly) {
     return (
       <Link
         href={badge.next.href}
         title={badge.next.title}
         data-testid={`badge-next-step-${ev.id}`}
-        className="text-[11px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1 transition-opacity hover:opacity-80 underline-offset-2 hover:underline"
-        style={{ backgroundColor: badge.bg, color: badge.fg }}
+        className={cn("group inline-flex w-fit rounded-md py-2.5 -my-2.5 lg:py-0 lg:my-0", FOCUS_RING)}
       >
-        {badge.label} <ChevronRight size={9} aria-hidden="true" />
+        <Chip tone={badge.tone} className="group-hover:underline underline-offset-2">
+          {badge.label} <ArrowRight size={12} aria-hidden className="transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
+        </Chip>
       </Link>
     );
   }
   return (
-    <span data-testid={`badge-status-${ev.id}`} title={badge.title} className="text-[11px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.bg, color: badge.fg }}>
-      {badge.label}
+    <span data-testid={`badge-status-${ev.id}`} title={badge.title} className="inline-flex">
+      <Chip tone={badge.tone}>{badge.label}</Chip>
       {badge.title && <span className="sr-only">. {badge.title}</span>}
     </span>
   );
 }
 
-/** Atalhos e menu "Mais ações" (mesmos na linha e no cartão). */
-function EventActions({ ev, user, readOnly, evaluationsHref, onEdit, onMerge, onDelete }: EventRowActions & { ev: EventItem; user: User | null; readOnly: boolean; evaluationsHref: string }) {
+/** Abrir o evento + menu "Mais ações" (mesmos na linha e no cartão). */
+function EventActions({ ev, user, readOnly, evaluationsHref, onEdit, onMerge, onDelete, variant }: EventRowActions & {
+  ev: EventItem; user: User | null; readOnly: boolean; evaluationsHref: string; variant: "row" | "card";
+}) {
+  const canEdit = !!user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador"));
+  const canCalibrate = !!user && ["admin", "rh", "diretoria"].includes(user.role);
+  const canMerge = user?.role === "admin";
+  const canDelete = !!user && ["admin", "operador"].includes(user.role);
   return (
     <>
-      {!readOnly && <Link
-        href={evaluationsHref}
-        data-testid={`link-evaluations-event-${ev.id}`}
-        title="Avaliações deste evento"
-        aria-label={`Avaliações de ${ev.name}`}
-        className="h-8 w-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
-        style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}
-      >
-        <ClipboardList size={13} aria-hidden="true" />
-      </Link>}
-      <Link
-        href={`/events/${ev.id}`}
-        data-testid={`button-view-event-${ev.id}`}
-        title={readOnly ? "Ver evento (só consulta)" : "Gerenciar evento"}
-        aria-label={`${readOnly ? "Ver" : "Gerenciar"} ${ev.name}`}
-        className="h-8 w-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-80"
-        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-      >
-        <ChevronRight size={13} aria-hidden="true" />
-      </Link>
-      {!readOnly && user && (["admin", "rh", "diretoria"].includes(user.role) || hasRole(user, "operador")) && (
+      {!readOnly && user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={`Mais ações para ${ev.name}`}
-              title="Mais ações"
-              className="h-8 w-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
-              style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}
-            >
-              <MoreHorizontal size={13} aria-hidden="true" />
+            <button type="button" aria-label={`Mais ações para ${ev.name}`} title="Mais ações" className={cn(iconBtn, "data-[state=open]:bg-secondary")}>
+              <MoreHorizontal size={16} aria-hidden />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            sideOffset={6}
-            className="p-1.5 min-w-[170px] rounded-lg shadow-lg"
-            style={{ backgroundColor: "var(--card)", border: "2px solid var(--border)", color: "var(--foreground)", zIndex: 9999 }}
-          >
-            {user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador")) && (
-              <DropdownMenuItem
-                data-testid={`button-edit-event-${ev.id}`}
-                onClick={() => onEdit(ev)}
-                className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
-              >
-                <Pencil size={13} /> Editar
+          <DropdownMenuContent align="end" sideOffset={6} className="font-body min-w-[200px] rounded-xl border-border bg-popover text-popover-foreground p-1.5 shadow-lg">
+            {canEdit && (
+              <DropdownMenuItem data-testid={`button-edit-event-${ev.id}`} onClick={() => onEdit(ev)} className={menuItemCls}>
+                <Pencil size={15} aria-hidden /> Editar
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]">
-              <Link href={evaluationsHref}>
-                <ClipboardList size={13} /> Avaliações
+            <DropdownMenuItem asChild className={menuItemCls}>
+              <Link href={evaluationsHref} data-testid={`link-evaluations-event-${ev.id}`}>
+                <ClipboardList size={15} aria-hidden /> Avaliações
               </Link>
             </DropdownMenuItem>
-            {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-              <DropdownMenuItem asChild className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]">
+            {canCalibrate && (
+              <DropdownMenuItem asChild className={menuItemCls}>
                 <Link href={`/calibrations?eventId=${ev.id}`}>
-                  <SlidersHorizontal size={13} /> Calibrações
+                  <SlidersHorizontal size={15} aria-hidden /> Calibrações
                 </Link>
               </DropdownMenuItem>
             )}
-            {user && ["admin", "operador"].includes(user.role) && (
-              <>
-                <DropdownMenuSeparator style={{ backgroundColor: "var(--border)", margin: "4px 0" }} />
-                {user.role === "admin" && (
-                  <DropdownMenuItem
-                    data-testid={`button-merge-event-${ev.id}`}
-                    onClick={() => onMerge(ev)}
-                    className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
-                  >
-                    <GitMerge size={13} /> Mesclar
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  data-testid={`button-delete-event-${ev.id}`}
-                  onClick={() => onDelete(ev)}
-                  className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2"
-                  style={{ color: DANGER_TEXT }}
-                >
-                  <Trash2 size={13} /> Excluir
-                </DropdownMenuItem>
-              </>
+            {(canMerge || canDelete) && <DropdownMenuSeparator className="my-1 bg-border" />}
+            {canMerge && (
+              <DropdownMenuItem data-testid={`button-merge-event-${ev.id}`} onClick={() => onMerge(ev)} className={menuItemCls}>
+                <GitMerge size={15} aria-hidden /> Mesclar duplicado
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <DropdownMenuItem data-testid={`button-delete-event-${ev.id}`} onClick={() => onDelete(ev)}
+                className={cn(menuItemCls, "text-[var(--status-danger-text)] focus:text-[var(--status-danger-text)] focus:bg-[var(--status-danger-bg)] data-[highlighted]:bg-[var(--status-danger-bg)]")}>
+                <Trash2 size={15} aria-hidden /> Excluir
+              </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+      )}
+      {variant === "row" ? (
+        <Link
+          href={`/events/${ev.id}`}
+          data-testid={`button-view-event-${ev.id}`}
+          title={readOnly ? "Ver evento (só consulta)" : "Abrir o evento"}
+          aria-label={`${readOnly ? "Ver" : "Abrir"} ${ev.name}`}
+          className={cn(iconBtn, "bg-primary text-primary-foreground border-primary hover:bg-primary hover:opacity-90")}
+        >
+          <ChevronRight size={16} aria-hidden />
+        </Link>
+      ) : (
+        <Link
+          href={`/events/${ev.id}`}
+          data-testid={`button-view-event-${ev.id}`}
+          aria-label={`${readOnly ? "Ver" : "Abrir"} ${ev.name}`}
+          className={cn(btnSmall, "bg-primary text-primary-foreground border-primary enabled:hover:bg-primary hover:opacity-90")}
+        >
+          {readOnly ? "Ver" : "Abrir"} <ChevronRight size={15} aria-hidden />
+        </Link>
       )}
     </>
   );
 }
 
 /** Admin: a barra vira botão que abre o detalhe (quem respondeu, calibrações, matriz). Demais papéis: só informativa. */
-function DetailTrigger({ enabled, label, onOpen, children }: { enabled: boolean; label: string; onOpen: () => void; children: React.ReactNode }) {
+function DetailTrigger({ enabled, label, onOpen, children }: { enabled: boolean; label: string; onOpen: () => void; children: ReactNode }) {
   if (!enabled) return <>{children}</>;
   return (
     <button
@@ -258,167 +248,188 @@ function DetailTrigger({ enabled, label, onOpen, children }: { enabled: boolean;
       onClick={onOpen}
       aria-label={label}
       title={label}
-      className="block text-left rounded-md -mx-1.5 px-1.5 -my-1 py-1 cursor-pointer transition-colors hover:bg-[var(--secondary)]"
-      style={{ width: "calc(100% + 0.75rem)" }}
+      className={cn(
+        "group/bar relative block w-[calc(100%+16px)] -mx-2 px-2 py-2 -my-2 rounded-lg text-left cursor-pointer transition-colors duration-150 hover:bg-secondary/70",
+        FOCUS_RING, "focus-visible:ring-offset-0",
+      )}
     >
       {children}
+      <Maximize2 size={11} aria-hidden className="absolute right-2 bottom-2 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/bar:opacity-100 group-focus-visible/bar:opacity-100" />
     </button>
   );
 }
 
-/** Mesma altura do selo "N a publicar" — mantém as três barras na mesma linha. */
-function PendingSpacer({ ev }: { ev: EventItem }) {
-  if ((ev.pendingPublishCount ?? 0) <= 0) return null;
-  return <span aria-hidden className="invisible mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED }}>0</span>;
-}
-
-/** Cor do número da Matriz: legível também quando ninguém respondeu (antes var(--border) quase sumia). */
-const matrixColor = (ev: EventItem) => ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--muted-foreground)";
-
 function PendingPublishBadge({ ev }: { ev: EventItem }) {
-  if ((ev.pendingPublishCount ?? 0) <= 0) return null;
+  const n = ev.pendingPublishCount ?? 0;
+  if (n <= 0) return null;
   return (
     // "N calibrações a publicar" não cabe numa linha nesta coluna: o texto
     // curto fica visível e o completo vai no título e para o leitor de tela.
-    <span data-testid={`badge-pending-publish-${ev.id}`}
-      title={`${ev.pendingPublishCount} ${ev.pendingPublishCount === 1 ? "calibração salva e ainda não publicada" : "calibrações salvas e ainda não publicadas"}: só vale na nota depois de publicar`}
-      className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase whitespace-nowrap"
-      style={{ fontFamily: CONDENSED, letterSpacing: "0.03em", backgroundColor: "var(--status-warn-bg)", color: AMBER_TEXT }}>
-      <span aria-hidden>{ev.pendingPublishCount} a publicar</span>
-      <span className="sr-only">{ev.pendingPublishCount} {ev.pendingPublishCount === 1 ? "calibração" : "calibrações"} a publicar</span>
+    <span data-testid={`badge-pending-publish-${ev.id}`} className="inline-flex"
+      title={`${n} ${n === 1 ? "calibração salva e ainda não publicada" : "calibrações salvas e ainda não publicadas"}: só vale na nota depois de publicar`}>
+      <Chip tone="warn">
+        <span aria-hidden>{n} a publicar</span>
+        <span className="sr-only">{n} {n === 1 ? "calibração" : "calibrações"} a publicar</span>
+      </Chip>
     </span>
   );
 }
 
 /** Marcadores do nome: "Aguardando RH", "Não confirmado", cliente · cidade. */
 function NameMeta({ ev, pendingRH }: { ev: EventItem; pendingRH: boolean }) {
+  const where = [ev.clientName, ev.city].filter(Boolean).join(" · ");
+  const flags = [
+    pendingRH ? { label: "Aguardando RH", cls: "text-[var(--status-danger-text)]", title: "A avaliação já devia ter aberto e os critérios não foram confirmados" } : null,
+    !ev.resultsConfirmed && ev.criteriaConfirmed ? { label: "Não confirmado", cls: "text-[var(--status-warn-text)]", title: "Resultados não confirmados: ainda não contam na elegibilidade nem na nota dos colaboradores" } : null,
+  ].filter(Boolean) as { label: string; cls: string; title: string }[];
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5 min-w-0">
-      {pendingRH && (
-        <span className="text-[11px] font-bold uppercase" title="A avaliação já devia ter aberto e os critérios não foram confirmados" style={{ color: DANGER_TEXT }}>Aguardando RH ·</span>
-      )}
-      {!ev.resultsConfirmed && ev.criteriaConfirmed && (
-        <span className="text-[11px] font-bold uppercase" title="Resultados não confirmados: ainda não contam na elegibilidade nem na nota dos colaboradores" style={{ color: AMBER_TEXT }}>Não confirmado ·</span>
-      )}
-      <span className="text-[11px] truncate min-w-0" style={{ color: "var(--muted-foreground)" }}>
-        {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
-      </span>
+    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+      {flags.map(f => (
+        <span key={f.label} title={f.title} className={cn("font-condensed text-[12px] font-bold uppercase tracking-[0.05em] whitespace-nowrap", f.cls)}>{f.label}</span>
+      ))}
+      {where && <span className="text-[13px] text-muted-foreground truncate min-w-0">{where}</span>}
     </div>
   );
 }
 
-export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null }: EventRowProps) {
-  const {
-    score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,
-    hasEvals, hasAnyPublication, missing, evaluationsHref, evalTooltip, accentColor,
-    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle, isPreview, previewPartial,
-  } = deriveEventRow(ev, undefined, eventCycle, areaCounts);
+/** Cor da faixa lateral (o significado está na legenda). */
+function accentCls(r: ReturnType<typeof deriveEventRow>, ev: EventItem) {
+  if (r.notOpenYet || r.nextCycle) return "bg-[var(--status-info)]";
+  if (r.pendingRH) return "bg-[var(--status-danger)]";
+  if (ev.feedbackReleased) return "bg-[var(--status-ok)]";
+  if (r.evalDone === r.evalTotal && r.evalTotal > 0) return "bg-foreground/60";
+  if (r.evalDone > 0) return "bg-[var(--status-warn)]";
+  return "bg-border";
+}
+
+const evalTone = (r: ReturnType<typeof deriveEventRow>): BarTone =>
+  !r.isPureHistorical && r.evalDone === r.evalTotal && r.evalTotal > 0 ? "ok" : "progress";
+const matrixTone = (ev: EventItem): BarTone => ev.conformityComplete ? "ok" : (ev.conformityFilled ?? 0) > 0 ? "warn" : "muted";
+
+const Dash = ({ title }: { title?: string }) => <span className="font-condensed text-[15px] font-bold text-muted-foreground/60" title={title} aria-label={title ?? "Não se aplica"}>—</span>;
+
+/** As três métricas (barras) — iguais na linha e no cartão. */
+function Metrics({ ev, r, isAdmin, onOpen, wrap }: {
+  ev: EventItem; r: ReturnType<typeof deriveEventRow>; isAdmin: boolean; onOpen: (k: EventDetailsKind) => void;
+  wrap: (key: string, label: string, node: ReactNode) => ReactNode;
+}) {
+  return (
+    <>
+      {wrap("evaluations", "Avaliações", ev.isHistorical || r.evalTotal === 0
+        ? <Dash title={ev.isHistorical ? "Evento histórico: sem avaliações neste sistema" : "Nenhum critério ativo neste evento"} />
+        : (
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das avaliações de ${ev.name}`} onOpen={() => onOpen("evaluations")}>
+            <MiniBar value={r.evalDone} total={r.evalTotal} tone={evalTone(r)} title={isAdmin ? undefined : r.evalTooltip} srLabel={r.evalTooltip} />
+          </DetailTrigger>
+        ))}
+      {wrap("calibrations", "Publicadas", r.isPureHistorical || r.total === 0
+        ? <Dash />
+        : (
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das calibrações de ${ev.name}`} onOpen={() => onOpen("calibrations")}>
+            <CalBar finalCount={r.finalPubCount} partialCount={r.partialOnlyCount} total={r.total} />
+          </DetailTrigger>
+        ))}
+      {wrap("matrix", "Matriz", !ev.conformityNeeded
+        ? <Dash title="Matriz não exigida neste evento" />
+        : (
+          <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => onOpen("matrix")}>
+            <MiniBar
+              value={ev.conformityFilled ?? 0}
+              total={ev.conformityTotal ?? 0}
+              tone={matrixTone(ev)}
+              title={isAdmin ? undefined : `${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
+              srLabel={`${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz respondidos`}
+            />
+          </DetailTrigger>
+        ))}
+    </>
+  );
+}
+
+/** Data em destaque + dia da semana (ajuda a achar o fim de semana). */
+function DateText({ ev, dateStr, inline = false }: { ev: EventItem; dateStr: string; inline?: boolean }) {
+  const wd = weekdayShort(ev.startDate);
+  const multi = ev.endDate && ev.endDate !== ev.startDate;
+  if (inline) {
+    return (
+      <span className="font-condensed text-[15px] font-bold uppercase tracking-[0.02em] tabular-nums text-foreground whitespace-nowrap">
+        {dateStr}{wd && !multi && <span className="ml-1.5 text-muted-foreground">{wd}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="block">
+      {/* Período em duas linhas (início / fim): com ano não cabe numa linha só. */}
+      {dateStr.split("–").map((part, i) => (
+        <span key={i} className="block font-condensed text-[15px] font-bold leading-tight tabular-nums text-foreground whitespace-nowrap">{i > 0 ? `– ${part}` : part}</span>
+      ))}
+      {wd && !multi && <span className="block font-condensed text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground mt-0.5">{wd}</span>}
+    </span>
+  );
+}
+
+export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: EventRowProps) {
+  const r = deriveEventRow(ev, undefined, eventCycle, areaCounts);
   const isAdmin = hasRole(user, "admin");
   const [details, setDetails] = useState<EventDetailsKind | null>(null);
+  const missingShown = r.missing.length > 0 && !r.hasEvals && !r.hasAnyPublication;
 
   return (
     <div
+      role="row"
       data-testid={`row-event-${ev.id}`}
-      className="grid relative items-center transition-colors group hover:opacity-95"
-      style={{ gridTemplateColumns: gridCols, borderBottom: "1px solid var(--border)" }}
+      className="group/row grid relative items-center border-b border-border last:border-b-0 transition-colors duration-150 hover:bg-secondary/35"
+      style={{ gridTemplateColumns: gridCols }}
     >
-      {/* Accent bar */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accentColor }} />
+      <span aria-hidden className={cn("absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full", accentCls(r, ev))} />
 
-      {/* Event name + subtitle */}
-      <div className="pl-4 pr-3 py-3 min-w-0">
-        <Link href={`/events/${ev.id}`} className="text-[13px] font-bold uppercase leading-tight block truncate transition-colors hover:opacity-70">
+      <div role="cell" className="pl-5 pr-3 py-3.5 min-w-0">
+        <Link href={`/events/${ev.id}`} title={ev.name}
+          className={cn("font-condensed block truncate text-[16.5px] font-black uppercase leading-tight tracking-[-0.005em] text-foreground rounded-sm hover:underline underline-offset-2", FOCUS_RING)}>
           {ev.name}
         </Link>
-        <NameMeta ev={ev} pendingRH={pendingRH} />
-        {missing.length > 0 && !hasEvals && !hasAnyPublication && (
-          <p className="text-[11px] font-bold uppercase truncate mt-0.5" style={{ color: DANGER_TEXT }}>
-            Sem aval.: {missing.join(", ")}
+        <NameMeta ev={ev} pendingRH={r.pendingRH} />
+        {missingShown && (
+          <p className="mt-0.5 font-condensed text-[12px] font-bold uppercase tracking-[0.05em] truncate text-[var(--status-danger-text)]" title={`Sem avaliador: ${r.missing.join(", ")}`}>
+            Sem avaliador: {r.missing.join(", ")}
           </p>
         )}
       </div>
 
-      {/* Date */}
-      <div className="px-3.5 py-3 text-xs font-semibold min-w-0">
-        {/* Período em duas linhas (início / fim): com ano não cabe numa linha só e invadia "Part.". */}
-        {dateStr.split("–").map((part, i) => (
-          <span key={i} className="block whitespace-nowrap leading-snug">{i > 0 ? `– ${part}` : part}</span>
-        ))}
-        <div><PeriodBadge ev={ev} cycle={eventCycle} hideAfter={nextCycle} /></div>
+      <div role="cell" className="px-3 py-3.5 min-w-0 flex flex-col items-start gap-1.5">
+        <DateText ev={ev} dateStr={r.dateStr} />
+        <PeriodBadge ev={ev} cycle={eventCycle} hideAfter={r.nextCycle} />
         {cycleLabel && <CycleLabelBadge ev={ev} cycleLabel={cycleLabel} />}
       </div>
 
-      {/* Participants */}
-      <div className="px-3.5 py-3 flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}>
-        <Users size={12} aria-hidden />
-        <span className="text-[12px] font-bold">{ev.participantCount ?? 0}</span>
+      <div role="cell" className="px-3 py-3.5">
+        <span className="inline-flex items-center gap-1.5 font-condensed text-[15px] font-bold tabular-nums text-foreground" title={`${plural(ev.participantCount ?? 0, "participante", "participantes")}`}>
+          <Users size={14} aria-hidden className="text-muted-foreground" />
+          {ev.participantCount ?? 0}
+          <span className="sr-only"> participantes</span>
+        </span>
       </div>
 
-      {/* Avaliações / Publicadas / Matriz: a mesma estrutura de célula (barra + espaço do selo
-          "a publicar"), então as três barras ficam na mesma linha. */}
-      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
-        {ev.isHistorical || evalTotal === 0 ? (
-          <span className="text-[11px] italic opacity-40" title={ev.isHistorical ? "Evento histórico: sem avaliações neste sistema" : "Nenhum critério ativo neste evento"}>—</span>
-        ) : (
-          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das avaliações de ${ev.name}`} onOpen={() => setDetails("evaluations")}>
-            <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={isAdmin ? undefined : evalTooltip} />
-          </DetailTrigger>
-        )}
-        <PendingSpacer ev={ev} />
+      <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails}
+        wrap={(key, _label, node) => (
+          <div key={key} role="cell" className="px-3 py-3.5">{node}</div>
+        )} />
+
+      {showScore && (
+        <div role="cell" className="px-1 py-3.5 text-center">
+          <ScoreBlock score={r.score} fc={r.fc} label={r.scoreLabel} labelColor={r.scoreLabelColor} isPreview={r.isPreview} previewPartial={r.previewPartial} hasEvals={r.hasEvals} />
+        </div>
+      )}
+
+      <div role="cell" className="px-3 py-3.5 min-w-0 flex flex-col items-start gap-1.5">
+        <StatusBadgeView ev={ev} badge={r.badge} readOnly={readOnly} nextCycle={r.nextCycle} cycle={eventCycle} />
+        <PendingPublishBadge ev={ev} />
       </div>
 
-      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
-        {isPureHistorical || total === 0 ? (
-          <span className="text-[11px] italic opacity-40">—</span>
-        ) : (
-          <DetailTrigger enabled={isAdmin} label={`Ver detalhes das calibrações de ${ev.name}`} onOpen={() => setDetails("calibrations")}>
-            <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
-          </DetailTrigger>
-        )}
-        <div><PendingPublishBadge ev={ev} /></div>
+      <div role="cell" className="pl-2 pr-4 py-3.5 flex items-center justify-end gap-1.5">
+        <EventActions ev={ev} user={user} readOnly={readOnly} evaluationsHref={r.evaluationsHref} onEdit={onEdit} onMerge={onMerge} onDelete={onDelete} variant="row" />
       </div>
-
-      <div className="px-3.5 py-3 self-stretch flex flex-col justify-center">
-        {!ev.conformityNeeded ? (
-          <span className="text-[11px] italic opacity-40">—</span>
-        ) : (
-          <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => setDetails("matrix")}>
-            <MiniBar
-              value={ev.conformityFilled ?? 0}
-              total={ev.conformityTotal ?? 0}
-              color={matrixColor(ev)}
-              title={isAdmin ? undefined : `${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
-            />
-          </DetailTrigger>
-        )}
-        <PendingSpacer ev={ev} />
-        {details && <EventDetailsDialog ev={ev} kind={details} areaMode={!!eventCycle?.areaEvaluation} onClose={() => setDetails(null)} />}
-      </div>
-
-      {/* Score */}
-      <div className="px-1 py-3 text-center">
-        <ScoreBlock score={score} fc={fc} label={scoreLabel} labelColor={scoreLabelColor} isPreview={isPreview} previewPartial={previewPartial} hasEvals={hasEvals} />
-      </div>
-
-      {/* Status badge */}
-      <div className="px-3.5 py-3">
-        <StatusBadgeView ev={ev} badge={badge} readOnly={readOnly} nextCycle={nextCycle} cycle={eventCycle} />
-      </div>
-
-      {/* Action */}
-      <div className="px-2.5 py-3 flex items-center justify-center gap-1.5">
-        <EventActions ev={ev} user={user} readOnly={readOnly} evaluationsHref={evaluationsHref} onEdit={onEdit} onMerge={onMerge} onDelete={onDelete} />
-      </div>
-    </div>
-  );
-}
-
-/** Uma métrica do cartão: rótulo pequeno em cima, valor/barra embaixo. */
-function CardMetric({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <span className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{label}</span>
-      {children}
+      {details && <EventDetailsDialog ev={ev} kind={details} areaMode={!!eventCycle?.areaEvaluation} onClose={() => setDetails(null)} />}
     </div>
   );
 }
@@ -427,89 +438,64 @@ function CardMetric({ label, children }: { label: string; children: React.ReactN
  * Cartão do evento para celular e tablet (no lugar da tabela de 9 colunas,
  * que espremia o nome até sumir e sobrepunha a data). Mesmos dados e ações.
  */
-export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null }: Omit<EventRowProps, "gridCols">) {
-  const {
-    score, fc, total, evalTotal, evalDone, finalPubCount, partialOnlyCount, isPureHistorical,
-    hasEvals, hasAnyPublication, missing, evaluationsHref, evalTooltip, accentColor,
-    scoreLabel, scoreLabelColor, evalColor, dateStr, badge, pendingRH, nextCycle, isPreview, previewPartial,
-  } = deriveEventRow(ev, undefined, eventCycle, areaCounts);
+export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: Omit<EventRowProps, "gridCols">) {
+  const r = deriveEventRow(ev, undefined, eventCycle, areaCounts);
   const isAdmin = hasRole(user, "admin");
   const [details, setDetails] = useState<EventDetailsKind | null>(null);
+  const missingShown = r.missing.length > 0 && !r.hasEvals && !r.hasAnyPublication;
+  const showPeriod = eventPeriodPosition(ev, eventCycle) !== "inside" && !r.nextCycle;
 
   return (
     <article
       data-testid={`card-event-${ev.id}`}
       aria-labelledby={`card-event-title-${ev.id}`}
-      className="relative overflow-hidden rounded-xl pl-4 pr-3 py-3"
-      style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
+      className="relative h-full flex flex-col rounded-2xl border border-border bg-card overflow-hidden"
     >
-      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accentColor }} aria-hidden />
+      <span aria-hidden className={cn("absolute left-0 top-4 bottom-4 w-[3px] rounded-r-full", accentCls(r, ev))} />
 
-      <div className="flex items-start gap-3">
+      <div className="px-4 pt-4 flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <Link id={`card-event-title-${ev.id}`} href={`/events/${ev.id}`} className="text-[14px] font-bold uppercase leading-snug block break-words transition-colors hover:opacity-70">
+          <Link id={`card-event-title-${ev.id}`} href={`/events/${ev.id}`}
+            className={cn("font-condensed block text-[18px] font-black uppercase leading-[1.08] tracking-[-0.005em] text-foreground break-words rounded-sm", FOCUS_RING)}>
             {ev.name}
           </Link>
-          <NameMeta ev={ev} pendingRH={pendingRH} />
+          <NameMeta ev={ev} pendingRH={r.pendingRH} />
         </div>
-        <div className="shrink-0 text-right">
-          <ScoreBlock big score={score} fc={fc} label={scoreLabel} labelColor={scoreLabelColor} isPreview={isPreview} previewPartial={previewPartial} hasEvals={hasEvals} />
-        </div>
+        {showScore && (
+          <div className="shrink-0 pt-0.5">
+            <ScoreBlock align="right" score={r.score} fc={r.fc} label={r.scoreLabel} labelColor={r.scoreLabelColor} isPreview={r.isPreview} previewPartial={r.previewPartial} hasEvals={r.hasEvals} />
+          </div>
+        )}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[12px] font-semibold whitespace-nowrap">{dateStr}</span>
-        <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-          <Users size={12} aria-hidden /> {ev.participantCount ?? 0}<span className="sr-only"> participantes</span>
+      <div className="px-4 mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <DateText ev={ev} dateStr={r.dateStr} inline />
+        <span className="inline-flex items-center gap-1 font-condensed text-[15px] font-bold tabular-nums text-muted-foreground">
+          <Users size={14} aria-hidden /> {ev.participantCount ?? 0}<span className="sr-only"> participantes</span>
         </span>
-        <StatusBadgeView ev={ev} badge={badge} readOnly={readOnly} nextCycle={nextCycle} cycle={eventCycle} />
+        <StatusBadgeView ev={ev} badge={r.badge} readOnly={readOnly} nextCycle={r.nextCycle} cycle={eventCycle} />
+        {showPeriod && <PeriodBadge ev={ev} cycle={eventCycle} hideAfter={r.nextCycle} />}
+        {cycleLabel && <CycleLabelBadge ev={ev} cycleLabel={cycleLabel} />}
       </div>
-      {((eventPeriodPosition(ev, eventCycle) !== "inside" && !nextCycle) || cycleLabel) && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <PeriodBadge ev={ev} cycle={eventCycle} hideAfter={nextCycle} />
-          {cycleLabel && <CycleLabelBadge ev={ev} cycleLabel={cycleLabel} />}
-        </div>
-      )}
-      {missing.length > 0 && !hasEvals && !hasAnyPublication && (
-        <p className="text-[11px] font-bold uppercase mt-1" style={{ color: DANGER_TEXT }}>Sem aval.: {missing.join(", ")}</p>
+      {missingShown && (
+        <p className="px-4 mt-1.5 font-condensed text-[12px] font-bold uppercase tracking-[0.05em] text-[var(--status-danger-text)]">Sem avaliador: {r.missing.join(", ")}</p>
       )}
 
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        <CardMetric label="Avaliações">
-          {ev.isHistorical || evalTotal === 0 ? <span className="text-[11px] italic opacity-40">—</span>
-            : (
-              <DetailTrigger enabled={isAdmin} label={`Ver detalhes das avaliações de ${ev.name}`} onOpen={() => setDetails("evaluations")}>
-                <MiniBar value={evalDone} total={evalTotal} color={evalColor} title={isAdmin ? undefined : evalTooltip} />
-              </DetailTrigger>
-            )}
-        </CardMetric>
-        <CardMetric label="Publicadas">
-          {isPureHistorical || total === 0 ? <span className="text-[11px] italic opacity-40">—</span>
-            : (
-              <DetailTrigger enabled={isAdmin} label={`Ver detalhes das calibrações de ${ev.name}`} onOpen={() => setDetails("calibrations")}>
-                <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
-              </DetailTrigger>
-            )}
-        </CardMetric>
-        <CardMetric label="Matriz">
-          {!ev.conformityNeeded ? <span className="text-[11px] italic opacity-40">—</span> : (
-            <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => setDetails("matrix")}>
-              <MiniBar
-                value={ev.conformityFilled ?? 0}
-                total={ev.conformityTotal ?? 0}
-                color={matrixColor(ev)}
-                title={isAdmin ? undefined : `${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
-              />
-            </DetailTrigger>
-          )}
-        </CardMetric>
+      <div className="mx-4 mt-3.5 pt-3 border-t border-border grid grid-cols-3 gap-4">
+        <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails}
+          wrap={(key, label, node) => (
+            <div key={key} className="min-w-0">
+              <Eyebrow as="span" className="block mb-2 text-[11.5px]">{label}</Eyebrow>
+              {node}
+            </div>
+          )} />
       </div>
       {details && <EventDetailsDialog ev={ev} kind={details} areaMode={!!eventCycle?.areaEvaluation} onClose={() => setDetails(null)} />}
 
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-auto px-4 pt-3.5 pb-4 flex items-center justify-between gap-2">
         <PendingPublishBadge ev={ev} />
-        <div className="ml-auto flex items-center gap-1.5">
-          <EventActions ev={ev} user={user} readOnly={readOnly} evaluationsHref={evaluationsHref} onEdit={onEdit} onMerge={onMerge} onDelete={onDelete} />
+        <div className="ml-auto flex items-center gap-2">
+          <EventActions ev={ev} user={user} readOnly={readOnly} evaluationsHref={r.evaluationsHref} onEdit={onEdit} onMerge={onMerge} onDelete={onDelete} variant="card" />
         </div>
       </div>
     </article>
