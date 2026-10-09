@@ -1,43 +1,55 @@
+// "Roteamento e link" de um critério: avaliador principal, para onde pode
+// redirecionar e se permite link para freela. O PUT substitui o roteamento
+// inteiro, então o que a tela não edita (comentário obrigatório, avaliador da
+// matriz) é reenviado como estava.
 import { useState } from "react";
 import type { Criterion } from "@workspace/api-client-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AlertTriangle, Check, Info, Loader2, Route, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle } from "lucide-react";
 import { useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
-import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle, evaluatorsForArea } from "./helpers";
+import { displayCriterionName } from "@/lib/criterion-name";
+import { cn, plural } from "@/lib/utils";
+import { SwitchRow } from "../cycles/cycles-ui";
+import { DialogHeading, Eyebrow, FOCUS_RING, FieldLabel, Notice, Segmented, btnPrimary, btnSecondary, dialogCls, dialogFooterCls, inputCls, useReturnFocus } from "./criteria-ui";
+import { evaluatorsForArea, serverMessage } from "./helpers";
+import { extraAreasOf } from "./evaluating-areas";
 import type { AreaOption, EvaluatorOption } from "./types";
 
-/** Diálogo "Roteamento — {critério}": casca do Dialog + formulário de roteamento. */
+type RedirectMode = "none" | "area" | "specific";
+
+/** Casca do diálogo; o formulário monta de novo a cada critério aberto. */
 export function CriterionRoutingDialog({
-  criterionId, criterion, currentRouting, areas, evaluators, onClose,
+  criterionId, criterion, currentRouting, areas, evaluators, areaMode, onClose,
 }: {
   criterionId: number | null;
   criterion: Criterion | null | undefined;
   currentRouting: CriterionRouting | undefined;
   areas: AreaOption[];
   evaluators: (EvaluatorOption & { areaId?: number | null })[];
+  areaMode: boolean;
   onClose: () => void;
 }) {
+  const open = criterionId !== null;
+  const onCloseAutoFocus = useReturnFocus(open);
+  const [pending, setPending] = useState(false);
   return (
-    <Dialog open={criterionId !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Route size={18} /> Roteamento — {criterion?.name}
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={v => { if (!v && !pending) onClose(); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[560px] max-h-[92dvh] overflow-y-auto")} data-testid="routing-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Route} Title={DialogTitle} Description={DialogDescription} title="Roteamento e link"
+          description={criterion ? <><span className="font-semibold text-foreground">{displayCriterionName(criterion.name)}</span>{criterion.responsibleAreaName ? ` · ${criterion.responsibleAreaName}` : ""}</> : undefined} />
         {criterionId !== null && criterion && (
-          <RoutingConfigDialog
-            criterionId={criterionId}
-            criterionName={criterion.name}
+          <RoutingForm
+            key={criterionId}
+            criterion={criterion}
             currentRouting={currentRouting}
             areas={areas}
             evaluators={evaluatorsForArea(evaluators, criterion.responsibleAreaId)}
+            areaMode={areaMode}
+            onPendingChange={setPending}
             onClose={onClose}
           />
         )}
@@ -46,29 +58,34 @@ export function CriterionRoutingDialog({
   );
 }
 
-function RoutingConfigDialog({
-  criterionId, currentRouting, areas, evaluators, onClose,
-}: {
-  criterionId: number;
-  criterionName: string;
+function RoutingForm({ criterion, currentRouting, areas, evaluators, areaMode, onPendingChange, onClose }: {
+  criterion: Criterion;
   currentRouting: CriterionRouting | undefined;
   areas: AreaOption[];
   evaluators: EvaluatorOption[];
+  areaMode: boolean;
+  onPendingChange: (p: boolean) => void;
   onClose: () => void;
 }) {
   const { toast } = useToast();
-  const saveMutation = useSaveCriterionRouting(criterionId);
+  const saveMutation = useSaveCriterionRouting(criterion.id);
+  const id = `routing-${criterion.id}`;
 
   const [defaultEvaluatorId, setDefaultEvaluatorId] = useState<number | null>(currentRouting?.defaultEvaluatorId ?? null);
-  const [redirectMode, setRedirectMode] = useState<"none" | "area" | "specific">(currentRouting?.redirectMode ?? "none");
+  const [redirectMode, setRedirectMode] = useState<RedirectMode>(currentRouting?.redirectMode ?? "none");
   const [redirectAreaId, setRedirectAreaId] = useState<number | null>(currentRouting?.redirectAreaId ?? null);
-  const [selectedRedirectUsers, setSelectedRedirectUsers] = useState<Set<number>>(
-    new Set(currentRouting?.redirectUsers?.map(u => u.id) ?? []),
-  );
-  const [redirectSearch, setRedirectSearch] = useState("");
-  const [redirectCollapsed, setRedirectCollapsed] = useState(true);
+  const [selectedRedirectUsers, setSelectedRedirectUsers] = useState<Set<number>>(new Set(currentRouting?.redirectUsers?.map(u => u.id) ?? []));
   const [evalSearch, setEvalSearch] = useState("");
+  const [redirectSearch, setRedirectSearch] = useState("");
   const [allowPublicLink, setAllowPublicLink] = useState(currentRouting?.allowPublicLink ?? false);
+  const [error, setError] = useState<string | null>(null);
+
+  const extras = extraAreasOf(criterion, areas);
+  const evalQ = evalSearch.trim().toLowerCase();
+  const filteredEvaluators = evaluators.filter(u => u.name.toLowerCase().includes(evalQ));
+  const redirectQ = redirectSearch.trim().toLowerCase();
+  const filteredRedirect = evaluators.filter(u => u.name.toLowerCase().includes(redirectQ));
+  const pending = saveMutation.isPending;
 
   const toggleRedirectUser = (userId: number) => {
     setSelectedRedirectUsers(prev => {
@@ -78,161 +95,155 @@ function RoutingConfigDialog({
     });
   };
 
-  const filteredRedirectEvaluators = evaluators.filter(u =>
-    u.name.toLowerCase().includes(redirectSearch.toLowerCase()),
-  );
-
-  const filteredEvaluators = evaluators.filter(u =>
-    u.name.toLowerCase().includes(evalSearch.toLowerCase()),
-  );
-
-  const redirectCount = selectedRedirectUsers.size;
-
   const handleSave = () => {
+    setError(null);
+    onPendingChange(true);
     saveMutation.mutate({
       defaultEvaluatorId,
+      conformityEvaluatorId: currentRouting?.conformityEvaluatorId ?? null,
+      commentRequired: currentRouting?.commentRequired ?? true,
       redirectMode,
       redirectAreaId: redirectMode === "area" ? redirectAreaId : null,
       redirectUserIds: redirectMode === "specific" ? Array.from(selectedRedirectUsers) : undefined,
       allowPublicLink,
     }, {
-      onSuccess: () => { toast({ title: "Roteamento salvo" }); onClose(); },
-      onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+      onSuccess: () => { onPendingChange(false); toast({ title: "Roteamento salvo", description: displayCriterionName(criterion.name) }); onClose(); },
+      onError: (e: unknown) => { onPendingChange(false); setError(serverMessage(e)); },
     });
   };
 
   return (
-    <div className="space-y-5 pt-2">
-      {/* Avaliador Principal */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Avaliador Principal</Label>
-          <span className="rounded px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wider" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Obrigatório</span>
+    <div className="space-y-5">
+      {areaMode && (
+        <Notice icon={Info} tone="info" testId="routing-area-mode-notice">
+          <span className="font-semibold text-foreground">Ciclo por área:</span> qualquer avaliador da área responde e a primeira resposta enviada fecha o critério. Avaliador principal e redirecionamento valem nos ciclos com designação.
+        </Notice>
+      )}
+
+      {/* Avaliador principal */}
+      <section aria-labelledby={`${id}-main`} className="space-y-2">
+        <div>
+          <Eyebrow as="h3" id={`${id}-main`}>Avaliador principal</Eyebrow>
+          <p className="mt-1 text-[13px] text-muted-foreground">Vem designado ao liberar as avaliações de um evento.</p>
         </div>
-        <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Responsável padrão por este critério. Pré-selecionado ao gerar atribuições para um evento.</p>
-        <Input placeholder="Buscar avaliador..." value={evalSearch} onChange={e => setEvalSearch(e.target.value)} className="h-9 rounded-lg text-sm" style={fieldStyle} />
-        <div className="rounded-lg max-h-40 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
-          {defaultEvaluatorId == null && (
-            <button type="button" onClick={() => setDefaultEvaluatorId(null)} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-left" style={{ backgroundColor: "var(--secondary)" }}>
-              <span>— Sem avaliador</span>
-            </button>
-          )}
-          {filteredEvaluators.map((u, i) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => setDefaultEvaluatorId(u.id)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
-              style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === defaultEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === defaultEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
-            >
-              {u.id === defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
-              <span className="flex items-center gap-2"><UserCheck size={13} style={{ color: "var(--accent-text)" }} />{u.name}</span>
-            </button>
-          ))}
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="relative border-b border-border">
+            <Search size={14} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input type="search" value={evalSearch} onChange={e => setEvalSearch(e.target.value)} aria-label="Buscar avaliador principal" placeholder="Buscar avaliador"
+              className="w-full h-11 bg-card pl-9 pr-3 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:bg-secondary/40 [&::-webkit-search-cancel-button]:hidden" />
+          </div>
+          <div role="radiogroup" aria-labelledby={`${id}-main`} className="max-h-44 overflow-y-auto p-1">
+            {filteredEvaluators.length === 0 && (
+              <p className="px-3 py-4 text-center text-[13px] text-muted-foreground">{evaluators.length === 0 ? "Nenhum avaliador ativo nesta área." : <>Ninguém com “{evalSearch.trim()}”.</>}</p>
+            )}
+            {filteredEvaluators.map(u => {
+              const on = u.id === defaultEvaluatorId;
+              return (
+                <button key={u.id} type="button" role="radio" aria-checked={on} disabled={pending} onClick={() => setDefaultEvaluatorId(u.id)}
+                  className={cn("w-full flex items-center gap-2 min-h-11 lg:min-h-9 px-2.5 rounded-md text-left text-[14px] transition-colors duration-150 hover:bg-secondary", on && "bg-secondary/70 font-semibold", FOCUS_RING, "focus-visible:ring-offset-0")}>
+                  <span className={cn("w-4 h-4 shrink-0 rounded-full border flex items-center justify-center", on ? "border-foreground bg-foreground text-background" : "border-border")}>
+                    {on && <Check size={10} aria-hidden strokeWidth={3} />}
+                  </span>
+                  <span className="truncate">{u.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         {defaultEvaluatorId == null && (
-          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase" style={{ color: DANGER_TEXT }}>
-            <AlertCircle size={12} /> Sem avaliador principal definido
-          </p>
+          areaMode
+            ? <p className="text-[12.5px] text-muted-foreground">Sem principal: neste ciclo é o normal.</p>
+            : <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--status-warn-text)]"><AlertTriangle size={13} aria-hidden /> Sem avaliador principal: ninguém vem designado ao liberar o evento.</p>
         )}
-      </div>
+      </section>
 
       {/* Redirecionamento */}
-      <div className="space-y-2 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pode Redirecionar Para</Label>
-        <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Quando o principal não puder avaliar, para onde pode redirecionar?</p>
-        <Select value={redirectMode} onValueChange={v => { setRedirectMode(v as "none" | "area" | "specific"); setRedirectCollapsed(true); }}>
-          <SelectTrigger className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sem redirecionamento</SelectItem>
-            <SelectItem value="area">Qualquer usuário da área</SelectItem>
-            <SelectItem value="specific">Usuários específicos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {redirectMode === "area" && (
-        <div className="space-y-2">
-          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área de Redirecionamento</Label>
-          <Select value={redirectAreaId != null ? String(redirectAreaId) : "__none"} onValueChange={v => setRedirectAreaId(v === "__none" ? null : parseInt(v))}>
-            <SelectTrigger className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
-              <SelectValue placeholder="Selecione a área..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">— Selecione</SelectItem>
-              {areas.map(a => (
-                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <section aria-labelledby={`${id}-redirect`} className="space-y-2.5 pt-4 border-t border-border">
+        <div>
+          <Eyebrow as="h3" id={`${id}-redirect`}>Quando o principal não puder</Eyebrow>
+          <p className="mt-1 text-[13px] text-muted-foreground">Para quem ele pode passar a avaliação.</p>
         </div>
-      )}
-
-      {redirectMode === "specific" && (
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setRedirectCollapsed(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors hover:opacity-90"
-            style={{ backgroundColor: "var(--secondary)" }}
-          >
-            <span className="flex items-center gap-2 font-bold uppercase text-xs" style={{ color: "var(--muted-foreground)" }}>
-              <Users size={13} />
-              {redirectCount === 0
-                ? "Nenhum avaliador de backup selecionado"
-                : `${redirectCount} avaliador${redirectCount > 1 ? "es" : ""} de backup selecionado${redirectCount > 1 ? "s" : ""}`}
-            </span>
-            {redirectCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-
-          {!redirectCollapsed && (
-            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-              <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                <Input placeholder="Buscar avaliador..." value={redirectSearch} onChange={e => setRedirectSearch(e.target.value)} className="h-8 rounded-lg text-sm" style={fieldStyle} />
-              </div>
-              <div className="max-h-44 overflow-y-auto">
-                {filteredRedirectEvaluators.length === 0 ? (
-                  <p className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado para "{redirectSearch}"</p>
-                ) : filteredRedirectEvaluators.map((u, i) => (
-                  <label key={u.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:opacity-90" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: selectedRedirectUsers.has(u.id) ? "rgba(154,176,0,0.10)" : "transparent" }}>
-                    <input type="checkbox" checked={selectedRedirectUsers.has(u.id)} onChange={() => toggleRedirectUser(u.id)} className="h-4 w-4" />
-                    <span className="text-sm font-bold uppercase">{u.name}</span>
-                    {u.id === defaultEvaluatorId && (
-                      <span className="ml-auto text-[11px] font-black uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Principal</span>
-                    )}
-                  </label>
-                ))}
+        <Segmented<RedirectMode>
+          label="Redirecionamento"
+          value={redirectMode}
+          onChange={v => setRedirectMode(v)}
+          disabled={pending}
+          options={[
+            { value: "none", label: "Não redireciona", testId: "redirect-mode-none" },
+            { value: "area", label: "Uma área", testId: "redirect-mode-area" },
+            { value: "specific", label: "Pessoas", testId: "redirect-mode-specific" },
+          ]}
+        />
+        {redirectMode === "area" && (
+          <div>
+            <FieldLabel htmlFor={`${id}-redirect-area`}>Área de redirecionamento</FieldLabel>
+            <Select value={redirectAreaId != null ? String(redirectAreaId) : undefined} onValueChange={v => setRedirectAreaId(parseInt(v))} disabled={pending}>
+              <SelectTrigger id={`${id}-redirect-area`} className={cn(inputCls, "justify-between")}>
+                <SelectValue placeholder="Selecione a área…" />
+              </SelectTrigger>
+              <SelectContent>
+                {areas.filter(a => a.active !== false || a.id === redirectAreaId).map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="mt-1.5 text-[12.5px] text-muted-foreground">Qualquer usuário dessa área pode receber.</p>
+          </div>
+        )}
+        {redirectMode === "specific" && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/40">
+              <span className="text-[13px] font-semibold text-foreground" aria-live="polite">
+                {selectedRedirectUsers.size === 0 ? "Ninguém marcado" : plural(selectedRedirectUsers.size, "pessoa marcada", "pessoas marcadas")}
+              </span>
+              <div className="relative ml-auto w-[min(200px,50%)]">
+                <Search size={13} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input type="search" value={redirectSearch} onChange={e => setRedirectSearch(e.target.value)} aria-label="Buscar pessoa para redirecionamento" placeholder="Buscar"
+                  className="w-full h-11 lg:h-8 rounded-md border border-border bg-card pl-8 pr-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 [&::-webkit-search-cancel-button]:hidden" />
               </div>
             </div>
-          )}
-        </div>
-      )}
+            <div className="max-h-44 overflow-y-auto p-1">
+              {filteredRedirect.length === 0 ? (
+                <p className="px-3 py-4 text-center text-[13px] text-muted-foreground">Ninguém com “{redirectSearch.trim()}”.</p>
+              ) : filteredRedirect.map(u => {
+                const on = selectedRedirectUsers.has(u.id);
+                const cbId = `${id}-redirect-user-${u.id}`;
+                return (
+                  <label key={u.id} htmlFor={cbId} className={cn("flex items-center gap-2.5 min-h-11 lg:min-h-9 px-2.5 rounded-md cursor-pointer text-[14px] transition-colors duration-150 hover:bg-secondary has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring", on && "bg-secondary/70")}>
+                    <input id={cbId} type="checkbox" checked={on} onChange={() => toggleRedirectUser(u.id)} disabled={pending} className="w-4 h-4 shrink-0 accent-[var(--foreground)]" />
+                    <span className={cn("truncate", on && "font-semibold")}>{u.name}</span>
+                    {u.id === defaultEvaluatorId && <span className="ml-auto font-condensed text-[11.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground">Principal</span>}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
-      {/* Link Freelancer */}
-      <div className="space-y-2 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-        <label className="flex items-start gap-2.5 cursor-pointer">
-          <input type="checkbox" checked={allowPublicLink} onChange={e => setAllowPublicLink(e.target.checked)} className="h-4 w-4 mt-0.5" />
-          <span>
-            <span className="block font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Permite link para freela</span>
-            <span className="block text-[11px]" style={{ color: "var(--muted-foreground)" }}>Libera gerar um link público de avaliação (sem conta no sistema) para este critério — use só para áreas que recebem freelas (ex.: Ativação, Produção, Cenografia). Logística e Atendimento são sempre time da casa, não precisam disso.</span>
-          </span>
-        </label>
+      {/* Link para freela */}
+      <div className="pt-4 border-t border-border">
+        <SwitchRow
+          id={`${id}-public-link`}
+          testId="routing-public-link"
+          title="Permite link para freela"
+          control={<Switch id={`${id}-public-link`} checked={allowPublicLink} onCheckedChange={setAllowPublicLink} disabled={pending} className="data-[state=unchecked]:bg-muted-foreground/40" />}
+        >
+          Libera um link de avaliação sem conta no sistema, para quem é freela. Use nas áreas que recebem freelas (Ativação, Produção, Cenografia); Logística e Atendimento são time da casa.
+          {extras.length > 0 && <span className="block mt-1 font-semibold text-foreground">Vale para todas as {1 + extras.length} áreas que avaliam este critério.</span>}
+        </SwitchRow>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-        <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-lg font-bold uppercase text-xs transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
-          Cancelar
-        </button>
-        <button
-          type="button"
-          disabled={saveMutation.isPending}
-          onClick={handleSave}
-          className="px-5 py-2.5 rounded-lg font-bold uppercase text-xs disabled:opacity-50 transition-opacity hover:opacity-90"
-          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-        >
-          {saveMutation.isPending ? "Salvando..." : "Salvar Roteamento"}
+      {error && (
+        <Notice icon={AlertTriangle} tone="danger" testId="routing-save-error">
+          <p className="font-semibold text-foreground">Não foi possível salvar o roteamento</p>
+          <p className="mt-0.5">{error}</p>
+        </Notice>
+      )}
+
+      <div className={dialogFooterCls}>
+        <button type="button" onClick={onClose} disabled={pending} className={btnSecondary}>Cancelar</button>
+        <button type="button" data-testid="button-save-routing" disabled={pending} aria-busy={pending || undefined} onClick={handleSave} className={btnPrimary}>
+          {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+          {pending ? "Salvando…" : "Salvar roteamento"}
         </button>
       </div>
     </div>

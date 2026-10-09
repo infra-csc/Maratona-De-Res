@@ -1,7 +1,4 @@
-import type { CSSProperties } from "react";
 import type { ConformityArea } from "./types";
-
-export const fieldStyle: CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 /** Mensagem do servidor sem o prefixo "HTTP 409 Conflict: " que o cliente gerado acrescenta. */
 export function serverMessage(e: unknown): string {
@@ -39,12 +36,30 @@ export function conformityAreasOf(areas: { id: number; name: string }[], opts: {
       const n = a.name.trim().toLowerCase();
       return n.includes("cenografia") || n.includes("ferramentas");
     })
-    .map(a => ({
-      ...a,
-      description: a.name.trim().toLowerCase().includes("ferramentas")
-        ? "1 pergunta: Guarda de Equipamentos"
-        : opts.withoutConduta
-          ? "2 perguntas (EPI, Estaiamentos) + faltas/atrasos e destaque — a Conduta saiu da matriz neste ciclo"
-          : "EPI, Estaiamentos e Conduta (a Conduta sai nos ciclos sem ela) + faltas/atrasos e destaque",
-    }));
+    .map(a => {
+      const tools = a.name.trim().toLowerCase().includes("ferramentas");
+      return {
+        ...a,
+        questions: tools ? ["Guarda de equipamentos"] : opts.withoutConduta ? ["EPI", "Estaiamentos"] : ["EPI", "Estaiamentos", "Conduta"],
+        extra: tools ? null : "Faltas/atrasos e destaque",
+        note: !tools && opts.withoutConduta ? "A Conduta saiu da matriz neste ciclo." : null,
+      };
+    });
+}
+
+/** Ids das áreas que respondem o critério (responsável + extras; todas as ativas com evaluateAllAreas). */
+export function evaluatingAreaIdsOf(
+  c: { responsibleAreaId?: number | null; evaluateAllAreas?: boolean; evaluatingAreaIds?: number[] },
+  areas: { id: number; active?: boolean }[],
+): Set<number> {
+  const ids = new Set<number>();
+  if (c.responsibleAreaId != null) ids.add(c.responsibleAreaId);
+  if (c.evaluateAllAreas) areas.filter(a => a.active !== false).forEach(a => ids.add(a.id));
+  else (c.evaluatingAreaIds ?? []).forEach(id => ids.add(id));
+  return ids;
+}
+
+/** Peso como fatia do total ("23%"); total zero vira "—". */
+export function weightShare(weight: number, total: number): number | null {
+  return total > 0 ? (weight / total) * 100 : null;
 }

@@ -1,94 +1,152 @@
-import { useState } from "react";
-import { useSetAreaConformityRouting, getGetConformityRoutingQueryKey, useGetCurrentCycle } from "@workspace/api-client-react";
+import { useRef, useState, type ReactNode } from "react";
+import { useSetAreaConformityRouting, getGetConformityRoutingQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { Check, UserCheck, AlertCircle, Users } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Loader2, Search, UserCheck, Users } from "lucide-react";
 import { useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
-import { DANGER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle } from "./helpers";
+import { cn } from "@/lib/utils";
+import { Eyebrow, FOCUS_RING } from "./criteria-ui";
+import { serverMessage } from "./helpers";
 import type { EvaluatorOption } from "./types";
 
-/** Avaliador padrão do critério, trocado direto na linha da tabela (mantém o resto do roteamento). */
+/** Texto do gatilho: nome, "qualquer avaliador da área" (ciclo por área) ou o alerta "sem avaliador". */
+function TriggerLabel({ name, areaMode, testId }: { name: string | null; areaMode: boolean; testId?: string }) {
+  if (name) {
+    return (
+      <span className="flex items-center gap-1.5 min-w-0 text-[14px] font-semibold text-foreground">
+        <UserCheck size={14} aria-hidden className="shrink-0 text-[var(--accent-text)]" />
+        <span className="truncate">{name}</span>
+      </span>
+    );
+  }
+  if (areaMode) {
+    return (
+      <span data-testid={testId} className="flex items-start gap-1.5 min-w-0 text-[13.5px] text-muted-foreground">
+        <Users size={14} aria-hidden className="shrink-0 mt-0.5" />
+        <span className="leading-snug">Qualquer avaliador da área</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--status-danger-text)]">
+      <AlertCircle size={14} aria-hidden className="shrink-0" /> Sem avaliador
+    </span>
+  );
+}
+
+/** Popover de escolha: título, busca e a lista (selecionado com ✓). */
+function PickerPanel({ title, hint, evaluators, currentId, pending, onPick }: {
+  title: string;
+  hint?: ReactNode;
+  evaluators: EvaluatorOption[];
+  currentId: number | null;
+  pending: boolean;
+  onPick: (id: number) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(q));
+  return (
+    <>
+      <div className="p-3 space-y-2 border-b border-border">
+        <Eyebrow>{title}</Eyebrow>
+        {hint && <p className="text-[12.5px] leading-snug text-muted-foreground">{hint}</p>}
+        <div className="relative">
+          <Search size={14} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input type="search" autoFocus value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar avaliador por nome" placeholder="Buscar por nome"
+            className="w-full h-11 lg:h-9 rounded-lg border border-border bg-card pl-8 pr-2.5 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/30 [&::-webkit-search-cancel-button]:hidden" />
+        </div>
+      </div>
+      <div role="listbox" aria-label={title} className="max-h-60 overflow-y-auto p-1">
+        {filtered.length === 0 && (
+          <p className="px-3 py-5 text-center text-[13px] text-muted-foreground">{evaluators.length === 0 ? "Nenhum avaliador ativo nesta área." : <>Ninguém com “{search.trim()}”.</>}</p>
+        )}
+        {filtered.map(u => {
+          const on = u.id === currentId;
+          return (
+            <button key={u.id} type="button" role="option" aria-selected={on} disabled={pending} onClick={() => onPick(u.id)}
+              className={cn("w-full flex items-center gap-2 min-h-11 lg:min-h-9 px-2.5 rounded-md text-left text-[14px] transition-colors duration-150 hover:bg-secondary disabled:opacity-60", on ? "font-semibold text-foreground bg-secondary/70" : "text-foreground", FOCUS_RING, "focus-visible:ring-offset-0")}>
+              <span className="w-4 shrink-0">{on && <Check size={14} aria-hidden className="text-[var(--accent-text)]" />}</span>
+              <span className="truncate">{u.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      {pending && (
+        <div role="status" className="flex items-center justify-center gap-2 px-3 py-2 border-t border-border text-[12.5px] font-semibold text-muted-foreground">
+          <Loader2 size={13} aria-hidden className="motion-safe:animate-spin" /> Salvando…
+        </div>
+      )}
+    </>
+  );
+}
+
+const popoverCls = "font-body w-[min(300px,calc(100vw-24px))] p-0 rounded-xl border-border bg-popover text-popover-foreground shadow-lg";
+const triggerCls = cn("group/p -mx-2 -my-1 px-2 py-1 min-h-11 lg:min-h-9 max-w-full rounded-lg inline-flex items-center gap-1.5 text-left transition-colors duration-150 hover:bg-secondary data-[state=open]:bg-secondary", FOCUS_RING);
+
+/** Avaliador padrão do critério, trocado direto na linha (mantém o resto do roteamento). */
 export function EvaluatorPickerCell({
-  criterionId, currentRouting, evaluators, onSaved,
+  criterionId, criterionName, currentRouting, evaluators, onSaved, areaMode, canEdit,
 }: {
   criterionId: number;
+  criterionName: string;
   currentRouting: CriterionRouting | undefined;
   evaluators: EvaluatorOption[];
   onSaved: () => void;
+  /** Ciclo atual por área: sem avaliador padrão é o normal, não um alerta. */
+  areaMode: boolean;
+  canEdit: boolean;
 }) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const saveMutation = useSaveCriterionRouting(criterionId);
+  const current = currentRouting?.defaultEvaluatorName ?? null;
 
-  const handleSelect = (userId: number | null) => {
+  const handleSelect = (userId: number) => {
+    // PUT substitui o roteamento inteiro: reenvia tudo o que já estava gravado.
     saveMutation.mutate({
       defaultEvaluatorId: userId,
+      conformityEvaluatorId: currentRouting?.conformityEvaluatorId ?? null,
       commentRequired: currentRouting?.commentRequired ?? true,
       redirectMode: currentRouting?.redirectMode ?? "none",
       redirectAreaId: currentRouting?.redirectAreaId ?? null,
       redirectUserIds: currentRouting?.redirectUsers?.map(u => u.id) ?? [],
+      allowPublicLink: currentRouting?.allowPublicLink ?? false,
     }, {
-      onSuccess: () => { setOpen(false); setSearch(""); onSaved(); },
+      onSuccess: () => {
+        setOpen(false);
+        onSaved();
+        toast({ title: "Avaliador padrão salvo", description: evaluators.find(u => u.id === userId)?.name });
+      },
+      onError: (e: unknown) => toast({ title: "Não foi possível salvar o avaliador", description: serverMessage(e), variant: "destructive" }),
     });
   };
 
-  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
-  const current = currentRouting?.defaultEvaluatorName ?? null;
-  // Ciclo atual POR ÁREA: ninguém é designado — sem avaliador padrão é o normal
-  // (qualquer avaliador da área responde), não um alerta.
-  const { data: cycle } = useGetCurrentCycle();
-  const areaMode = !!cycle?.areaEvaluation && cycle.status !== "closed";
+  const label = <TriggerLabel name={current} areaMode={areaMode} testId={`criterion-area-mode-any-${criterionId}`} />;
+  if (!canEdit) return <div className="min-h-9 flex items-center">{label}</div>;
 
   return (
-    <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="flex items-center gap-1.5 text-left" title={areaMode && !current ? "No ciclo por área, qualquer avaliador da área do critério responde. O avaliador padrão só vale num ciclo com designação. Clique para definir." : "Clique para definir o avaliador padrão"}>
-          {current ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80">
-              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent-text)" }} />
-              {current}
-            </span>
-          ) : areaMode ? (
-            <span data-testid={`criterion-area-mode-any-${criterionId}`} className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: "var(--muted-foreground)" }}>
-              <Users size={12} className="shrink-0" aria-hidden /> Qualquer avaliador da área (ciclo por área)
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: DANGER_TEXT }}>
-              <AlertCircle size={12} /> Sem avaliador
-            </span>
-          )}
+        <button ref={triggerRef} type="button" data-testid={`button-evaluator-picker-${criterionId}`} className={triggerCls}
+          aria-label={`Avaliador padrão de ${criterionName}: ${current ?? (areaMode ? "qualquer avaliador da área" : "sem avaliador")}. Trocar`}>
+          {label}
+          <ChevronDown size={13} aria-hidden className="shrink-0 text-muted-foreground opacity-60 group-hover/p:opacity-100" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0 rounded-xl" align="start" onClick={e => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <div className="p-2" style={{ borderBottom: "1px solid var(--border)" }}>
-          <p className="text-[11px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão</p>
-          <Input placeholder="Buscar por nome..." value={search} onChange={e => setSearch(e.target.value)} className="h-7 text-xs rounded-lg" style={fieldStyle} autoFocus />
-        </div>
-        <div className="max-h-56 overflow-y-auto">
-          {filtered.length === 0 && (
-            <p className="text-center text-xs py-4" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado para "{search}"</p>
-          )}
-          {filtered.map((u, i) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => handleSelect(u.id)}
-              disabled={saveMutation.isPending}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
-              style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === currentRouting?.defaultEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === currentRouting?.defaultEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
-            >
-              {u.id === currentRouting?.defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
-              <span>{u.name}</span>
-            </button>
-          ))}
-        </div>
-        {saveMutation.isPending && (
-          <div className="p-2 text-center text-[11px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
-        )}
+      <PopoverContent className={popoverCls} align="start" sideOffset={6} onClick={e => e.stopPropagation()}
+        onCloseAutoFocus={e => { e.preventDefault(); triggerRef.current?.focus(); }}>
+        <PickerPanel
+          title="Avaliador padrão"
+          hint={areaMode ? "Neste ciclo qualquer avaliador da área responde. O padrão vale nos ciclos com designação." : "Vem marcado ao liberar as avaliações de um evento."}
+          evaluators={evaluators}
+          currentId={currentRouting?.defaultEvaluatorId ?? null}
+          pending={saveMutation.isPending}
+          onPick={handleSelect}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -96,73 +154,53 @@ export function EvaluatorPickerCell({
 
 /** Avaliador padrão de uma área da matriz de conformidade (Cenografia / Ferramentas e Case). */
 export function ConformityAreaEvaluatorPicker({
-  areaId, currentEvaluatorId, currentEvaluatorName, evaluators,
+  areaId, areaName, currentEvaluatorId, currentEvaluatorName, evaluators, areaMode, canEdit,
 }: {
   areaId: number;
+  areaName: string;
   currentEvaluatorId: number | null;
   currentEvaluatorName: string | null;
   evaluators: EvaluatorOption[];
+  areaMode: boolean;
+  canEdit: boolean;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const saveMutation = useSetAreaConformityRouting({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetConformityRoutingQueryKey() });
         setOpen(false);
-        setSearch("");
-        toast({ title: "Avaliador padrão da matriz salvo" });
+        toast({ title: "Avaliador padrão da matriz salvo", description: areaName });
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível salvar", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
-  const handleSelect = (userId: number | null) => {
-    saveMutation.mutate({ id: areaId, data: { defaultEvaluatorId: userId } });
-  };
-
-  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+  const label = <TriggerLabel name={currentEvaluatorName} areaMode={areaMode} testId={`conformity-area-mode-any-${areaId}`} />;
+  if (!canEdit) return <div className="min-h-9 flex items-center">{label}</div>;
 
   return (
-    <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="flex items-center gap-1.5 text-left" title="Clique para definir o avaliador padrão da matriz">
-          {currentEvaluatorName ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80">
-              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent-text)" }} />
-              {currentEvaluatorName}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: DANGER_TEXT }}>
-              <AlertCircle size={12} /> Sem avaliador
-            </span>
-          )}
+        <button ref={triggerRef} type="button" data-testid={`button-conformity-picker-${areaId}`} className={triggerCls}
+          aria-label={`Avaliador padrão da matriz de ${areaName}: ${currentEvaluatorName ?? (areaMode ? "qualquer avaliador da área" : "sem avaliador")}. Trocar`}>
+          {label}
+          <ChevronDown size={13} aria-hidden className="shrink-0 text-muted-foreground opacity-60 group-hover/p:opacity-100" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0 rounded-xl" align="start" onClick={e => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <div className="p-2" style={{ borderBottom: "1px solid var(--border)" }}>
-          <p className="text-[11px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão da Matriz</p>
-          <Input placeholder="Buscar por nome..." value={search} onChange={e => setSearch(e.target.value)} className="h-7 text-xs rounded-lg" style={fieldStyle} autoFocus />
-        </div>
-        <div className="max-h-56 overflow-y-auto">
-          {filtered.length === 0 && (
-            <p className="text-center text-xs py-4" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado para "{search}"</p>
-          )}
-          {filtered.map((u, i) => (
-            <button key={u.id} type="button" onClick={() => handleSelect(u.id)} disabled={saveMutation.isPending}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
-              style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === currentEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === currentEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
-            >
-              {u.id === currentEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
-              <span>{u.name}</span>
-            </button>
-          ))}
-        </div>
-        {saveMutation.isPending && (
-          <div className="p-2 text-center text-[11px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
-        )}
+      <PopoverContent className={popoverCls} align="end" sideOffset={6} onClick={e => e.stopPropagation()}
+        onCloseAutoFocus={e => { e.preventDefault(); triggerRef.current?.focus(); }}>
+        <PickerPanel
+          title={`Matriz · ${areaName}`}
+          hint={areaMode ? "Neste ciclo a matriz é respondida no formulário da área. O padrão vale nos ciclos com designação." : "Vem preenchido na matriz ao liberar as avaliações de um evento."}
+          evaluators={evaluators}
+          currentId={currentEvaluatorId}
+          pending={saveMutation.isPending}
+          onPick={id => saveMutation.mutate({ id: areaId, data: { defaultEvaluatorId: id } })}
+        />
       </PopoverContent>
     </Popover>
   );
