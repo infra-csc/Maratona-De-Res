@@ -1,21 +1,14 @@
 import type { RankingDetailBonusBreakdown } from "@workspace/api-client-react";
-import { Wallet2 } from "lucide-react";
-import { cn, fmtDate, fmtNum, plural, faixaEdge } from "@/lib/utils";
-import { CONDENSED, WARNING, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
-import { contrastingTextColor, fmtBRL, fmtBRLShort } from "./helpers";
-
-const BONUS_STATUS_LABEL: Record<string, string> = {
-  projected: "Projetado",
-  approved: "Aprovado",
-  scheduled: "Agendado",
-  paid: "Pago",
-  blocked: "Bloqueado",
-  not_eligible: "Não elegível",
-};
+import { AlertTriangle, Info, Wallet2 } from "lucide-react";
+import { cn, fmtDate, fmtNum, plural } from "@/lib/utils";
+import { fmtBRL, fmtBRLShort } from "./helpers";
+import { FaixaBadge } from "./badges";
+import { PayStatusChip } from "./payments-list";
+import { Notice, SectionTitle, surfaceCls } from "./results-ui";
 
 type BonusBreakdownData = RankingDetailBonusBreakdown;
 
-/** Conta completa do bônus no detalhamento: base + cada evento extra + total. */
+/** Conta completa do bônus na ficha: base da faixa + cada evento extra (valor da MESMA faixa) = total. */
 export function BonusBreakdownSection({ bd, readOnly = false }: { bd: BonusBreakdownData; readOnly?: boolean }) {
   const dateFull = { day: "2-digit", month: "2-digit", year: "numeric" } as const;
   const zeroMsg = bd.zeroReason === "not_eligible"
@@ -26,101 +19,84 @@ export function BonusBreakdownSection({ bd, readOnly = false }: { bd: BonusBreak
     ? "Resultado do ciclo ainda não calculado para este colaborador (nenhum evento confirmado que conte para nota)."
     : null;
   const diverges = bd.storedTotal != null && Math.abs(bd.storedTotal - bd.totalValue) > 0.01;
-  const rowStyle: React.CSSProperties = { backgroundColor: "var(--card)" };
-  const muted: React.CSSProperties = { color: "var(--muted-foreground)" };
+  const struck = !bd.applied && "line-through text-muted-foreground";
   return (
-    <section className="space-y-2.5" data-testid="detail-bonus-breakdown">
-      <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-        <Wallet2 size={14} /> Composição do Bônus
-      </h4>
+    <section data-testid="detail-bonus-breakdown">
+      <SectionTitle icon={Wallet2}>Composição do bônus</SectionTitle>
 
-      {zeroMsg && (
-        <div className="px-3 py-2.5 text-[12px] font-semibold leading-snug" style={{ border: "2px solid " + AMBER, color: "var(--foreground)", backgroundColor: "rgba(232,162,61,0.08)" }}>
-          {zeroMsg}
-        </div>
-      )}
+      {zeroMsg && <Notice icon={Info} tone="warn" className="mb-2.5">{zeroMsg}</Notice>}
 
-      <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+      <div className={cn(surfaceCls, "overflow-hidden")}>
         {/* Prêmio base */}
-        <div className="flex items-start gap-3 px-3 py-3" style={rowStyle}>
+        <div className="flex items-start gap-3 px-4 py-3.5">
           <div className="flex-1 min-w-0">
-            <p className="font-black uppercase text-[12px] leading-tight">Prêmio base da faixa</p>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-bold" style={muted}>
-              {bd.basePlatoon ? (
-                <span className="px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: bd.basePlatoonColor ?? "var(--secondary)", color: bd.basePlatoonColor ? contrastingTextColor(bd.basePlatoonColor) : "var(--muted-foreground)", ...faixaEdge(bd.basePlatoonColor) }}>
-                  {bd.basePlatoon}
-                  {bd.basePlatoonMinScore != null && bd.basePlatoonMaxScore != null && (
-                    <span className="opacity-60 ml-1">{bd.basePlatoonMinScore}–{bd.basePlatoonMaxScore}</span>
-                  )}
-                </span>
-              ) : <span>Sem faixa</span>}
-              <span>· nota final {bd.baseScore != null ? fmtNum(bd.baseScore, 2) : "—"}</span>
+            <p className="font-condensed text-[15px] font-bold uppercase leading-tight">Prêmio base da faixa</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
+              {bd.basePlatoon
+                ? <FaixaBadge name={bd.basePlatoon} color={bd.basePlatoonColor} minScore={bd.basePlatoonMinScore} maxScore={bd.basePlatoonMaxScore} />
+                : <span>Sem faixa</span>}
+              <span className="tabular-nums">nota final {bd.baseScore != null ? fmtNum(bd.baseScore, 2) : "—"}</span>
             </div>
           </div>
-          <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.baseValue)}</span>
+          <span className={cn("font-condensed text-[20px] font-black tabular-nums shrink-0", struck)}>{fmtBRL(bd.baseValue)}</span>
         </div>
 
         {/* Eventos extras */}
-        <div className="px-3 py-3" style={{ ...rowStyle, borderTop: "1px solid var(--border)" }}>
+        <div className="px-4 py-3.5 border-t border-border">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-black uppercase text-[12px] leading-tight">Bônus por evento extra</p>
-              <p className="mt-1 text-[11px] font-bold" style={muted}>
+              <p className="font-condensed text-[15px] font-bold uppercase leading-tight">Bônus por evento extra</p>
+              <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
                 {plural(bd.scoredEventsCount, "prova pontuada", "provas pontuadas")} · mínimo {bd.minEvents} · {plural(bd.extraEvents.length, "extra", "extras")} × {fmtBRL(bd.extraEvents[0]?.value ?? 0)}, o valor por evento adicional da faixa da média. Extras contados a partir da {bd.minEvents + 1}ª prova, em ordem de data.
               </p>
             </div>
-            <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.extraValue)}</span>
+            <span className={cn("font-condensed text-[20px] font-black tabular-nums shrink-0", struck)}>{fmtBRL(bd.extraValue)}</span>
           </div>
           {bd.extraEvents.length > 0 ? (
-            <div className="mt-2.5 rounded-md overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-              {bd.extraEvents.map((ev, idx) => (
-                <div key={ev.eventId} data-testid={"detail-bonus-extra-" + ev.eventId} className="flex items-center gap-2.5 px-2.5 py-2" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--secondary)" }}>
-                  <span className="text-[11px] font-black shrink-0 w-7 text-center" style={muted}>{ev.position}ª</span>
+            <ol className="mt-3 rounded-lg border border-border divide-y divide-border overflow-hidden bg-secondary/40">
+              {bd.extraEvents.map(ev => (
+                <li key={ev.eventId} data-testid={"detail-bonus-extra-" + ev.eventId} className="flex items-center gap-3 px-3 py-2">
+                  <span className="font-condensed text-[13px] font-bold w-7 text-center text-muted-foreground tabular-nums shrink-0">{ev.position}ª</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold uppercase text-[11px] leading-tight truncate" title={ev.eventName}>{ev.eventName}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] font-bold" style={muted}>
-                      {ev.startDate && <span>{fmtDate(ev.startDate, dateFull)}</span>}
-                      <span>· nota {fmtNum(ev.eventScore, 1)}</span>
-                    </div>
+                    <p className="font-condensed text-[14px] font-bold uppercase leading-tight truncate" title={ev.eventName}>{ev.eventName}</p>
+                    <p className="text-[12px] text-muted-foreground tabular-nums">
+                      {ev.startDate && <>{fmtDate(ev.startDate, dateFull)} · </>}nota {fmtNum(ev.eventScore, 1)}
+                    </p>
                   </div>
-                  <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD_TEXT : "var(--muted-foreground)" }}>
+                  <span className={cn("font-condensed text-[15px] font-bold tabular-nums shrink-0", ev.value > 0 ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}>
                     {ev.value > 0 ? "+" + fmtBRLShort(ev.value) : "R$ 0"}
                   </span>
-                </div>
+                </li>
               ))}
-            </div>
+            </ol>
           ) : (
-            <p className="mt-2 text-[11px] font-semibold" style={muted}>
+            <p className="mt-2 text-[12.5px] text-muted-foreground">
               Nenhum evento extra: {plural(bd.scoredEventsCount, "prova pontuada", "provas pontuadas")} para um mínimo de {bd.minEvents}.
             </p>
           )}
         </div>
 
         {/* Total */}
-        <div className="flex items-center justify-between px-4 py-3.5" style={{ backgroundColor: bd.applied ? "var(--primary)" : "var(--secondary)", borderTop: "2px solid var(--border)" }}>
-          <div>
-            <span className="text-xs font-black uppercase tracking-widest block" style={{ fontFamily: CONDENSED, color: bd.applied ? "var(--primary-foreground)" : "var(--muted-foreground)", opacity: 0.8 }}>Bônus do Ciclo</span>
-            {bd.applied && (
-              <span className="text-[11px] font-bold block mt-0.5" style={{ color: "var(--primary-foreground)", opacity: 0.65 }}>
-                {fmtBRLShort(bd.baseValue)} base + {fmtBRLShort(bd.extraValue)} extra
-              </span>
-            )}
+        <div className={cn("flex items-center justify-between gap-3 px-4 py-4 border-t border-border", bd.applied ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
+          <div className="min-w-0">
+            <span className="block font-condensed text-[12px] font-bold uppercase tracking-[0.08em] opacity-80">Bônus do ciclo</span>
+            {bd.applied && <span className="block mt-0.5 text-[12px] opacity-75 tabular-nums">{fmtBRLShort(bd.baseValue)} base + {fmtBRLShort(bd.extraValue)} extra</span>}
           </div>
-          <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: bd.applied ? "var(--primary-foreground)" : "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(bd.totalValue)}</span>
+          <span className="font-condensed text-[32px] font-black leading-none tabular-nums whitespace-nowrap" data-testid="detail-bonus-value">{fmtBRL(bd.totalValue)}</span>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold" style={muted}>
-        {bd.bonusStatus && <span>Status: <strong style={{ color: "var(--foreground)" }}>{BONUS_STATUS_LABEL[bd.bonusStatus] ?? bd.bonusStatus}</strong></span>}
-        {bd.paymentMethod && <span>· Pagamento: {bd.paymentMethod}</span>}
-        {bd.paymentDueDate && <span>· Previsto: {fmtDate(bd.paymentDueDate.slice(0, 10), dateFull)}</span>}
-        {bd.paidAt && <span>· Pago em: {fmtDate(bd.paidAt.slice(0, 10), dateFull)}</span>}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px] text-muted-foreground">
+        {bd.bonusStatus && <span className="inline-flex items-center gap-1.5">Situação <PayStatusChip status={bd.bonusStatus} /></span>}
+        {bd.paymentMethod && <span>Pagamento: {bd.paymentMethod}</span>}
+        {bd.paymentDueDate && <span>Previsto: {fmtDate(bd.paymentDueDate.slice(0, 10), dateFull)}</span>}
+        {bd.paidAt && <span>Pago em: <b className="font-semibold text-foreground">{fmtDate(bd.paidAt.slice(0, 10), dateFull)}</b></span>}
       </div>
 
       {diverges && (
-        <div className="px-3 py-2.5 text-[12px] font-semibold leading-snug" style={{ border: "2px solid " + WARNING, color: "var(--foreground)", backgroundColor: "rgba(229,72,77,0.08)" }}>
-          O valor gravado no ciclo é {fmtBRL(bd.storedTotal ?? 0)}, diferente da conta acima. {readOnly ? "Algum dado mudou depois do último cálculo deste ciclo; vale o valor gravado." : <>Algum dado mudou depois do último cálculo: use "Recalcular Ciclo" na aba Bônus &amp; Pagamentos.</>}
-        </div>
+        <Notice icon={AlertTriangle} tone="danger" className="mt-2.5">
+          O valor gravado no ciclo é {fmtBRL(bd.storedTotal ?? 0)}, diferente da conta acima. {readOnly ? "Algum dado mudou depois do último cálculo deste ciclo; vale o valor gravado." : <>Algum dado mudou depois do último cálculo: use <strong>Recalcular</strong>, no topo da tela.</>}
+        </Notice>
       )}
     </section>
   );

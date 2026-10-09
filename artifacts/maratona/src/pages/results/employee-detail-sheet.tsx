@@ -1,13 +1,12 @@
 import { useGetRankingDetail, getGetRankingDetailQueryKey } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trophy, Award, AlertTriangle, MapPin, History } from "lucide-react";
+import { Award, AlertTriangle, MapPin, History, Hourglass, Trophy, X, Wallet2 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { cn, fmtDate, fmtNum, faixaEdge } from "@/lib/utils";
-import { CONDENSED, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { contrastingTextColor, fmtBRL } from "./helpers";
+import { cn, fmtDate, fmtNum, plural } from "@/lib/utils";
+import { fmtBRL } from "./helpers";
 import { BonusBreakdownSection } from "./bonus-breakdown-section";
-import { fmtBound } from "./badges";
+import { FaixaBadge } from "./badges";
+import { Bone, Chip, Drawer, DrawerClose, DrawerDescription, DrawerTitle, Eyebrow, Notice, SectionTitle, iconBtn, surfaceCls } from "./results-ui";
 
 /** Pontos com sinal ("+2", "−1,5"); zero sai "0", sem sinal (antes "-0"/"+0"). */
 function signedPoints(v: number): string {
@@ -15,6 +14,10 @@ function signedPoints(v: number): string {
   const abs = Number.isInteger(v) ? fmtNum(Math.abs(v), 0) : fmtNum(Math.abs(v), 1);
   return `${v > 0 ? "+" : "−"}${abs}`;
 }
+
+type Summary = {
+  platoon?: string | null; platoonColor?: string | null; platoonMinScore?: number | string | null; platoonMaxScore?: number | string | null;
+};
 
 export function EmployeeDetailSheet({
   employeeId,
@@ -33,248 +36,232 @@ export function EmployeeDetailSheet({
   // Linha do tempo da nota: só admin e RH (a rota também barra).
   const { user } = useAuth();
   const canSeeTimeline = hasRole(user, "admin") || hasRole(user, "rh");
-  const { data: detail, isLoading: detailLoading } = useGetRankingDetail(detailParams, {
+  const { data: detail, isLoading: detailLoading, isError } = useGetRankingDetail(detailParams, {
     query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: !!employeeId },
   });
 
+  const closeBtn = (
+    <DrawerClose aria-label="Fechar ficha" className={cn(iconBtn, "shrink-0")}>
+      <X size={16} aria-hidden />
+    </DrawerClose>
+  );
+
   return (
-    <Dialog open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent
-        className="w-[calc(100vw-2rem)] max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0 sm:rounded-xl"
-        style={{ backgroundColor: "var(--background)", border: "2px solid var(--border)" }}
-      >
-        {detailLoading || !detail ? (
-          <div className="p-10 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-            <DialogTitle className="sr-only">Carregando detalhamento</DialogTitle>
-            Carregando detalhamento...
+    <Drawer open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }} testId="employee-detail-sheet">
+      {detailLoading || !detail ? (
+        <>
+          <div className="px-5 sm:px-6 py-4 border-b border-border bg-card flex items-start gap-3">
+            <div className="flex-1 space-y-2.5">
+              <DrawerTitle className="sr-only">{isError ? "Não foi possível carregar a ficha" : "Carregando a ficha"}</DrawerTitle>
+              <DrawerDescription className="sr-only">Ficha do colaborador no ciclo</DrawerDescription>
+              {isError ? (
+                <p className="font-condensed text-[22px] font-black uppercase leading-tight">Não foi possível carregar a ficha</p>
+              ) : (
+                <><Bone className="h-3 w-24" /><Bone className="h-7 w-64 max-w-full" /><Bone className="h-5 w-28" /></>
+              )}
+            </div>
+            {closeBtn}
           </div>
-        ) : (
-          <div>
-            {/* Header brutalist */}
-            <DialogHeader className="p-0 text-left space-y-0" style={{ borderBottom: "2px solid var(--border)" }}>
-              <div className="px-6 pt-6 pb-4 pr-14 rounded-t-xl" style={{ backgroundColor: "var(--secondary)" }}>
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  {detail.employee.functionName && (
-                    <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--accent)", color: "#191c1e" }}>{detail.employee.functionName}</span>
-                  )}
-                  <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
-                </div>
-                <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
-                  {detail.employee.name}
-                </DialogTitle>
+          <div className="p-5 sm:p-6 space-y-4" role="status" aria-label={isError ? undefined : "Carregando a ficha"}>
+            {isError ? (
+              <Notice icon={AlertTriangle} tone="danger">Verifique a conexão e abra a ficha de novo.</Notice>
+            ) : (
+              <><Bone className="h-28 w-full rounded-xl" /><Bone className="h-40 w-full rounded-xl" /><Bone className="h-24 w-full rounded-xl" /></>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Cabeçalho fixo da ficha: quem é, ciclo e faixa. */}
+          <div className="px-5 sm:px-6 pt-4 pb-4 border-b border-border bg-card flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {detail.employee.functionName && <Chip>{detail.employee.functionName}</Chip>}
+                <Eyebrow as="span">{detail.cycle.name}</Eyebrow>
+              </div>
+              <DrawerTitle className="mt-2 font-condensed text-[28px] sm:text-[32px] font-black uppercase leading-[1.02] tracking-[-0.01em] break-words">
+                {detail.employee.name}
+              </DrawerTitle>
+              <DrawerDescription className="sr-only">Ficha do colaborador em {detail.cycle.name}: nota, faixa, provas, penalidades, méritos e bônus.</DrawerDescription>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                {(detail.summary as Summary).platoon && (
+                  <FaixaBadge
+                    name={(detail.summary as Summary).platoon}
+                    color={(detail.summary as Summary).platoonColor}
+                    minScore={(detail.summary as Summary).platoonMinScore != null ? Number((detail.summary as Summary).platoonMinScore) : null}
+                    maxScore={(detail.summary as Summary).platoonMaxScore != null ? Number((detail.summary as Summary).platoonMaxScore) : null}
+                  />
+                )}
                 {canSeeTimeline && !readOnly && (
                   <Link
                     href={`/linha-do-tempo?colaborador=${detail.employee.id}`}
-                    className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold uppercase hover:underline underline-offset-2"
-                    style={{ fontFamily: CONDENSED, letterSpacing: "0.04em", color: "var(--accent-text)" }}
+                    className="inline-flex items-center gap-1.5 min-h-11 md:min-h-0 font-condensed text-[13px] font-bold uppercase tracking-[0.04em] text-[var(--accent-text)] hover:underline underline-offset-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     data-testid="link-score-timeline"
                   >
-                    <History size={14} aria-hidden /> Ver linha do tempo da nota
+                    <History size={14} aria-hidden /> Linha do tempo da nota
                   </Link>
                 )}
-                {/* Platoon badge — shown prominently below the name */}
-                {(detail.summary as any).platoon && (
-                  <div className="mt-2.5">
-                    <span
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide"
-                      style={{
-                        backgroundColor: (detail.summary as any).platoonColor ?? "var(--secondary)",
-                        color: (detail.summary as any).platoonColor ? contrastingTextColor((detail.summary as any).platoonColor) : "var(--muted-foreground)",
-                        ...faixaEdge((detail.summary as any).platoonColor),
-                      }}
-                    >
-                      {(detail.summary as any).platoon}
-                      {(detail.summary as any).platoonMinScore != null && (detail.summary as any).platoonMaxScore != null && (
-                        <span className="opacity-60 text-[11px] font-bold">
-                          {fmtBound(Number((detail.summary as any).platoonMinScore))}–{fmtBound(Number((detail.summary as any).platoonMaxScore))}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </DialogHeader>
-
-            <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <div className="space-y-6 min-w-0">
-              {/* Stats grid — brutalist */}
-              <section className="grid grid-cols-2 gap-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
-                <div className="p-4" style={{ backgroundColor: "var(--primary)", borderRight: "2px solid var(--border)" }}>
-                  <span className="text-[11px] font-black uppercase tracking-wider block" style={{ color: "var(--primary-foreground)", opacity: 0.7 }}>Nota Final</span>
-                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
-                    {detail.summary.finalResult != null ? fmtNum(detail.summary.finalResult, 1) : "—"}
-                  </p>
-                  {detail.summary.finalResult != null && detail.summary.grossAverage != null &&
-                   (detail.summary.penaltyPoints > 0 || detail.summary.meritPoints > 0) && (
-                    <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.6 }}>
-                      {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null ? (
-                        <>
-                          ({fmtNum(detail.summary.scoreSum, 1)}
-                          {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
-                          {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
-                          ) ÷ {detail.summary.confirmedEventCount}
-                        </>
-                      ) : (
-                        <>
-                          {fmtNum(detail.summary.grossAverage, 1)}
-                          {detail.summary.penaltyPoints > 0 && <> − {fmtNum((detail.summary.penaltyPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
-                          {detail.summary.meritPoints > 0 && <> + {fmtNum((detail.summary.meritPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
-                        </>
-                      )}
-                      {" "}= {fmtNum(detail.summary.finalResult, 1)}
-                    </p>
-                  )}
-                </div>
-                <div className="p-4" style={{ backgroundColor: "var(--card)" }}>
-                  <span className="text-[11px] font-black uppercase tracking-wider block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
-                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
-                    {detail.summary.grossAverage != null ? fmtNum(detail.summary.grossAverage, 1) : "—"}
-                  </p>
-                  {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
-                    <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
-                      Soma: {fmtNum(detail.summary.scoreSum, 1)} ÷ {detail.summary.confirmedEventCount} provas
-                    </p>
-                  )}
-                </div>
-                <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", borderRight: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
-                  <AlertTriangle size={16} className="shrink-0" style={{ color: DANGER_TEXT }} />
-                  <div>
-                    <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: detail.summary.penaltyPoints > 0 ? DANGER_TEXT : "var(--muted-foreground)" }}>{signedPoints(-detail.summary.penaltyPoints)}</p>
-                  </div>
-                </div>
-                <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
-                  <Award size={16} className="shrink-0" style={{ color: GOOD_TEXT }} />
-                  <div>
-                    <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: detail.summary.meritPoints > 0 ? GOOD_TEXT : "var(--muted-foreground)" }}>{signedPoints(detail.summary.meritPoints)}</p>
-                  </div>
-                </div>
-              </section>
-
-              {!detail.summary.isQuarterClosed && (
-                <div className="px-4 py-3 text-xs font-black uppercase" style={{ border: "2px solid " + AMBER, color: AMBER_TEXT, backgroundColor: "rgba(232,162,61,0.08)" }}>
-                  ⚠ Ciclo ainda não fechado — valores parciais.
-                </div>
-              )}
-
-              <section className="space-y-2.5">
-                <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                  <Trophy size={14} /> Desempenho nas Provas
-                </h4>
-                {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
-                  <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum evento confirmado no ciclo.</p>
-                ) : (
-                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
-                    {detail.events.filter(ev => ev.resultsConfirmed).map((ev, idx) => (
-                      <div
-                        key={ev.eventId}
-                        data-testid={`detail-event-${ev.eventId}`}
-                        className={cn("flex items-center gap-3 px-3 py-2.5", !ev.countsForScore && "opacity-60")}
-                        style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold uppercase text-[12px] leading-tight">{ev.eventName}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            {(ev.city || ev.state) && (
-                              <span className="inline-flex items-center gap-1"><MapPin size={10} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
-                            )}
-                            {!ev.countsForScore && (
-                              <span
-                                data-testid={`detail-event-no-score-${ev.eventId}`}
-                                className="px-1.5 py-0.5 font-bold text-[11px] uppercase shrink-0"
-                                style={{ border: "1px solid " + AMBER, color: AMBER_TEXT }}
-                                title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
-                              >
-                                {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
-                                  ? "Sup Ceno"
-                                  : (ev as { noScoreReason?: string }).noScoreReason === "freela"
-                                  ? "Freela"
-                                  : "Não conta"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="block text-[11px] uppercase font-bold leading-none mb-0.5" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
-                          <p className="text-xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(ev.eventScore, 1)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              </div>
-
-              <div className="space-y-6 min-w-0">
-              {detail.summary.bonusBreakdown && <BonusBreakdownSection bd={detail.summary.bonusBreakdown} readOnly={readOnly} />}
-
-              {!detail.summary.bonusBreakdown && detail.summary.bonusValue != null && (
-                detail.summary.bonusValue > 0 ? (
-                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
-                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
-                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(detail.summary.bonusValue)}</span>
-                  </section>
-                ) : (
-                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)" }}>
-                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Bônus do Ciclo</span>
-                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(0)}</span>
-                  </section>
-                )
-              )}
-
-              {detail.penalties.length > 0 && (
-                <section className="space-y-2.5">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>
-                    <AlertTriangle size={14} /> Penalidades
-                  </h4>
-                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
-                    {detail.penalties.map((p, idx) => (
-                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold uppercase text-[12px]">{p.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            <span>{fmtDate(p.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
-                            {p.eventName && <span>· {p.eventName}</span>}
-                            {p.quantity > 1 && <span>· {p.quantity}×</span>}
-                          </div>
-                        </div>
-                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ backgroundColor: WARNING, color: "#fff" }}>-{p.total}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {detail.merits.length > 0 && (
-                <section className="space-y-2.5">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>
-                    <Award size={14} /> Méritos
-                  </h4>
-                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
-                    {detail.merits.map((m, idx) => (
-                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold uppercase text-[12px]">{m.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            <span>{fmtDate(m.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
-                            {m.eventName && <span>· {m.eventName}</span>}
-                            {m.quantity > 1 && <span>· {m.quantity}×</span>}
-                          </div>
-                        </div>
-                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ border: "2px solid " + GOOD, color: GOOD_TEXT }}>+{m.total}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
               </div>
             </div>
+            {closeBtn}
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 py-5 space-y-6">
+            {/* Nota: final (com a conta) e média bruta; penalidades e méritos ao lado. */}
+            <section aria-label="Nota do ciclo" className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 gap-px bg-border")}>
+              <div className="bg-card px-4 py-4 min-w-0">
+                <Eyebrow as="span" className="block">Nota final</Eyebrow>
+                <p className="mt-2 font-condensed text-[36px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums" data-testid="detail-final-result">
+                  {detail.summary.finalResult != null ? fmtNum(detail.summary.finalResult, 1) : "—"}
+                </p>
+                {detail.summary.finalResult != null && detail.summary.grossAverage != null &&
+                 (detail.summary.penaltyPoints > 0 || detail.summary.meritPoints > 0) && (
+                  <p className="mt-2 text-[12.5px] text-muted-foreground tabular-nums">
+                    {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null ? (
+                      <>
+                        ({fmtNum(detail.summary.scoreSum, 1)}
+                        {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
+                        {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
+                        ) ÷ {detail.summary.confirmedEventCount}
+                      </>
+                    ) : (
+                      <>
+                        {fmtNum(detail.summary.grossAverage, 1)}
+                        {detail.summary.penaltyPoints > 0 && <> − {fmtNum((detail.summary.penaltyPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
+                        {detail.summary.meritPoints > 0 && <> + {fmtNum((detail.summary.meritPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
+                      </>
+                    )}
+                    {" "}= {fmtNum(detail.summary.finalResult, 1)}
+                  </p>
+                )}
+              </div>
+              <div className="bg-card px-4 py-4 min-w-0">
+                <Eyebrow as="span" className="block">Média bruta</Eyebrow>
+                <p className="mt-2 font-condensed text-[36px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums text-muted-foreground">
+                  {detail.summary.grossAverage != null ? fmtNum(detail.summary.grossAverage, 1) : "—"}
+                </p>
+                {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
+                  <p className="mt-2 text-[12.5px] text-muted-foreground tabular-nums">
+                    Soma {fmtNum(detail.summary.scoreSum, 1)} ÷ {plural(detail.summary.confirmedEventCount, "prova", "provas")}
+                  </p>
+                )}
+              </div>
+              <div className="bg-card px-4 py-3 flex items-center gap-2.5">
+                <AlertTriangle size={16} aria-hidden className="shrink-0 text-[var(--status-danger-text)]" />
+                <span className="min-w-0">
+                  <Eyebrow as="span" className="block">Penalidades</Eyebrow>
+                  <span className={cn("mt-1 block font-condensed text-[22px] font-black leading-none tabular-nums", detail.summary.penaltyPoints > 0 ? "text-[var(--status-danger-text)]" : "text-muted-foreground")}>{signedPoints(-detail.summary.penaltyPoints)}</span>
+                </span>
+              </div>
+              <div className="bg-card px-4 py-3 flex items-center gap-2.5">
+                <Award size={16} aria-hidden className="shrink-0 text-[var(--status-ok-text)]" />
+                <span className="min-w-0">
+                  <Eyebrow as="span" className="block">Méritos</Eyebrow>
+                  <span className={cn("mt-1 block font-condensed text-[22px] font-black leading-none tabular-nums", detail.summary.meritPoints > 0 ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}>{signedPoints(detail.summary.meritPoints)}</span>
+                </span>
+              </div>
+            </section>
+
+            {!detail.summary.isQuarterClosed && (
+              <Notice icon={Hourglass} tone="warn">Ciclo ainda aberto: os valores são parciais e mudam até o fechamento.</Notice>
+            )}
+
+            {detail.summary.bonusBreakdown && <BonusBreakdownSection bd={detail.summary.bonusBreakdown} readOnly={readOnly} />}
+
+            {!detail.summary.bonusBreakdown && detail.summary.bonusValue != null && (
+              <section>
+                <SectionTitle icon={Wallet2}>Bônus do ciclo</SectionTitle>
+                <div className={cn("rounded-xl px-4 py-3.5 flex items-center justify-between gap-3", detail.summary.bonusValue > 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
+                  <Eyebrow as="span" className="text-current opacity-80">Total</Eyebrow>
+                  <span className="font-condensed text-[30px] font-black leading-none tabular-nums" data-testid="detail-bonus-value">{fmtBRL(detail.summary.bonusValue > 0 ? detail.summary.bonusValue : 0)}</span>
+                </div>
+              </section>
+            )}
+
+            <section>
+              {(() => {
+                const confirmed = detail.events.filter(ev => ev.resultsConfirmed);
+                return (
+                  <>
+                    <SectionTitle icon={Trophy} count={confirmed.length || undefined}>Desempenho nas provas</SectionTitle>
+                    {confirmed.length === 0 ? (
+                      <p className="text-[14px] text-muted-foreground">Nenhum evento confirmado no ciclo.</p>
+                    ) : (
+                      <ul className={cn(surfaceCls, "divide-y divide-border overflow-hidden")}>
+                        {confirmed.map(ev => {
+                          const reason = (ev as { noScoreReason?: string }).noScoreReason;
+                          return (
+                            <li key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="flex items-center gap-3 px-4 py-3">
+                              <div className="flex-1 min-w-0">
+                                <p className={cn("font-condensed text-[15px] font-bold uppercase leading-tight", !ev.countsForScore && "text-muted-foreground")}>{ev.eventName}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
+                                  {(ev.city || ev.state) && <span className="inline-flex items-center gap-1"><MapPin size={12} aria-hidden />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>}
+                                  {!ev.countsForScore && (
+                                    <span data-testid={`detail-event-no-score-${ev.eventId}`}
+                                      title={reason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : reason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}>
+                                      <Chip tone="warn">{reason === "sup_ceno" ? "Sup Ceno" : reason === "freela" ? "Freela" : "Não conta"}</Chip>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="block font-condensed text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Nota do time</span>
+                                <p className={cn("font-condensed text-[22px] font-black leading-none tabular-nums", !ev.countsForScore && "text-muted-foreground")}>{fmtNum(ev.eventScore, 1)}</p>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
+                );
+              })()}
+            </section>
+
+            {detail.penalties.length > 0 && (
+              <section>
+                <SectionTitle icon={AlertTriangle} tone="danger" count={detail.penalties.length}>Penalidades</SectionTitle>
+                <ul className={cn(surfaceCls, "divide-y divide-border overflow-hidden")}>
+                  {detail.penalties.map(p => (
+                    <li key={p.id} data-testid={`detail-penalty-${p.id}`} className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-condensed text-[15px] font-bold uppercase leading-tight">{p.label}</p>
+                        <p className="mt-1 text-[12.5px] text-muted-foreground">
+                          {fmtDate(p.date, { day: "2-digit", month: "2-digit", year: "numeric" })}
+                          {p.eventName && <> · {p.eventName}</>}
+                          {p.quantity > 1 && <> · {p.quantity}×</>}
+                        </p>
+                      </div>
+                      <span className="font-condensed text-[20px] font-black tabular-nums text-[var(--status-danger-text)] shrink-0">−{fmtNum(p.total, Number.isInteger(p.total) ? 0 : 1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {detail.merits.length > 0 && (
+              <section>
+                <SectionTitle icon={Award} tone="ok" count={detail.merits.length}>Méritos</SectionTitle>
+                <ul className={cn(surfaceCls, "divide-y divide-border overflow-hidden")}>
+                  {detail.merits.map(m => (
+                    <li key={m.id} data-testid={`detail-merit-${m.id}`} className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-condensed text-[15px] font-bold uppercase leading-tight">{m.label}</p>
+                        <p className="mt-1 text-[12.5px] text-muted-foreground">
+                          {fmtDate(m.date, { day: "2-digit", month: "2-digit", year: "numeric" })}
+                          {m.eventName && <> · {m.eventName}</>}
+                          {m.quantity > 1 && <> · {m.quantity}×</>}
+                        </p>
+                      </div>
+                      <span className="font-condensed text-[20px] font-black tabular-nums text-[var(--status-ok-text)] shrink-0">+{fmtNum(m.total, Number.isInteger(m.total) ? 0 : 1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        </>
+      )}
+    </Drawer>
   );
 }

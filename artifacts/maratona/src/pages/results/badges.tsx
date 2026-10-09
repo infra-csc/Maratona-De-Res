@@ -24,7 +24,7 @@ export function FaixaBadge({ name, minScore, maxScore, color, compact = false }:
   const secondary = name && range && !compact ? range : null;
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full"
       style={{ backgroundColor: bg, color: fg, ...faixaEdge(color) }}
     >
       <span>{primary}</span>

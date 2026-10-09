@@ -1,13 +1,13 @@
-import { useState, useMemo } from "react";
-import { useGetRanking, getGetRankingQueryKey, exportRanking } from "@workspace/api-client-react";
+import { Fragment, useMemo, useState } from "react";
+import { useGetRanking, getGetRankingQueryKey, exportRanking, type RankingEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Users, Search, Trophy, ChevronRight } from "lucide-react";
-import { cn, fmtNum, plural } from "@/lib/utils";
-import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle, fmtScore, fmtBRLShort } from "./helpers";
-import { FaixaBadge } from "./badges";
-import { PodiumStage } from "./podium-stage";
+import { ChevronRight, Download, SearchX, Trophy, UserX, X } from "lucide-react";
+import { cn, faixaEdge, plural } from "@/lib/utils";
+import { fmtScore, fmtBRLShort } from "./helpers";
+import { FaixaBadge, fmtBound } from "./badges";
+import { MEDAL, PodiumStage } from "./podium-stage";
 import { EmployeeDetailSheet } from "./employee-detail-sheet";
+import { Bone, Chip, EligibilityFilter, EmptyBlock, ErrorBlock, FOCUS_RING, ListSkeleton, SearchField, btnSmall, surfaceCls, type EligFilter } from "./results-ui";
 
 export function RankingTab({ canViewDetail, cycleId, readOnly = false, minEvents, cycleClosed = false }: {
   canViewDetail: boolean;
@@ -21,14 +21,14 @@ export function RankingTab({ canViewDetail, cycleId, readOnly = false, minEvents
 }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
+  const [filterEligible, setFilterEligible] = useState<EligFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   // Busca filtra no cliente: a lista tem dezenas de linhas e ir ao servidor a
   // cada tecla gerava uma requisição (e uma entrada de cache) por caractere.
   const params = cycleId ? { cycleId } : undefined;
   const qKey = getGetRankingQueryKey(params);
-  const { data: rankingAll, isLoading } = useGetRanking(params, { query: { queryKey: qKey } });
+  const { data: rankingAll, isLoading, isError, refetch } = useGetRanking(params, { query: { queryKey: qKey } });
   const ranking = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!rankingAll) return rankingAll;
@@ -50,197 +50,174 @@ export function RankingTab({ canViewDetail, cycleId, readOnly = false, minEvents
   }
 
   const allResults = ranking ?? [];
-
   const filteredRanking = allResults.filter(r => {
     if (filterEligible === "eligible" && r.eligible === false) return false;
     if (filterEligible === "ineligible" && r.eligible !== false) return false;
     return true;
   });
-
-  const top3 = filteredRanking.slice(0, 3);
-  const activeRunners = filteredRanking.length;
-  const scoredRanking = filteredRanking.filter(r => r.eventsCount > 0);
-  const avgResult = scoredRanking.length > 0 ? scoredRanking.reduce((acc, r) => acc + r.finalResult, 0) / scoredRanking.length : 0;
-
-  const eligFilters = [
-    { key: "all" as const, label: "Todos" },
-    { key: "eligible" as const, label: "Elegíveis" },
-    { key: "ineligible" as const, label: "Não Elegíveis" },
-  ];
+  const counts = { all: allResults.length, eligible: allResults.filter(r => r.eligible !== false).length, ineligible: allResults.filter(r => r.eligible === false).length };
+  // Pódio: os 3 primeiros do ciclo (sem busca), no filtro de elegibilidade escolhido.
+  const top3 = (rankingAll ?? []).filter(r => filterEligible === "eligible" ? r.eligible !== false : filterEligible === "ineligible" ? r.eligible === false : true).slice(0, 3);
+  const bonusLabel = cycleClosed ? "Bônus oficial" : "Bônus projetado";
 
   function openDetail(id: number) {
     if (!canViewDetail) return;
     setSelectedId(id);
   }
 
+  if (isLoading) return <ListSkeleton label="Carregando ranking" rows={6} />;
+  if (isError) return <ErrorBlock title="Não foi possível carregar o ranking" onRetry={() => { void refetch(); }} />;
+  if (!rankingAll || rankingAll.length === 0) {
+    return (
+      <div className={cn(surfaceCls, "border-dashed")}>
+        <EmptyBlock icon={Trophy} title="Ranking ainda vazio" testId="ranking-empty">
+          {readOnly ? "Nenhum resultado consolidado neste ciclo." : "Nenhum resultado consolidado para o ciclo atual. Feche o ciclo, no topo, para gerar o ranking oficial."}
+        </EmptyBlock>
+      </div>
+    );
+  }
+
+  const clear = () => { setSearch(""); setFilterEligible("all"); };
+
   return (
-    <div className="space-y-6">
-      <section className="flex items-center gap-3 flex-wrap">
-        {ranking && ranking.length > 0 && (
-          <>
-            <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--primary)" }}>
-              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota média</span>
-              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="stat-avg-result">{fmtNum(avgResult, 1)}</span>
-            </div>
-            <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Colaboradores</span>
-              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED }} data-testid="stat-active-runners">{activeRunners}</span>
-            </div>
-          </>
-        )}
-        <button
-          data-testid="button-export-ranking"
-          className="rounded-lg px-5 py-3 font-bold text-xs uppercase tracking-wide flex items-center gap-2 ml-auto transition-opacity hover:opacity-90"
-          style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-          onClick={handleExport}
-        >
-          <Download size={15} /> Exportar
+    <div className="space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+        <SearchField value={search} onChange={setSearch} label="Buscar colaborador no ranking" testId="input-search-ranking" className="lg:w-72" />
+        <EligibilityFilter value={filterEligible} onChange={setFilterEligible} counts={counts} className="w-full lg:w-auto" />
+        <button type="button" data-testid="button-export-ranking" onClick={handleExport} className={cn(btnSmall, "lg:ml-auto self-start lg:self-auto")}>
+          <Download size={15} aria-hidden /> Exportar CSV
         </button>
-      </section>
+      </div>
 
-      {isLoading ? (
-        <div className="text-center py-24 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando ranking...</div>
-      ) : !ranking || ranking.length === 0 ? (
-        <div className="text-center py-20 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-          <Trophy size={56} className="mx-auto mb-6 opacity-20" strokeWidth={1.5} />
-          <h3 className="text-2xl font-black uppercase tracking-tight mb-2" style={{ fontFamily: CONDENSED }}>Ranking Indisponível</h3>
-          <p style={{ color: "var(--muted-foreground)" }}>{readOnly ? "Nenhum resultado consolidado neste ciclo." : "Nenhum resultado consolidado para o ciclo atual."}</p>
-          {!readOnly && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Feche o ciclo na aba "Bônus & Pagamentos" para gerar o ranking oficial.</p>}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-          <div className="space-y-3.5">
-            <div className="flex gap-2 flex-wrap">
-              <div className="flex-1 min-w-[220px] flex items-center gap-2 rounded-lg px-3.5 py-2.5" style={fieldStyle}>
-                <Search size={15} style={{ color: "var(--muted-foreground)" }} />
-                <input
-                  data-testid="input-search-ranking"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="bg-transparent outline-none text-sm w-full"
-                  style={{ color: "var(--foreground)" }}
-                  placeholder="Buscar colaborador no ranking..."
-                />
-              </div>
-              {eligFilters.map(f => {
-                const active = filterEligible === f.key;
-                return (
-                  <button
-                    key={f.key}
-                    onClick={() => setFilterEligible(f.key)}
-                    className="h-[42px] px-3.5 rounded-lg text-[11px] font-bold uppercase transition-colors"
-                    style={{
-                      fontFamily: CONDENSED,
-                      backgroundColor: active ? "var(--primary)" : "transparent",
-                      color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                      border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
+      <div className={cn("grid grid-cols-1 gap-4 items-start", top3.length > 0 && !search.trim() && "xl:grid-cols-[minmax(0,1fr)_300px]")}>
+        <div className="min-w-0 space-y-3">
+          {top3.length > 0 && !search.trim() && <PodiumStage className="hidden md:block xl:hidden" top3={top3} canViewDetail={canViewDetail} onSelect={openDetail} />}
+
+          {filteredRanking.length === 0 ? (
+            <div className={surfaceCls}>
+              {filterEligible === "eligible" && !search.trim() ? (
+                <EmptyBlock icon={UserX} title="Ninguém elegível ainda" testId="ranking-no-eligible"
+                  action={<button type="button" className={btnSmall} onClick={() => setFilterEligible("all")}>Ver todos</button>}>
+                  {/* Mínimo do ciclo EXIBIDO (effectiveMinEvents) — sem número fixo; espera o ciclo carregar. */}
+                  {minEvents != null
+                    ? <>São necessários pelo menos {plural(minEvents, "evento")} no ciclo. </>
+                    : <Bone className="inline-block h-3 w-48 align-middle mr-1" />}
+                  Use <strong>Todos</strong> para ver o ranking parcial.
+                </EmptyBlock>
+              ) : (
+                <EmptyBlock icon={SearchX} title="Ninguém encontrado" testId="ranking-no-results"
+                  action={<button type="button" className={btnSmall} onClick={clear}><X size={14} aria-hidden /> Limpar filtros</button>}>
+                  Nenhum colaborador bate com a busca e o filtro escolhidos.
+                </EmptyBlock>
+              )}
             </div>
-
-            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Classificação Geral</h3>
+          ) : (
+            <section aria-label="Classificação geral" className={cn(surfaceCls, "overflow-hidden")}>
+              <div aria-hidden className="hidden md:grid grid-cols-[48px_minmax(0,1fr)_200px_150px_20px] items-center gap-4 px-4 lg:px-5 py-2.5 border-b border-border bg-secondary/60 font-condensed text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                <span className="text-center">Pos.</span><span>Colaborador</span><span>Nota final</span><span className="text-right">Bônus</span><span />
               </div>
-              <div>
-                {filteredRanking.length === 0 && allResults.length > 0 && filterEligible === "eligible" && (
-                  <div className="px-5 py-8 text-center">
-                    <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador elegível ainda</p>
-                    <p className="text-xs mt-1.5" style={{ color: "var(--muted-foreground)" }}>
-                      {/* Mínimo do ciclo EXIBIDO (effectiveMinEvents) — sem número fixo; espera o ciclo carregar. */}
-                      {minEvents != null
-                        ? <>São necessários pelo menos {plural(minEvents, "evento")} no ciclo. </>
-                        : <span className="inline-block h-3 w-48 align-middle rounded animate-pulse mr-1" style={{ backgroundColor: "var(--secondary)" }} aria-label="Carregando o mínimo de eventos do ciclo" />}
-                      Use <strong>Todos</strong> para ver o ranking parcial.
-                    </p>
-                  </div>
-                )}
-                {filteredRanking.map((entry) => {
-                  const actualRank = entry.position;
-                  const scorePct = Math.max(0, Math.min(100, entry.finalResult));
+              <ol>
+                {filteredRanking.map((entry, i) => {
+                  const prev = filteredRanking[i - 1];
+                  const newFaixa = !prev || (prev.platoon ?? "") !== (entry.platoon ?? "");
                   return (
-                    <button
-                      type="button"
-                      key={entry.employeeId}
-                      data-testid={`card-ranking-${entry.employeeId}`}
-                      onClick={() => openDetail(entry.employeeId)}
-                      className={cn(
-                        "w-full text-left flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3.5 transition-colors group",
-                        canViewDetail ? "cursor-pointer hover:opacity-90" : "cursor-default",
-                      )}
-                      style={{ borderTop: "1px solid var(--border)" }}
-                    >
-                      <div className="w-11 h-11 rounded-lg flex flex-col items-center justify-center shrink-0" style={{ backgroundColor: "var(--secondary)" }}>
-                        <span className="text-[11px] font-bold uppercase leading-none" style={{ color: "var(--muted-foreground)" }}>Pos</span>
-                        <span className="text-base font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED }}>{String(actualRank).padStart(2, "0")}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold uppercase text-sm truncate" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
-                            {plural(entry.eventsCount, "evento", "eventos")}
-                          </span>
-                          {entry.eligible === false && (
-                            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
-                              Inelegível
-                            </span>
-                          )}
-                          {entry.absences > 0 && (
-                            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
-                              {plural(entry.absences, "penalidade", "penalidades")}
-                            </span>
-                          )}
-                          <FaixaBadge name={entry.platoon} minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
-                        </div>
-                      </div>
-                      <div className="hidden md:flex items-center gap-2 w-36 shrink-0">
-                        <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${scorePct}%`, backgroundColor: "var(--accent)" }} />
-                        </div>
-                        <span className="text-[11px] font-bold w-14 text-right whitespace-nowrap">{fmtScore(entry.finalResult)}/100</span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 sm:pl-3 sm:w-[16rem] sm:justify-end">
-                        <div className="text-right">
-                          <span className="block text-[11px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
-                          <p className="font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }} data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
-                        </div>
-                        <div className="text-right hidden sm:block w-28 shrink-0">
-                          {entry.bonusValue > 0 && (
-                            <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: "var(--primary)" }} title={cycleClosed ? "Bônus oficial, apurado no fechamento do ciclo" : "Bônus projetado: o ciclo está aberto e o valor muda até o fechamento"}>
-                              <span className="block text-[11px] uppercase font-bold leading-none mb-1 whitespace-nowrap" style={{ color: "var(--primary-foreground)", opacity: 0.75 }} data-testid={`ranking-bonus-label-${entry.employeeId}`}>{cycleClosed ? "Bônus oficial" : "Bônus projetado"}</span>
-                              <p className="font-black text-sm leading-none" style={{ color: "var(--primary-foreground)" }}>{fmtBRLShort(entry.bonusValue)}</p>
-                            </div>
-                          )}
-                        </div>
-                        {canViewDetail && <ChevronRight size={16} style={{ color: "var(--muted-foreground)" }} className="shrink-0" />}
-                      </div>
-                    </button>
+                    <Fragment key={entry.employeeId}>
+                      {newFaixa && <FaixaDivider entry={entry} count={filteredRanking.filter(r => (r.platoon ?? "") === (entry.platoon ?? "")).length} first={i === 0} />}
+                      <RankingRow entry={entry} canViewDetail={canViewDetail} onOpen={openDetail} bonusLabel={bonusLabel} cycleClosed={cycleClosed} />
+                    </Fragment>
                   );
                 })}
-              </div>
+              </ol>
             </section>
-          </div>
-
-          <aside className="space-y-2.5">
-            <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <Trophy size={15} style={{ color: "var(--accent-text)" }} />
-              <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Pódio da Maratona</h3>
-            </div>
-            {top3.length > 0 && (
-              <PodiumStage top3={top3} canViewDetail={canViewDetail} onSelect={openDetail} />
-            )}
-            {canViewDetail && (
-              <p className="text-[11px] px-1" style={{ color: "var(--muted-foreground)" }}>Clique em um colaborador para ver o detalhamento de provas, penalidades e méritos.</p>
-            )}
-          </aside>
+          )}
+          {canViewDetail && filteredRanking.length > 0 && (
+            <p className="px-1 text-[12.5px] text-muted-foreground">Clique em um colaborador para ver a ficha: provas, penalidades, méritos e a conta do bônus.</p>
+          )}
         </div>
-      )}
+
+        {top3.length > 0 && !search.trim() && (
+          <aside className="hidden xl:block xl:sticky xl:top-[84px]">
+            <PodiumStage top3={top3} canViewDetail={canViewDetail} onSelect={openDetail} />
+          </aside>
+        )}
+      </div>
 
       <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} cycleId={cycleId} readOnly={readOnly} />
     </div>
+  );
+}
+
+/** Divisória de faixa dentro do ranking: a média define a faixa, então a ordem já agrupa. */
+function FaixaDivider({ entry, count, first }: { entry: RankingEntry; count: number; first: boolean }) {
+  const range = entry.platoonMinScore != null && entry.platoonMaxScore != null ? `${fmtBound(entry.platoonMinScore)}–${fmtBound(entry.platoonMaxScore)}` : null;
+  return (
+    <li aria-hidden className={cn("flex items-center gap-2.5 px-4 lg:px-5 py-1.5 bg-secondary/40", !first && "border-t border-border")}>
+      <span className="w-1 h-4 rounded-full" style={{ backgroundColor: entry.platoonColor ?? "var(--border)", ...faixaEdge(entry.platoonColor) }} />
+      <span className="font-condensed text-[12.5px] font-bold uppercase tracking-[0.06em] text-foreground">{entry.platoon ?? "Sem faixa"}</span>
+      {range && <span className="text-[12px] text-muted-foreground tabular-nums">{range}</span>}
+      <span className="ml-auto text-[12px] text-muted-foreground">{plural(count, "pessoa", "pessoas")}</span>
+    </li>
+  );
+}
+
+function RankingRow({ entry, canViewDetail, onOpen, bonusLabel, cycleClosed }: {
+  entry: RankingEntry; canViewDetail: boolean; onOpen: (id: number) => void; bonusLabel: string; cycleClosed: boolean;
+}) {
+  const pos = entry.position;
+  const medal = pos >= 1 && pos <= 3 ? MEDAL[pos as 1 | 2 | 3] : null;
+  const scorePct = Math.max(0, Math.min(100, entry.finalResult));
+  return (
+    <li className="border-t border-border first:border-t-0">
+      <button
+        type="button"
+        data-testid={`card-ranking-${entry.employeeId}`}
+        onClick={() => onOpen(entry.employeeId)}
+        className={cn(
+          "group w-full text-left grid grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[48px_minmax(0,1fr)_200px_150px_20px] items-center gap-x-3 md:gap-x-4 gap-y-2 px-4 lg:px-5 py-3",
+          "transition-colors duration-150", canViewDetail ? "hover:bg-secondary/40 cursor-pointer" : "cursor-default", FOCUS_RING, "focus-visible:ring-inset focus-visible:ring-offset-0",
+        )}
+      >
+        <span className="row-span-2 md:row-span-1 flex justify-center">
+          <span className={cn("w-10 h-10 rounded-lg flex items-center justify-center font-condensed text-[19px] font-black tabular-nums", medal ? "text-foreground" : "bg-secondary text-muted-foreground")}
+            style={medal ? { backgroundColor: medal.tint, boxShadow: `inset 0 0 0 2px ${medal.ring}` } : undefined}
+            title={medal ? `${pos}º lugar · ${medal.label}` : `${pos}º lugar`}>
+            {pos}
+          </span>
+        </span>
+
+        <span className="min-w-0">
+          <span className="block font-condensed text-[17px] font-bold uppercase tracking-[0.02em] leading-tight truncate group-hover:underline underline-offset-2" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="text-[12.5px] text-muted-foreground mr-0.5">{plural(entry.eventsCount, "evento", "eventos")}</span>
+            {entry.eligible === false && <Chip tone="danger">Inelegível</Chip>}
+            {entry.absences > 0 && <Chip tone="danger">{plural(entry.absences, "penalidade", "penalidades")}</Chip>}
+            <FaixaBadge name={entry.platoon} minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} compact />
+          </span>
+        </span>
+
+        <span className="col-start-3 row-start-1 md:col-start-auto md:row-start-auto flex items-center gap-3 justify-end md:justify-start">
+          <span className="hidden md:block flex-1 h-1.5 rounded-full bg-secondary overflow-hidden" aria-hidden>
+            <span className="block h-full rounded-full bg-[var(--status-ok)] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${scorePct}%` }} />
+          </span>
+          <span className="text-right">
+            <span className="block font-condensed text-[26px] font-black leading-none tabular-nums" data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</span>
+            <span className="md:hidden font-condensed text-[10.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Nota final</span>
+          </span>
+        </span>
+
+        <span className="col-start-2 col-span-2 md:col-span-1 md:col-start-auto text-left md:text-right min-w-0">
+          {entry.bonusValue > 0 ? (
+            <span className="inline-flex md:flex md:flex-col items-baseline md:items-end gap-1.5 md:gap-0.5" title={cycleClosed ? "Bônus oficial, apurado no fechamento do ciclo" : "Bônus projetado: o ciclo está aberto e o valor muda até o fechamento"}>
+              <span className="font-condensed text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground whitespace-nowrap" data-testid={`ranking-bonus-label-${entry.employeeId}`}>{bonusLabel}</span>
+              <span className="font-condensed text-[18px] font-black leading-none tabular-nums whitespace-nowrap">{fmtBRLShort(entry.bonusValue)}</span>
+            </span>
+          ) : (
+            <span className="hidden md:inline text-[13px] text-muted-foreground">—</span>
+          )}
+        </span>
+
+        {canViewDetail && <ChevronRight size={16} aria-hidden className="hidden md:block text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />}
+      </button>
+    </li>
   );
 }
