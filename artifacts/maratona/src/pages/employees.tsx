@@ -21,14 +21,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { BODY } from "@/lib/premium-theme";
-import { ConfirmDialog } from "@/components/shared";
-import { Textarea } from "@/components/ui/textarea";
+import { GitMerge, Info, Plus, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { invalidateCycleResults } from "@/lib/invalidate-results";
 import { plural } from "@/lib/utils";
-import type { BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
+import { nameKey, localizeBonusStatus, EmptyBlock, ErrorBlock, Bone, surfaceCls, btnPrimary, btnSmall, Notice } from "./employees/ui";
+import { CycleToggleDialog } from "./employees/cycle-toggle-dialog";
+import type { AttentionFilter, BulkTypeFilter, EmployeeWithCycle, EmploymentType, PinDialogData } from "./employees/types";
 import { cycleStatus, getEligibilityStatus, hasCycleScore, parseCpfRows, serverErrorMessage, toTitleCase } from "./employees/utils";
-import { EmployeesFilters, EmployeesHeader, EmployeesKpis } from "./employees/employees-header";
+import { EmployeesHeader, EmployeesPanel, EmployeesToolbar, MergeModeBanner } from "./employees/employees-header";
 import { CreateEmployeeDialog, EditEmployeeDialog } from "./employees/employee-form-dialogs";
 import { EmployeesTable } from "./employees/employees-table";
 import { MergeActionBar, MergeConfirmDialog, MergeResultDialog } from "./employees/merge-dialogs";
@@ -39,6 +40,27 @@ import { BulkCpfDialog } from "./employees/bulk-cpf-dialog";
 
 // Página de Colaboradores. Todo o estado, as queries/mutações e os handlers ficam aqui
 // (na mesma ordem de hooks de antes da divisão); os arquivos em ./employees/ só desenham.
+
+/** Carregando: o panorama, a barra de ferramentas e algumas linhas. */
+function EmployeesSkeleton() {
+  return (
+    <div role="status" aria-label="Carregando colaboradores" className="space-y-5">
+      <div className={cn(surfaceCls, "grid grid-cols-2 lg:grid-cols-5 gap-px overflow-hidden bg-border")}>
+        {Array.from({ length: 5 }, (_, i) => <div key={i} className={cn("bg-card px-5 py-4 space-y-3", i === 0 && "col-span-2 lg:col-span-1")}><Bone className="h-3 w-24" /><Bone className="h-8 w-16" /><Bone className="h-3 w-32" /></div>)}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2.5"><Bone className="h-11 lg:h-10 w-full sm:w-[300px]" /><Bone className="h-11 lg:h-9 w-full sm:w-[440px]" /></div>
+      <div className={cn(surfaceCls, "divide-y divide-border")}>
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 px-5 py-4">
+            <Bone className="h-10 w-10 rounded-lg" />
+            <div className="flex-1 space-y-2"><Bone className="h-4 w-52 max-w-full" /><Bone className="h-3 w-36" /></div>
+            <Bone className="h-6 w-20 hidden md:block" /><Bone className="h-6 w-24 hidden lg:block" /><Bone className="h-6 w-20 hidden lg:block" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function EmployeesPage() {
   const APP_LINK = (() => {
@@ -69,8 +91,13 @@ export default function EmployeesPage() {
   // (freela, recém-criado) aparece só pela busca, numa seção à parte "Sem nota
   // no ciclo" — assim ninguém fica inacessível (editar, PIN, mesclar).
   const [filterCycle, setFilterCycle] = useState<"in" | "out">("in");
+  // Atalho do painel (elegíveis, casa sem acesso, nome repetido): só recorta a lista.
+  const [attention, setAttention] = useState<AttentionFilter>(null);
   const [cycleTarget, setCycleTarget] = useState<EmployeeWithCycle | null>(null);
   const [cycleReason, setCycleReason] = useState("");
+  // Recusa do servidor mostrada dentro do diálogo (ex.: 409 do bônus, 409 de ciclo fechado).
+  const [cycleError, setCycleError] = useState<string | null>(null);
+  const [mergeError, setMergeError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -175,7 +202,7 @@ export default function EmployeesPage() {
   const [resetTypeSearch, setResetTypeSearch] = useState("");
 
   const qKey = getGetEmployeesQueryKey();
-  const { data: employeesRaw, isLoading } = useGetEmployees(
+  const { data: employeesRaw, isLoading, isError, refetch, isRefetching } = useGetEmployees(
     undefined,
     { query: { queryKey: qKey } }
   );
@@ -241,7 +268,8 @@ export default function EmployeesPage() {
         setSelectedIds(new Set());
         setCanonicalId(null);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+      // Fica no diálogo de confirmação (ex.: 409 — dados de ciclo fechado não mudam de cadastro).
+      onError: (e: unknown) => setMergeError(serverErrorMessage(e, "Não foi possível mesclar. Tente novamente.")),
     },
   });
 
@@ -305,9 +333,26 @@ export default function EmployeesPage() {
     e.name.toLowerCase().includes(term) ||
     e.department.toLowerCase().includes(term) ||
     e.functionName.toLowerCase().includes(term);
-  const filtered = (filterCycle === "in" ? inCycle : outOfCycle).filter(matches);
-  // Sem nota no ciclo: só com texto na busca (a lista padrão continua só com quem tem nota).
-  const noScoreMatches = term ? (employees ?? []).filter(e => cycleStatus(e) === "none" && matches(e)) : [];
+  // Nome repetido (sem acento/caixa/espaço duplo): pode ser a mesma pessoa — atalho para a mesclagem.
+  const duplicateIds = (() => {
+    const byName = new Map<string, number[]>();
+    for (const e of employees ?? []) {
+      const k = nameKey(e.name);
+      byName.set(k, [...(byName.get(k) ?? []), e.id]);
+    }
+    return new Set([...byName.values()].filter(ids => ids.length > 1).flat());
+  })();
+  const passesAttention = (e: EmployeeWithCycle) =>
+    attention === null ||
+    (attention === "eligible" && hasCycleScore(e) && getEligibilityStatus(e) === "eligible") ||
+    (attention === "noAccess" && e.employmentType === "casa" && !e.hasAccess) ||
+    (attention === "dup" && duplicateIds.has(e.id));
+  const filtered = (filterCycle === "in" ? inCycle : outOfCycle).filter(e => matches(e) && passesAttention(e));
+  // Sem nota no ciclo: só com texto na busca (a lista padrão continua só com quem tem
+  // nota) — ou no atalho "Nome repetido", que precisa mostrar o cadastro novo também.
+  const noScoreMatches = term || attention === "dup"
+    ? (employees ?? []).filter(e => cycleStatus(e) === "none" && matches(e) && passesAttention(e))
+    : [];
 
   function toggleMergeSelection(id: number) {
     setSelectedIds(prev => {
@@ -341,6 +386,8 @@ export default function EmployeesPage() {
     listaNoCiclo: inCycle.length,
     elegiveis: withScore.filter(e => getEligibilityStatus(e) === "eligible").length,
     foraDoCiclo: outOfCycle.length,
+    semAcesso: inCycle.filter(e => e.employmentType === "casa" && !e.hasAccess).length,
+    repetidos: duplicateIds.size,
   };
 
   const cycleMutation = useSetEmployeeCycleExclusion();
@@ -364,118 +411,143 @@ export default function EmployeesPage() {
         setCycleTarget(null);
         setCycleReason("");
       },
-      onError: e => toast({ title: "Não foi possível alterar", description: serverErrorMessage(e, "Tente novamente."), variant: "destructive" }),
+      // Fica no diálogo (ex.: 409 — bônus aprovado/agendado/pago/bloqueado), com o atalho para Resultados.
+      onError: e => setCycleError(localizeBonusStatus(serverErrorMessage(e, "Tente novamente.")).replace(cycleTarget.name, name)),
     });
   }
 
+  const exitMerge = () => { setMergeMode(false); setSelectedIds(new Set()); setCanonicalId(null); };
+  const startMerge = () => { setMergeMode(true); setSelectedIds(new Set()); setCanonicalId(null); };
+  const hasAny = (employees ?? []).length > 0;
+
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-      <div className="p-6 md:p-10 space-y-7">
-        {/* Page header */}
-        <EmployeesHeader
-          canEdit={canEdit}
-          canBulk={canBulk}
-          mergeMode={mergeMode}
-          onToggleMergeMode={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
-          onOpenBulkAccess={() => { setBulkOpen(true); setBulkResult(null); }}
-          onOpenBulkPin={() => { setBulkPinOpen(true); setBulkPinResult(null); }}
-          onOpenResetTypes={() => setResetTypeOpen(true)}
-          onOpenBulkCpf={() => { setBulkCpfOpen(true); setBulkCpfResult(null); }}
-          createDialog={
-            <CreateEmployeeDialog
-              open={open}
-              onOpenChange={setCreateOpen}
-              register={register}
-              handleSubmit={handleSubmit}
-              errors={errors}
-              onSubmit={d => createMutation.mutate({ data: { ...d, name: d.name.trim(), department: "Geral", functionName: "Colaborador", employmentType: "casa" } })}
-              isPending={createMutation.isPending}
-            />
-          }
-        />
-
-        {/* Edit dialog */}
-        <EditEmployeeDialog
-          open={!!editingEmployee}
-          onClose={() => setEditingEmployee(null)}
-          register={registerEdit}
-          handleSubmit={handleEditSubmit}
-          errors={editErrors}
-          setValue={setValueEdit}
-          functionName={watchedEditFunctionName}
-          employmentType={watchedEditEmploymentType}
-          onSubmit={d => {
-            if (!editingEmployee) return;
-            updateMutation.mutate({ id: editingEmployee.id, data: { ...d, name: d.name.trim() } });
-          }}
-          isPending={updateMutation.isPending}
-        />
-
-        {/* KPIs */}
-        <EmployeesKpis stats={stats} />
-
-        {/* Search + filter */}
-        <EmployeesFilters
-          search={search}
-          onSearchChange={setSearch}
-          filterCycle={filterCycle}
-          onFilterCycleChange={setFilterCycle}
-          counts={{ in: inCycle.length, out: outOfCycle.length }}
-        />
-
-        {/* Table */}
-        <EmployeesTable
-          isLoading={isLoading}
-          filtered={filtered}
-          noScore={noScoreMatches}
-          total={filterCycle === "in" ? inCycle.length : outOfCycle.length}
-          mergeMode={mergeMode}
-          selectedIds={selectedIds}
-          canonicalId={canonicalId}
-          canBulk={canBulk}
-          canEdit={canEdit}
-          isAdmin={isAdmin}
-          previewingId={previewingId}
-          generatingPinId={generatingPinId}
-          onToggleMergeSelection={toggleMergeSelection}
-          onPreviewAs={handlePreviewAs}
-          onGeneratePin={handleGeneratePin}
-          onEdit={setEditingEmployee}
-          onToggleCycle={isAdmin ? emp => { setCycleTarget(emp); setCycleReason(""); } : undefined}
-        />
-
-        <ConfirmDialog
-          open={!!cycleTarget}
-          onOpenChange={o => { if (!o && !cycleMutation.isPending) setCycleTarget(null); }}
-          title={cycleTarget && cycleStatus(cycleTarget) === "out" ? `Devolver ${toTitleCase(cycleTarget.name)} ao ciclo?` : `Tirar ${cycleTarget ? toTitleCase(cycleTarget.name) : ""} do ciclo?`}
-          description={cycleTarget && cycleStatus(cycleTarget) === "out"
-            ? "Volta a ter nota, entrar no ranking, nas análises e no bônus deste ciclo. O ciclo é recalculado na hora."
-            : "Fica sem nota, fora do ranking, das análises e do bônus deste ciclo. O histórico dos eventos continua guardado e dá para devolver depois em \"Fora do ciclo\". O ciclo é recalculado na hora."}
-          confirmLabel={cycleTarget && cycleStatus(cycleTarget) === "out" ? "Devolver ao ciclo" : "Tirar do ciclo"}
-          destructive={!!cycleTarget && cycleStatus(cycleTarget) !== "out"}
-          isPending={cycleMutation.isPending}
-          onConfirm={confirmCycleToggle}
-        >
-          {cycleTarget && cycleStatus(cycleTarget) !== "out" && (
-            <div className="space-y-1.5">
-              <label htmlFor="cycle-reason" className="text-sm font-semibold">Motivo <span className="font-normal" style={{ color: "var(--muted-foreground)" }}>(opcional)</span></label>
-              <Textarea id="cycle-reason" value={cycleReason} onChange={e => setCycleReason(e.target.value)} maxLength={300} rows={3} placeholder="Ex.: desligado em setembro, afastado…" />
-            </div>
-          )}
-        </ConfirmDialog>
-
-        {/* Merge action bar */}
-        {mergeMode && selectedIds.size >= 2 && (
-          <MergeActionBar
-            employees={employees}
-            selectedIds={selectedIds}
-            canonicalId={canonicalId}
-            onSelectCanonical={setCanonicalId}
-            onRequestMerge={() => setMergeConfirmOpen(true)}
-            isPending={mergeMutation.isPending}
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <EmployeesHeader
+        canEdit={canEdit}
+        canBulk={canBulk}
+        mergeMode={mergeMode}
+        onToggleMergeMode={() => { if (mergeMode) exitMerge(); else startMerge(); }}
+        onOpenBulkAccess={() => { setBulkOpen(true); setBulkResult(null); }}
+        onOpenBulkPin={() => { setBulkPinOpen(true); setBulkPinResult(null); }}
+        onOpenResetTypes={() => setResetTypeOpen(true)}
+        onOpenBulkCpf={() => { setBulkCpfOpen(true); setBulkCpfResult(null); }}
+        createDialog={
+          <CreateEmployeeDialog
+            open={open}
+            onOpenChange={setCreateOpen}
+            register={register}
+            handleSubmit={handleSubmit}
+            errors={errors}
+            onSubmit={d => createMutation.mutate({ data: { ...d, name: d.name.trim(), department: "Geral", functionName: "Colaborador", employmentType: "casa" } })}
+            isPending={createMutation.isPending}
           />
+        }
+      />
+
+      <EditEmployeeDialog
+        open={!!editingEmployee}
+        onClose={() => setEditingEmployee(null)}
+        register={registerEdit}
+        handleSubmit={handleEditSubmit}
+        errors={editErrors}
+        setValue={setValueEdit}
+        functionName={watchedEditFunctionName}
+        employmentType={watchedEditEmploymentType}
+        onSubmit={d => {
+          if (!editingEmployee) return;
+          updateMutation.mutate({ id: editingEmployee.id, data: { ...d, name: d.name.trim() } });
+        }}
+        isPending={updateMutation.isPending}
+      />
+
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-5 max-w-[1680px] w-full mx-auto">
+        {isLoading ? <EmployeesSkeleton /> : isError || !employees ? (
+          <ErrorBlock title="Não foi possível carregar os colaboradores" onRetry={() => { void refetch(); }} />
+        ) : !hasAny ? (
+          <div className={surfaceCls}>
+            <EmptyBlock icon={Users} title="Nenhum colaborador cadastrado" testId="employees-empty"
+              action={canEdit ? <button type="button" onClick={() => setCreateOpen(true)} className={btnPrimary}><Plus size={15} aria-hidden /> Cadastrar o primeiro</button> : undefined}>
+              Os colaboradores chegam pela sincronização ou pelo cadastro manual.
+            </EmptyBlock>
+          </div>
+        ) : (
+          <div className={cn("space-y-5 transition-opacity duration-150", isRefetching && "opacity-80")}>
+            <EmployeesPanel
+              stats={stats}
+              canBulk={canBulk}
+              tab={filterCycle}
+              attention={attention}
+              onTab={setFilterCycle}
+              onAttention={setAttention}
+            />
+            {filterCycle === "in" && stats.noCiclo === 0 && stats.listaNoCiclo > 0 && (
+              <Notice icon={Info} tone="info" testId="notice-new-cycle">
+                <span className="font-semibold text-foreground">Ciclo novo, ninguém com nota ainda.</span> A lista “No ciclo” mostra quem estava no ciclo anterior; cada um passa a ter nota quando for avaliado em algum evento deste ciclo.
+              </Notice>
+            )}
+            {mergeMode && <MergeModeBanner selected={selectedIds.size} onExit={exitMerge} />}
+            <div className="space-y-3">
+              <EmployeesToolbar
+                search={search}
+                onSearchChange={setSearch}
+                filterCycle={filterCycle}
+                onFilterCycleChange={setFilterCycle}
+                counts={{ in: inCycle.length, out: outOfCycle.length }}
+                attention={attention}
+                onClearAttention={() => setAttention(null)}
+                extra={attention === "dup" && canBulk && !mergeMode
+                  ? <button type="button" onClick={startMerge} className={cn(btnSmall, "min-h-11 lg:min-h-7 text-[12.5px]")}><GitMerge size={13} aria-hidden /> Mesclar duplicatas</button>
+                  : undefined}
+              />
+              <EmployeesTable
+                filtered={filtered}
+                noScore={noScoreMatches}
+                total={filterCycle === "in" ? inCycle.length : outOfCycle.length}
+                tab={filterCycle}
+                search={search}
+                attention={attention}
+                onClearSearch={() => setSearch("")}
+                onClearAttention={() => setAttention(null)}
+                duplicateIds={canBulk ? duplicateIds : new Set()}
+                mergeMode={mergeMode}
+                selectedIds={selectedIds}
+                canonicalId={canonicalId}
+                canBulk={canBulk}
+                canEdit={canEdit}
+                isAdmin={isAdmin}
+                previewingId={previewingId}
+                generatingPinId={generatingPinId}
+                onToggleMergeSelection={toggleMergeSelection}
+                onPreviewAs={handlePreviewAs}
+                onGeneratePin={handleGeneratePin}
+                onEdit={setEditingEmployee}
+                onToggleCycle={isAdmin ? emp => { setCycleTarget(emp); setCycleReason(""); setCycleError(null); } : undefined}
+              />
+            </div>
+
+            {mergeMode && selectedIds.size >= 2 && (
+              <MergeActionBar
+                employees={employees}
+                selectedIds={selectedIds}
+                canonicalId={canonicalId}
+                onSelectCanonical={setCanonicalId}
+                onRequestMerge={() => { setMergeError(null); setMergeConfirmOpen(true); }}
+                isPending={mergeMutation.isPending}
+              />
+            )}
+          </div>
         )}
       </div>
+
+      <CycleToggleDialog
+        target={cycleTarget}
+        reason={cycleReason}
+        onReasonChange={setCycleReason}
+        pending={cycleMutation.isPending}
+        error={cycleError}
+        onConfirm={() => { setCycleError(null); confirmCycleToggle(); }}
+        onClose={() => { setCycleTarget(null); setCycleError(null); }}
+      />
 
       {/* Bulk generate access dialog */}
       <BulkAccessDialog
@@ -546,8 +618,10 @@ export default function EmployeesPage() {
         selectedIds={selectedIds}
         canonicalId={canonicalId}
         isPending={mergeMutation.isPending}
+        error={mergeError}
         onConfirm={() => {
           if (!canonicalId) return;
+          setMergeError(null);
           const dupIds = Array.from(selectedIds).filter(id => id !== canonicalId);
           mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dupIds } });
         }}

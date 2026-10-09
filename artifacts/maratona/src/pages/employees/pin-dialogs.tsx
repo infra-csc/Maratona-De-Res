@@ -1,30 +1,33 @@
-import { plural } from "@/lib/utils";
+// Senhas dos colaboradores casa (senha = CPF): a lista em massa (carregada ou
+// recém-definida) e o acesso individual criado/redefinido.
 import type { CasaPin, SkippedPin } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle, Check, Copy, Download, Hash, KeyRound, Link, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { Hash, Copy, Check, Link } from "lucide-react";
-import { CONDENSED, WARNING, DANGER_TEXT } from "@/lib/premium-theme";
+import { cn, plural } from "@/lib/utils";
+import { Bone, DialogHeading, Eyebrow, Notice, btnPrimary, btnSecondary, btnSmall, dialogCls, dialogFooterCls, iconBtn, useReturnFocus } from "./ui";
+import { toTitleCase } from "./utils";
 import type { PinDialogData, ToastFn } from "./types";
 
+const fmtCpf = (v: string) => v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+
+function downloadPinsCsv(results: CasaPin[]) {
+  const bom = "﻿";
+  const header = "Nome,Senha";
+  const body = results.map(r => `"${r.name.replace(/"/g, '""')}","${r.pin}"`).join("\n");
+  const blob = new Blob([bom + header + "\n" + body], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "senhas-colaboradores.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
- * "Gerar Senhas — Colaboradores Casa": mostra as senhas carregadas (casa-pins) ou recém-definidas
+ * "Gerar senhas — colaboradores casa": mostra as senhas carregadas (casa-pins) ou recém-definidas
  * (bulk-generate-pins). Carga, geração e estado ficam no pai.
  */
 export function BulkPinDialog({
-  open,
-  onOpenChange,
-  loading,
-  result,
-  source,
-  confirmRegen,
-  onConfirmRegenChange,
-  onGenerate,
-  onCancel,
-  onClose,
-  appLink,
-  linkCopied,
-  onLinkCopiedChange,
-  toast,
+  open, onOpenChange, loading, result, source, confirmRegen, onConfirmRegenChange, onGenerate, onCancel, onClose, appLink, linkCopied, onLinkCopiedChange, toast,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -43,74 +46,54 @@ export function BulkPinDialog({
   onLinkCopiedChange: (v: boolean) => void;
   toast: ToastFn;
 }) {
+  const onCloseAutoFocus = useReturnFocus(open);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-            Gerar Senhas — Colaboradores Casa
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={v => { if (!loading || v) onOpenChange(v); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[640px] max-h-[92dvh] overflow-y-auto")} data-testid="bulk-pin-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Hash} Title={DialogTitle} Description={DialogDescription} title="Senhas dos colaboradores casa"
+          description="A senha de cada colaborador casa é o próprio CPF (11 dígitos, sem pontuação). O login também é o CPF." />
 
         {loading && !result ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Hash size={24} className="animate-spin" style={{ color: "#ccff00" }} />
-            <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Carregando…</p>
+          <div role="status" aria-label="Carregando as senhas" className="rounded-xl border border-border divide-y divide-border">
+            {Array.from({ length: 5 }, (_, i) => <div key={i} className="flex items-center justify-between px-4 py-3"><Bone className="h-4 w-44" /><Bone className="h-4 w-28" /></div>)}
           </div>
         ) : !result ? (
-          <div className="space-y-4 pt-1">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Nenhuma senha definida ainda. Clique abaixo para definir a senha de todos os colaboradores casa ativos com CPF cadastrado. A senha de cada um será o próprio CPF (11 dígitos sem pontuação).
-            </p>
-            <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-              <button onClick={() => onCancel()} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
-              <button
-                onClick={onGenerate}
-                disabled={loading}
-                className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
-                style={{ backgroundColor: "#ccff00", color: "#000" }}
-              >
-                <Hash size={15} /> Definir senhas (CPF)
+          <>
+            <Notice icon={KeyRound} tone="neutral">Nenhuma senha definida ainda. Defina agora a senha de todos os colaboradores casa ativos com CPF cadastrado.</Notice>
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onCancel} className={btnSecondary}>Cancelar</button>
+              <button type="button" onClick={onGenerate} disabled={loading} aria-busy={loading || undefined} className={btnPrimary} data-testid="button-define-pins">
+                {loading ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Hash size={15} aria-hidden />} {loading ? "Definindo…" : "Definir senhas (CPF)"}
               </button>
             </div>
-          </div>
+          </>
         ) : (
-          <div className="space-y-3 pt-1">
-            {/* Stats + source badge */}
-            <div className="flex gap-3 items-stretch">
-              <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{result.results.length}</p>
-                <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-                  {source === "generated" ? "Senhas definidas agora" : "Senhas ativas"}
-                </p>
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border px-4 py-3">
+                <Eyebrow as="span" className="block">{source === "generated" ? "Definidas agora" : "Senhas ativas"}</Eyebrow>
+                <span className="mt-2 block font-condensed text-[30px] font-black leading-none tabular-nums">{result.results.length}</span>
               </div>
-              {result.skipped.length > 0 && (
-                <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                  <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{result.skipped.length}</p>
-                  <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
-                </div>
-              )}
+              <div className="rounded-xl border border-border px-4 py-3">
+                <Eyebrow as="span" className="block">Sem CPF (ignorados)</Eyebrow>
+                <span className={cn("mt-2 block font-condensed text-[30px] font-black leading-none tabular-nums", result.skipped.length > 0 && "text-[var(--status-warn-text)]")}>{result.skipped.length}</span>
+              </div>
             </div>
 
-            {/* Scrollable table */}
-            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-              <div style={{ maxHeight: 380, overflowY: "auto" }}>
-                <table className="w-full text-sm border-collapse">
-                  <thead style={{ backgroundColor: "var(--secondary)", position: "sticky", top: 0, zIndex: 10 }}>
-                    <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
-                      <th className="px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Senha</th>
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="max-h-[320px] overflow-y-auto">
+                <table className="w-full text-[14px] border-collapse" aria-label="Senhas dos colaboradores casa">
+                  <thead className="sticky top-0 z-10 bg-card">
+                    <tr className="border-b border-border">
+                      <th className="font-condensed px-4 h-10 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Nome</th>
+                      <th className="font-condensed px-4 h-10 text-right text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Senha</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.results.map((r, i) => (
-                      <tr key={r.cpfLogin ?? `${r.name}-${i}`} style={{ borderBottom: i < result.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
-                        <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className="text-sm font-black font-mono" style={{ color: "#ccff00" }}>
-                            {r.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
-                          </span>
-                        </td>
+                      <tr key={r.cpfLogin ?? `${r.name}-${i}`} className="border-t border-border first:border-t-0">
+                        <td className="px-4 py-2.5 font-medium" title={r.name}>{toTitleCase(r.name)}</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold tabular-nums whitespace-nowrap">{fmtCpf(r.pin)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -118,159 +101,96 @@ export function BulkPinDialog({
               </div>
             </div>
 
-            {/* Shared access link */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-              <Link size={12} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
-              <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--muted-foreground)" }}>{appLink}</span>
-              <button
+            <div className="flex items-center gap-2 rounded-xl bg-secondary/70 pl-3.5 pr-1.5 py-1.5">
+              <Link size={14} aria-hidden className="shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-muted-foreground" title={appLink}>{appLink}</span>
+              <button type="button" aria-label="Copiar o link do app" title="Copiar o link do app"
                 onClick={async () => {
                   if (await copyToClipboard(appLink)) { onLinkCopiedChange(true); setTimeout(() => onLinkCopiedChange(false), 2000); }
                   else toast(COPY_FAILED_TOAST);
                 }}
-                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded font-black text-[11px] uppercase transition-all hover:opacity-80"
-                style={{ border: "1px solid var(--border)", color: "var(--foreground)", cursor: "pointer" }}
-              >
-                {linkCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Link</>}
+                className={cn(btnSmall, "min-h-11 lg:min-h-8")}>
+                {linkCopied ? <><Check size={13} aria-hidden /> Copiado</> : <><Copy size={13} aria-hidden /> Copiar link</>}
               </button>
             </div>
 
-            {/* Actions */}
-            <div className="flex justify-between items-center gap-2 pt-1" style={{ borderTop: "1px solid var(--border)" }}>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const bom = "﻿";
-                    const header = "Nome,Senha";
-                    const body = result.results.map(r => `"${r.name.replace(/"/g, '""')}","${r.pin}"`).join("\n");
-                    const blob = new Blob([bom + header + "\n" + body], { type: "text/csv;charset=utf-8" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url; a.download = "senhas-colaboradores.csv"; a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                  style={{ backgroundColor: "#ccff00", color: "#000", border: "none", cursor: "pointer" }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Baixar Excel
-                </button>
-                <button
+            {confirmRegen && (
+              <Notice icon={AlertTriangle} tone="warn" testId="confirm-regen-pins">
+                <p className="font-semibold text-foreground">Redefinir a senha de todos os colaboradores casa para o CPF?</p>
+                <p className="mt-0.5">Quem tiver CPF cadastrado volta a entrar com o CPF como senha.</p>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button type="button" onClick={onGenerate} disabled={loading} aria-busy={loading || undefined} className={cn(btnPrimary, "min-h-10 text-[13px]")}>
+                    {loading ? <Loader2 size={14} aria-hidden className="motion-safe:animate-spin" /> : <Hash size={14} aria-hidden />} {loading ? "Redefinindo…" : "Sim, redefinir"}
+                  </button>
+                  <button type="button" onClick={() => onConfirmRegenChange(false)} disabled={loading} className={cn(btnSecondary, "min-h-10 text-[13px]")}>Não</button>
+                </div>
+              </Notice>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+                <button type="button" onClick={() => downloadPinsCsv(result.results)} className={btnSecondary}><Download size={15} aria-hidden /> Baixar planilha</button>
+                <button type="button"
                   onClick={async () => {
                     const lines = ["Nome | Senha", ...result.results.map(r => `${r.name} | ${r.pin}`)];
-                    if (await copyToClipboard(lines.join("\n"))) toast({ title: "Lista copiada!", description: plural(result.results.length, "colaborador", "colaboradores") });
+                    if (await copyToClipboard(lines.join("\n"))) toast({ title: "Lista copiada", description: plural(result.results.length, "colaborador", "colaboradores") });
                     else toast(COPY_FAILED_TOAST);
                   }}
-                  className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                  style={{ border: "1px solid var(--border)", cursor: "pointer" }}
-                >
-                  <Copy size={13} /> Copiar lista
-                </button>
+                  className={btnSecondary}><Copy size={15} aria-hidden /> Copiar lista</button>
               </div>
-              <div className="flex gap-2 items-center">
-                {confirmRegen ? (
-                  <>
-                    <span className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Redefinir senhas para CPF?</span>
-                    <button
-                      onClick={onGenerate}
-                      disabled={loading}
-                      className="h-9 px-3 rounded-lg font-black text-xs uppercase flex items-center gap-1 disabled:opacity-60"
-                      style={{ backgroundColor: WARNING, color: "#000", cursor: "pointer" }}
-                    >
-                      {loading ? <Hash size={12} className="animate-spin" /> : <Hash size={12} />} Confirmar
-                    </button>
-                    <button onClick={() => onConfirmRegenChange(false)} className="h-9 px-3 rounded-lg font-bold text-xs uppercase" style={{ border: "1px solid var(--border)", cursor: "pointer" }}>
-                      Cancelar
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => onConfirmRegenChange(true)}
-                    className="h-9 px-4 rounded-lg font-bold text-xs uppercase flex items-center gap-1"
-                    style={{ border: "1px solid var(--border)", cursor: "pointer" }}
-                  >
-                    <Hash size={13} /> Redefinir senhas (CPF)
-                  </button>
+              <div className="sm:ml-auto flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+                {!confirmRegen && (
+                  <button type="button" onClick={() => onConfirmRegenChange(true)} className={btnSecondary} data-testid="button-regen-pins"><Hash size={15} aria-hidden /> Redefinir senhas</button>
                 )}
-                <button
-                  onClick={() => onClose()}
-                  className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                  style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", cursor: "pointer" }}
-                >
-                  Fechar
-                </button>
+                <button type="button" onClick={onClose} disabled={loading} className={btnPrimary}>Fechar</button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-/** PIN individual gerado ("Acesso Criado" ou "Senha Redefinida"). */
-export function PinDialog({
-  pinDialog,
-  onClose,
-  pinCopied,
-  onPinCopiedChange,
-  toast,
-}: {
+/** Acesso individual ("Acesso criado" ou "Senha redefinida"): login e senha = CPF. */
+export function PinDialog({ pinDialog, onClose, pinCopied, onPinCopiedChange, toast }: {
   pinDialog: PinDialogData | null;
   onClose: () => void;
   pinCopied: boolean;
   onPinCopiedChange: (v: boolean) => void;
   toast: ToastFn;
 }) {
+  const onCloseAutoFocus = useReturnFocus(!!pinDialog);
+  const name = pinDialog ? toTitleCase(pinDialog.empName) : "";
   return (
     <Dialog open={!!pinDialog} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-            {pinDialog?.created ? "Acesso Criado" : "Senha Redefinida"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-1">
-          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-            {pinDialog?.created
-              ? "Acesso criado com sucesso. A senha é o CPF do colaborador (11 dígitos)."
-              : `Senha redefinida para ${pinDialog?.empName}. A senha é o CPF do colaborador.`}
-          </p>
-
-          <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--border)" }}>
-            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              <p className="text-[11px] font-black uppercase tracking-widest mb-1" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Login (CPF)</p>
-              <p className="text-base font-black tracking-widest">{pinDialog?.cpfLogin}</p>
-            </div>
-            <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)", borderBottom: "1px solid rgba(0,0,0,0.15)" }}>
-              <p className="text-[11px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (CPF)</p>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-2xl font-black font-mono tracking-wider" style={{ color: "var(--primary-foreground)" }}>
-                  {pinDialog?.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
-                </span>
-                <button
-                  onClick={async () => {
-                    if (!pinDialog) return;
-                    if (await copyToClipboard(pinDialog.pin)) { onPinCopiedChange(true); setTimeout(() => onPinCopiedChange(false), 2000); }
-                    else toast(COPY_FAILED_TOAST);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-80"
-                  style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "var(--primary-foreground)" }}
-                >
-                  {pinCopied ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
-                </button>
-              </div>
-            </div>
+      <DialogContent className={cn(dialogCls, "max-w-[440px]")} data-testid="pin-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={KeyRound} tone="brand" Title={DialogTitle} Description={DialogDescription}
+          title={pinDialog?.created ? "Acesso criado" : "Senha redefinida"}
+          description={pinDialog?.created ? `${name} já pode entrar no app. Login e senha são o CPF.` : `A senha de ${name} voltou a ser o CPF.`} />
+        <dl className="rounded-xl border border-border divide-y divide-border">
+          <div className="px-4 py-3">
+            <dt><Eyebrow as="span">Login (CPF)</Eyebrow></dt>
+            <dd className="mt-1.5 font-mono text-[17px] font-bold tracking-wider">{pinDialog?.cpfLogin}</dd>
           </div>
-
-          <div className="flex justify-end pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-            <button
-              onClick={() => onClose()}
-              className="h-10 px-5 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
-            >
-              Fechar
+          <div className="px-4 py-3 bg-secondary/50 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <dt><Eyebrow as="span">Senha</Eyebrow></dt>
+              <dd className="mt-1.5 font-mono text-[22px] font-black tracking-wider tabular-nums">{pinDialog ? fmtCpf(pinDialog.pin) : ""}</dd>
+            </div>
+            <button type="button" aria-label={pinCopied ? "Senha copiada" : "Copiar a senha"} title="Copiar a senha"
+              onClick={async () => {
+                if (!pinDialog) return;
+                if (await copyToClipboard(pinDialog.pin)) { onPinCopiedChange(true); setTimeout(() => onPinCopiedChange(false), 2000); }
+                else toast(COPY_FAILED_TOAST);
+              }}
+              className={cn(iconBtn, pinCopied && "text-[var(--status-ok-text)]")}>
+              {pinCopied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
             </button>
           </div>
+        </dl>
+        <div className={dialogFooterCls}>
+          <button type="button" onClick={onClose} className={btnPrimary}>Fechar</button>
         </div>
       </DialogContent>
     </Dialog>

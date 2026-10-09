@@ -1,12 +1,13 @@
-import { plural } from "@/lib/utils";
+// Importação em lote de CPFs ("NOME;CPF" por linha). O texto, as linhas
+// reconhecidas e o envio ficam no pai — `onConfirm` precisa enxergar a lista
+// ATUAL (ver handleBulkSetCpf).
 import type { BulkSetCpfResult } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle2, AlertTriangle, RefreshCw, CreditCard } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn, plural } from "@/lib/utils";
+import { DialogHeading, FieldLabel, Notice, btnPrimary, btnSecondary, dialogCls, dialogFooterCls, useReturnFocus } from "./ui";
+import { toTitleCase } from "./utils";
 
-/**
- * Importação em lote de CPFs ("NOME;CPF" por linha). O texto, as linhas reconhecidas e o envio
- * ficam no pai — `onConfirm` precisa enxergar a lista ATUAL (ver handleBulkSetCpf).
- */
 export function BulkCpfDialog({
   open,
   onOpenChange,
@@ -30,84 +31,57 @@ export function BulkCpfDialog({
   /** Botões Cancelar/Fechar: só fecham (o resultado some ao reabrir, como antes). */
   onClose: () => void;
 }) {
+  const onCloseAutoFocus = useReturnFocus(open);
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).length;
+  const invalid = lines - validCount;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CreditCard size={18} /> Importar CPFs
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={v => { if (!loading) onOpenChange(v); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[520px] max-h-[92dvh] overflow-y-auto")} data-testid="bulk-cpf-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={CreditCard} Title={DialogTitle} Description={DialogDescription} title="Importar CPFs"
+          description={result ? "Resultado da importação." : "Uma linha por colaborador, no formato NOME;CPF. O nome precisa ser igual ao do cadastro. Rodar de novo não altera o que já está certo."} />
         {!result ? (
-          <div className="space-y-4 py-2">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Cole uma linha por colaborador no formato <code>NOME;CPF</code> (o nome precisa ser exatamente igual ao cadastro).
-              A operação é idempotente — rodar de novo não altera dados já corretos.
-            </p>
-            <textarea
-              id="bulk-cpf-text"
-              value={text}
-              onChange={e => onTextChange(e.target.value)}
-              rows={8}
-              placeholder={"MARIA DA SILVA;12345678901\nJOÃO SOUZA;98765432100"}
-              className="w-full rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2"
-              style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
-            />
-            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {validCount === 1 ? "1 linha válida reconhecida." : `${validCount} linhas válidas reconhecidas.`}
-            </p>
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={() => onClose()}
-                className="h-9 px-4 rounded-lg text-sm font-bold uppercase"
-                style={{ border: "1px solid var(--border)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={onConfirm}
-                disabled={loading || validCount === 0}
-                className="h-9 px-4 rounded-lg text-sm font-bold uppercase flex items-center gap-2 disabled:opacity-50"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                {loading ? <><RefreshCw size={14} className="animate-spin" /> Importando…</> : <><CreditCard size={14} /> Confirmar</>}
+          <>
+            <div>
+              <FieldLabel htmlFor="bulk-cpf-text" hint={lines > 0 ? <span aria-live="polite" className="tabular-nums">{plural(validCount, "linha válida", "linhas válidas")}{invalid > 0 ? ` · ${invalid} com erro` : ""}</span> : undefined}>Lista NOME;CPF</FieldLabel>
+              <textarea
+                id="bulk-cpf-text"
+                value={text}
+                onChange={e => onTextChange(e.target.value)}
+                rows={8}
+                spellCheck={false}
+                aria-describedby="bulk-cpf-help"
+                placeholder={"MARIA DA SILVA;12345678901\nJOÃO SOUZA;98765432100"}
+                className="w-full rounded-lg border border-border bg-card px-3.5 py-2.5 font-mono text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground transition-[border-color,box-shadow] duration-150 focus:outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/30"
+              />
+              <p id="bulk-cpf-help" className="mt-1.5 text-[12.5px] text-muted-foreground">Aceita ; , ou tab como separador. CPF com ou sem pontuação (11 dígitos).</p>
+            </div>
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onClose} disabled={loading} className={btnSecondary}>Cancelar</button>
+              <button type="button" onClick={onConfirm} disabled={loading || validCount === 0} aria-busy={loading || undefined} className={btnPrimary} data-testid="button-confirm-bulk-cpf">
+                {loading ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <CreditCard size={15} aria-hidden />}
+                {loading ? "Importando…" : validCount > 0 ? `Importar ${plural(validCount, "CPF", "CPFs")}` : "Importar"}
               </button>
             </div>
-          </div>
+          </>
         ) : (
-          <div className="space-y-4 py-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
-              <CheckCircle2 size={16} /> {plural(result.updated.length, "colaborador atualizado", "colaboradores atualizados")}
-            </div>
-            {result.updated.length > 0 && (
-              <div className="rounded-lg border text-xs max-h-36 overflow-y-auto divide-y">
-                {result.updated.map(e => (
-                  <div key={e.id} className="px-3 py-1.5 text-green-800">{e.name}</div>
-                ))}
-              </div>
-            )}
+          <>
+            <Notice icon={CheckCircle2} tone={result.updated.length > 0 ? "ok" : "neutral"} testId="bulk-cpf-result">
+              <p className="font-semibold text-foreground">{plural(result.updated.length, "colaborador atualizado", "colaboradores atualizados")}</p>
+              {result.updated.length > 0 && (
+                <ul className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 pr-1">{result.updated.map(e => <li key={e.id}>{toTitleCase(e.name)}</li>)}</ul>
+              )}
+            </Notice>
             {result.notFound.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">
-                  <AlertTriangle size={13} /> {result.notFound.length} não encontrados
-                </p>
-                <div className="rounded-lg border border-amber-200 text-xs max-h-28 overflow-y-auto divide-y divide-amber-100">
-                  {result.notFound.map(n => (
-                    <div key={n} className="px-3 py-1.5 text-amber-800">{n}</div>
-                  ))}
-                </div>
-              </div>
+              <Notice icon={AlertTriangle} tone="warn">
+                <p className="font-semibold text-foreground">{result.notFound.length === 1 ? "1 nome não encontrado" : `${result.notFound.length} nomes não encontrados`}</p>
+                <ul className="mt-1.5 max-h-28 overflow-y-auto space-y-0.5 pr-1">{result.notFound.map(n => <li key={n}>{n}</li>)}</ul>
+                <p className="mt-1.5 text-muted-foreground">Confira a grafia: o nome precisa ser igual ao do cadastro.</p>
+              </Notice>
             )}
-            <div className="flex justify-end pt-1">
-              <button
-                onClick={() => onClose()}
-                className="h-9 px-5 rounded-lg text-sm font-bold uppercase"
-                style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
-              >
-                Fechar
-              </button>
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onClose} className={btnPrimary}>Fechar</button>
             </div>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
