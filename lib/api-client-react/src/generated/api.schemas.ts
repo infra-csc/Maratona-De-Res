@@ -1891,6 +1891,8 @@ export interface CycleStats {
   eventsTotal: number;
   /** Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo) */
   eventsAfterEnd?: number;
+  /** Avaliações enviadas nos eventos do ciclo. Com alguma, a avaliação por área não pode mais ser ligada/desligada (409 CYCLE_HAS_EVALUATIONS). */
+  evaluationsSubmitted?: number;
   /**
      * TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista
      * (e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);
