@@ -457,6 +457,8 @@ test("M3: Total geral do Dashboard e de Análises = a conta de /ranking/total (p
 test("Evolução de Performance: ciclos em ordem de data de início (não de id)", async () => {
   // "Ciclo antigo R2" foi cadastrado DEPOIS do fechado, mas começa antes.
   await h.sql("insert into quarterly_results (employee_id, cycle_id, final_result, events_count) values ($1, $2, 70, 1) on conflict do nothing", [empAna, cicloAntigo]);
+  // A evolução usa o recorte do Ranking: quem tem resultado participou de evento do ciclo.
+  await h.fx.event({ cycleId: cicloAntigo, date: "2020-02-10", status: "closed", resultsConfirmed: true, name: "Evento ciclo antigo R2", participants: [empAna] });
   const pts = (await h.api("GET", "/dashboard/quarterly-evolution", { role: "admin" })).data as { cycleId: number }[];
   const starts = new Map(((await h.api("GET", "/cycles/options", { role: "admin" })).data as { id: number; startDate: string }[]).map(c => [c.id, c.startDate]));
   const ids = pts.map(p => p.cycleId);
