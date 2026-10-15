@@ -305,6 +305,7 @@
   }
   html, body { background: #ffffff !important; height: auto !important; overflow: visible !important; }
   .app-shell { display: block !important; height: auto !important; overflow: visible !important; }
+  .app-row { display: block !important; height: auto !important; min-height: 0 !important; }
   .app-main { height: auto !important; overflow: visible !important; display: block !important; }
   .no-print { display: none !important; }
   .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
@@ -320,3 +321,11 @@
 }
 .eval-flash { animation: eval-flash 1.2s ease-out; border-radius: 0.75rem; }
 @media (prefers-reduced-motion: reduce) { .eval-flash { animation: none; } }
+
+/* Casca: barra de carregamento indeterminada (abrindo o app / trocando de tela). */
+@keyframes shell-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+.shell-indeterminate { animation: shell-indeterminate 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .shell-indeterminate { animation: none; transform: translateX(75%); } }

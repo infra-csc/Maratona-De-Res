@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { BootScreen, PageFallback, RouteFallback } from "@/components/layout/shell-states";
+import { AccessDenied } from "@/components/layout/access-denied";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -39,16 +41,13 @@ const MyPerformancePage = lazy(() => import("@/pages/my-performance"));
 const ComoFuncionaPage = lazy(() => import("@/pages/como-funciona"));
 const PublicEvalPage = lazy(() => import("@/pages/eval-public"));
 
-function PageFallback() {
-  return (
-    <div className="flex h-[60vh] items-center justify-center" role="status" aria-live="polite">
-      <div className="text-muted-foreground text-sm">Carregando...</div>
-    </div>
-  );
-}
 
 function handleAuthError(error: unknown) {
   const status = (error as { status?: number })?.status;
+  // "Senha atual incorreta" (troca de senha) também volta 401, mas a sessão
+  // segue válida: o erro aparece no formulário, sem derrubar a pessoa para o login.
+  const { url, data } = (error ?? {}) as { url?: string; data?: { error?: unknown } | null };
+  if (status === 401 && /\/auth\/change-password$/.test(url ?? "") && data?.error === "Senha atual incorreta") return;
   if (status === 401 && localStorage.getItem("maratona_token")) {
     localStorage.removeItem("maratona_token");
     localStorage.removeItem("maratona_user");
@@ -58,6 +57,8 @@ function handleAuthError(error: unknown) {
     // Sessão vencida no meio do uso: guarda o evento aberto para retomar
     // depois do login (a tela de Avaliações consome "maratona_destino").
     try {
+      // A tela de login avisa "Sua sessão expirou" (só apresentação).
+      sessionStorage.setItem("maratona_sessao_expirou", "1");
       if (/\/evaluations$/.test(window.location.pathname) && new URLSearchParams(window.location.search).get("evento")) {
         sessionStorage.setItem("maratona_destino", window.location.pathname + window.location.search);
       }
@@ -81,13 +82,7 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
   const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Carregando...</div>
-      </div>
-    );
-  }
+  if (isLoading) return <BootScreen />;
   if (!user) return <Redirect to="/login" />;
   if (user.mustChangePassword) return <Redirect to="/trocar-senha" />;
   // Regra do dono: o avaliador só avalia — qualquer outra tela volta para /evaluations.
@@ -95,12 +90,7 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
   if (roles && !roles.includes(user.role)) {
     return (
       <AppLayout>
-        <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-center">
-          <h2 className="text-xl font-semibold">Acesso negado</h2>
-          <p className="text-muted-foreground text-sm">
-            Você não tem permissão para acessar esta página.
-          </p>
-        </div>
+        <AccessDenied role={user.role} />
       </AppLayout>
     );
   }
@@ -124,15 +114,9 @@ function HomeRoute() {
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Carregando...</div>
-      </div>
-    );
-  }
+  if (isLoading) return <BootScreen />;
   return (
-    <Suspense fallback={<PageFallback />}>
+    <Suspense fallback={<RouteFallback />}>
     <Switch>
       <Route path="/eval/:token" component={PublicEvalPage} />
       <Route path="/login">

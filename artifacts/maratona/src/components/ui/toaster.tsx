@@ -1,3 +1,4 @@
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -12,11 +13,19 @@ export function Toaster() {
   const { toasts } = useToast()
 
   return (
-    <ToastProvider>
+    // label: o leitor de tela anuncia "Notificação", não "Notification".
+    <ToastProvider label="Notificação">
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        const danger = props.variant === "destructive"
+        const Icon = danger ? AlertCircle : CheckCircle2
         return (
           <Toast key={id} {...props}>
-            <div className="grid gap-1">
+            <Icon
+              size={18}
+              aria-hidden="true"
+              className={danger ? "mt-px shrink-0 text-[var(--status-danger)]" : "mt-px shrink-0 text-[var(--accent-text)]"}
+            />
+            <div className="grid min-w-0 flex-1 gap-0.5">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>{description}</ToastDescription>
@@ -27,7 +36,7 @@ export function Toaster() {
           </Toast>
         )
       })}
-      <ToastViewport />
+      <ToastViewport label="Notificações ({hotkey})" />
     </ToastProvider>
   )
 }

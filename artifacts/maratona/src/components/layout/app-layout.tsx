@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { Menu } from "lucide-react";
-import { Sidebar } from "./sidebar";
+import { Sidebar, navLabelFor } from "./sidebar";
 import { ImpersonationBanner } from "./impersonation-banner";
-import { PremiumThemeProvider, BODY, ACCENT_TEXT } from "@/lib/premium-theme";
+import { BrandMark, Wordmark } from "./shell-ui";
+import { PremiumThemeProvider, BODY } from "@/lib/premium-theme";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +17,13 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
+  const [location] = useLocation();
+
+  // Aba do navegador com o nome da tela (várias abas abertas deixam de ser iguais).
+  useEffect(() => {
+    const label = navLabelFor(location);
+    document.title = label ? `${label} · Maratona de Resultados` : "Maratona de Resultados";
+  }, [location]);
 
   // Menu do celular como diálogo: Esc fecha, o Tab fica preso dentro dele e,
   // ao fechar, o foco volta ao botão que o abriu.
@@ -28,7 +37,8 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const focusables = () => Array.from(drawerRef.current?.querySelectorAll<HTMLElement>(
       "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])",
     ) ?? []).filter(el => el.offsetParent !== null);
-    focusables()[0]?.focus();
+    // Começa no item da tela atual (onde a pessoa está); sem ele, no primeiro.
+    (drawerRef.current?.querySelector<HTMLElement>("[aria-current=\"page\"]") ?? focusables()[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); setMobileOpen(false); return; }
       if (e.key !== "Tab") return;
@@ -45,64 +55,76 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   }, [mobileOpen]);
 
   return (
-    <div
-      className="app-shell flex h-screen overflow-hidden transition-colors duration-300"
-      style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}
-    >
-      {/* Desktop: sidebar persistente */}
-      <div className={cn("no-print hidden shrink-0", compactUntilLg ? "lg:flex" : "md:flex")}>
-        <Sidebar />
+    // A faixa do Modo Dev fica FORA da área que rola: nunca cobre os cabeçalhos
+    // fixos das telas (antes, presa em top:0 dentro do <main>, cobria).
+    <div className="app-shell flex h-dvh flex-col overflow-hidden bg-background text-foreground" style={{ fontFamily: BODY }}>
+      {/* Teclado: pula os itens do menu direto para a tela. */}
+      <a
+        href="#conteudo"
+        onClick={e => { e.preventDefault(); document.getElementById("conteudo")?.focus(); }}
+        className="font-condensed sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-3 focus:text-[13px] focus:font-bold focus:uppercase focus:tracking-[0.06em] focus:text-primary-foreground focus:shadow-lg"
+      >
+        Pular para o conteúdo
+      </a>
+      <div className="no-print shrink-0"><ImpersonationBanner /></div>
+
+      <div className="app-row flex min-h-0 flex-1">
+        {/* Desktop: menu persistente */}
+        <div className={cn("no-print hidden shrink-0", compactUntilLg ? "lg:flex" : "md:flex")}>
+          <Sidebar />
+        </div>
+
+        {/* Celular/tablet: menu como diálogo sobre a tela */}
+        {mobileOpen && (
+          <div className={cn("no-print fixed inset-0 z-50 flex", compactUntilLg ? "lg:hidden" : "md:hidden")}>
+            <div
+              className="absolute inset-0 bg-black/55 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+              aria-hidden="true"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
+              className="relative h-full shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-left motion-safe:duration-200"
+            >
+              <Sidebar onClose={() => setMobileOpen(false)} />
+            </div>
+          </div>
+        )}
+
+        <main className="app-main relative flex h-full min-w-0 flex-1 flex-col overflow-y-auto">
+          {/* Barra superior do celular/tablet: menu à esquerda, marca ao centro. */}
+          <div className={cn("no-print sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-1.5", compactUntilLg ? "lg:hidden" : "md:hidden")}>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              aria-expanded={mobileOpen}
+              aria-haspopup="dialog"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Abrir menu"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-150 hover:bg-secondary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <Link
+              href={compactUntilLg ? "/evaluations" : "/"}
+              aria-label="Maratona de Resultados — início"
+              className="mx-auto flex min-w-0 items-center gap-2 rounded-lg px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <BrandMark size={28} />
+              <Wordmark compact />
+            </Link>
+            {/* Contrapeso do botão de menu: a marca fica no centro de verdade. */}
+            <span className="size-11 shrink-0" aria-hidden="true" />
+          </div>
+
+          <div id="conteudo" tabIndex={-1} className="relative z-10 min-h-full pb-12 flex-1 outline-none">
+            {children}
+          </div>
+        </main>
       </div>
-
-      {/* Mobile: drawer overlay */}
-      {mobileOpen && (
-        <div className={cn("no-print fixed inset-0 z-50 flex", compactUntilLg ? "lg:hidden" : "md:hidden")}>
-          <div ref={drawerRef} role="dialog" aria-modal="true" aria-label="Menu" className="absolute left-0 top-0 h-full z-10">
-            <Sidebar onClose={() => setMobileOpen(false)} />
-          </div>
-          <div
-            className="absolute inset-0 bg-black/50"
-            aria-hidden="true"
-            onClick={() => setMobileOpen(false)}
-          />
-        </div>
-      )}
-
-      <main className="app-main flex-1 h-full overflow-y-auto relative flex flex-col">
-        {/* Barra superior mobile */}
-        <div
-          className={cn("no-print sticky top-0 z-30 flex items-center justify-between px-4 h-14 shrink-0 transition-colors duration-300", compactUntilLg ? "lg:hidden" : "md:hidden")}
-          style={{ backgroundColor: "var(--card)", borderBottom: "1px solid var(--border)" }}
-        >
-          <button
-            ref={menuButtonRef}
-            type="button"
-            aria-expanded={mobileOpen}
-            aria-haspopup="dialog"
-            onClick={() => setMobileOpen(true)}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
-            aria-label="Abrir menu"
-          >
-            <Menu size={20} />
-          </button>
-          <div className="text-center">
-            <span className="block font-black text-base uppercase tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-              Maratona
-            </span>
-            <span className="block font-bold text-[11px] uppercase tracking-wider leading-none mt-0.5" style={{ color: ACCENT_TEXT }}>
-              Resultados
-            </span>
-          </div>
-          {/* espaçador para centralizar o título */}
-          <div className="w-9" />
-        </div>
-
-        <div className="no-print"><ImpersonationBanner /></div>
-        <div className="relative z-10 min-h-full pb-12 flex-1">
-          {children}
-        </div>
-      </main>
     </div>
   );
 }
