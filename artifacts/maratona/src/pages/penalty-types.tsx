@@ -1,483 +1,110 @@
-import { plural } from "@/lib/utils";
-import { useState } from "react";
-import {
-  useGetPenaltyTypes, useCreatePenaltyType, useUpdatePenaltyType, useDeletePenaltyType,
-  useSeedDefaultPenaltyTypes,
-  getGetPenaltyTypesQueryKey,
-} from "@workspace/api-client-react";
-import type { PenaltyType } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { invalidateCycleResults } from "@/lib/invalidate-results";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2, RefreshCw } from "lucide-react";
+// Tela "Tipos de lançamento": o cadastro das penalidades e dos méritos que
+// aparecem no formulário de Penalidades e méritos. Peças em ./penalty-types/
+// (colunas, diálogos e o hook do formulário/mutações).
+import { useMemo } from "react";
+import { Link } from "wouter";
+import { useGetPenaltyTypes, useGetAbsences, getGetPenaltyTypesQueryKey } from "@workspace/api-client-react";
+import { ArrowLeft, Info, Loader2, Plus, RefreshCw, Tags } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
+import { cn } from "@/lib/utils";
+import { Bone, EmptyBlock, ErrorBlock, Notice, btnGhost, btnPrimary, btnSecondary, surfaceCls } from "./absences/absences-ui";
+import { useTypeForm } from "./penalty-types/use-type-form";
+import { TypeColumn } from "./penalty-types/type-list";
+import { DeleteTypeDialog, TypeFormDialog } from "./penalty-types/type-dialogs";
 
-const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
-
-/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
-const requiredText = (message: string) => ({
-  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
-});
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
-}
-
-interface TypeFormData {
-  slug: string;
-  label: string;
-  points: number;
-  kind: "penalty" | "merit";
-  requiresEvent: boolean;
-  active: boolean;
-  displayOrder: number;
-}
-
-type ApplyScope = "future" | "cycle";
-
-export default function PenaltyTypesPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const qc = useQueryClient();
-
-  const [open, setOpen] = useState(false);
-  const [editingType, setEditingType] = useState<PenaltyType | null>(null);
-  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  const [applyScope, setApplyScope] = useState<ApplyScope>("future");
-
-  const qKey = getGetPenaltyTypesQueryKey();
-  const { data: types, isLoading } = useGetPenaltyTypes({ query: { queryKey: qKey } });
-
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<TypeFormData>({
-    defaultValues: { slug: "", label: "", points: 10, kind: "penalty", requiresEvent: false, active: true, displayOrder: 0 },
-  });
-
-  const watchedKind = watch("kind");
-  const watchedRequiresEvent = watch("requiresEvent");
-  const watchedActive = watch("active");
-
-  const createMutation = useCreatePenaltyType({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc); toast({ title: "Tipo criado com sucesso" }); setOpen(false); },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const updateMutation = useUpdatePenaltyType({
-    mutation: {
-      onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc);
-        const retro = (data as PenaltyType & { retroactiveUpdated?: number }).retroactiveUpdated ?? 0;
-        toast({
-          title: "Tipo atualizado",
-          description: retro > 0
-            ? `${retro === 1 ? "1 lançamento já registrado neste ciclo foi atualizado" : `${retro} lançamentos já registrados neste ciclo foram atualizados`} com o novo valor. Os resultados foram recalculados.`
-            : undefined,
-        });
-        setOpen(false);
-        setEditingType(null);
-      },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const deleteMutation = useDeletePenaltyType({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc); setDeleteTargetId(null); toast({ title: "Tipo removido" }); },
-      onError: () => toast({ title: "Erro ao remover tipo", variant: "destructive" }),
-    },
-  });
-
-  const seedMutation = useSeedDefaultPenaltyTypes({
-    mutation: {
-      onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc);
-        if (data.inserted === 0) {
-          toast({ title: "Tipos padrão já existem", description: "Nenhum tipo novo foi inserido." });
-        } else {
-          toast({ title: `${plural(data.inserted ?? 0, "tipo padrão restaurado", "tipos padrão restaurados")} com sucesso` });
-        }
-      },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao restaurar padrões", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const isAdmin = hasRole(user, "admin");
-  const canEdit = isAdmin || hasRole(user, "rh");
-
-  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
-  function closeDialog() {
-    setOpen(false);
-    setEditingType(null);
-    reset();
-  }
-
-  function openCreate() {
-    setEditingType(null);
-    reset({ slug: "", label: "", points: 10, kind: "penalty", requiresEvent: false, active: true, displayOrder: (types?.length ?? 0) + 1 });
-    setOpen(true);
-  }
-
-  function openEdit(t: PenaltyType) {
-    setEditingType(t);
-    setApplyScope("future");
-    reset({
-      slug: t.slug,
-      label: t.label,
-      points: t.points,
-      kind: t.kind as "penalty" | "merit",
-      requiresEvent: t.requiresEvent,
-      active: t.active,
-      displayOrder: t.displayOrder,
-    });
-    setOpen(true);
-  }
-
-  function onSubmit(d: TypeFormData) {
-    const pointsChanged = !!editingType && Number(d.points) !== editingType.points;
-    const payload = {
-      slug: d.slug.trim().toLowerCase().replace(/\s+/g, "_"),
-      label: d.label.trim(),
-      points: Number(d.points),
-      kind: d.kind,
-      requiresEvent: d.requiresEvent,
-      active: d.active,
-      displayOrder: Number(d.displayOrder),
-      ...(pointsChanged ? { applyScope } : {}),
-    };
-    if (editingType) {
-      updateMutation.mutate({ id: editingType.id, data: payload });
-    } else {
-      createMutation.mutate({ data: payload });
-    }
-  }
-
-  const penaltyTypes = (types ?? []).filter(t => t.kind === "penalty");
-  const meritTypes = (types ?? []).filter(t => t.kind === "merit");
-  const isPending = createMutation.isPending || updateMutation.isPending;
-
+function TypesSkeleton() {
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-      <div className="p-6 md:p-10 space-y-7">
-        {/* Header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-              <Settings2 size={24} style={{ color: "var(--primary-foreground)" }} />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
-                Tipos de Lançamento
-              </h1>
-              <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>Configure os tipos de penalidade e mérito e seus valores em pontos.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {isAdmin && (
-              <button
-                onClick={() => seedMutation.mutate()}
-                disabled={seedMutation.isPending}
-                title="Insere os 6 tipos padrão (falta, atraso, conformidade, rei do galpão, estrela, colega top) que ainda não existem"
-                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
-                style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
-              >
-                <RefreshCw size={14} className={seedMutation.isPending ? "animate-spin" : ""} /> Restaurar Padrões
-              </button>
-            )}
-            {canEdit && (
-              <button
-                onClick={openCreate}
-                className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
-                style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <Plus size={16} /> Novo Tipo
-              </button>
-            )}
-          </div>
-        </section>
-
-        {isLoading ? (
-          <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando tipos...</div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-5">
-            {/* Penalidades */}
-            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                <AlertTriangle size={16} style={{ color: DANGER_TEXT }} />
-                <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Penalidades (−)</span>
-                <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{penaltyTypes.length} tipo{penaltyTypes.length !== 1 ? "s" : ""}</span>
-              </div>
-              <div>
-                {penaltyTypes.map((t, i) => (
-                  <TypeRow key={t.id} type={t} canEdit={canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
-                ))}
-                {penaltyTypes.length === 0 && (
-                  <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhuma penalidade cadastrada.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Méritos */}
-            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                <Award size={16} style={{ color: "var(--accent-text)" }} />
-                <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Méritos (+)</span>
-                <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{meritTypes.length} tipo{meritTypes.length !== 1 ? "s" : ""}</span>
-              </div>
-              <div>
-                {meritTypes.map((t, i) => (
-                  <TypeRow key={t.id} type={t} canEdit={canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
-                ))}
-                {meritTypes.length === 0 && (
-                  <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum mérito cadastrado.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Info box */}
-        <div className="rounded-xl px-5 py-4 text-sm font-semibold flex items-start gap-3" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: "1px solid rgba(154,176,0,0.3)" }}>
-          <Award size={18} className="shrink-0 mt-0.5" style={{ color: GOOD_TEXT }} />
-          <div>
-            <strong className="uppercase">Como funciona:</strong> Os tipos cadastrados aqui aparecem automaticamente no modal de "Novo Lançamento".
-            Tipos marcados com <strong>📍 Exige Evento</strong> obrigam a seleção de um evento específico ao registrar.
-            Tipos inativos ficam ocultos no modal mas seus registros históricos são preservados.
-          </div>
+    <div role="status" aria-label="Carregando tipos" className="grid lg:grid-cols-2 gap-5">
+      {[0, 1].map(c => (
+        <div key={c} className={cn(surfaceCls, "divide-y divide-border")}>
+          <div className="px-5 py-4 flex items-center gap-3"><Bone className="h-8 w-8 rounded-lg" /><div className="space-y-2"><Bone className="h-4 w-28" /><Bone className="h-3 w-40" /></div></div>
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="px-5 py-4 flex items-center gap-4"><div className="flex-1 space-y-2"><Bone className="h-4 w-40" /><Bone className="h-3 w-24" /></div><Bone className="h-7 w-14" /><Bone className="h-9 w-24 hidden sm:block" /></div>
+          ))}
         </div>
-      </div>
-
-      {/* Create / Edit modal */}
-      <Dialog open={open} onOpenChange={v => { if (!v) closeDialog(); else setOpen(true); }}>
-        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Settings2 size={22} /> {editingType ? "Editar Tipo" : "Novo Tipo"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="ptype-label" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
-                <Input id="ptype-label" aria-invalid={!!errors.label} {...register("label", requiredText("Informe o nome do tipo."))} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
-                <FieldError message={errors.label?.message} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ptype-slug" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: DANGER_TEXT }}>*</span></Label>
-                <Input
-                  id="ptype-slug"
-                  aria-invalid={!!errors.slug}
-                  {...register("slug", editingType ? {} : requiredText("Informe o slug (identificador)."))}
-                  placeholder="ex: atraso"
-                  className="h-11 rounded-lg font-mono text-sm"
-                  style={fieldStyle}
-                  disabled={!!editingType}
-                />
-                {editingType && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Slug não pode ser alterado.</p>}
-                <FieldError message={errors.slug?.message} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ptype-points" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: DANGER_TEXT }}>*</span></Label>
-                <Input
-                  id="ptype-points"
-                  type="number"
-                  min="0"
-                  aria-invalid={!!errors.points}
-                  {...register("points", { valueAsNumber: true, validate: v => (Number.isFinite(v) && v >= 0) || "Informe um número de pontos maior ou igual a zero." })}
-                  className="h-11 rounded-lg"
-                  style={fieldStyle}
-                />
-                <FieldError message={errors.points?.message} />
-              </div>
-            </div>
-
-            {editingType && Number(watch("points")) !== editingType.points && (
-              <div className="space-y-2 rounded-lg px-4 py-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid rgba(232,162,61,0.3)" }}>
-                <p className="font-bold uppercase text-xs tracking-wider">Aplicar mudança de pontos a partir de:</p>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setApplyScope("future")}
-                    className="w-full text-left px-3 py-2 rounded-lg flex items-start gap-2 transition-colors"
-                    style={applyScope === "future" ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
-                  >
-                    <span className="mt-0.5 h-3 w-3 rounded-full border-2 shrink-0" style={{ backgroundColor: applyScope === "future" ? "var(--primary-foreground)" : "transparent", borderColor: "currentColor" }} />
-                    <span>
-                      <span className="block font-black uppercase text-xs">Só a partir de agora</span>
-                      <span className="block text-[11px] opacity-80">Lançamentos já feitos neste ciclo mantêm o valor antigo. Só os novos usam o valor atualizado.</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setApplyScope("cycle")}
-                    className="w-full text-left px-3 py-2 rounded-lg flex items-start gap-2 transition-colors"
-                    style={applyScope === "cycle" ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
-                  >
-                    <span className="mt-0.5 h-3 w-3 rounded-full border-2 shrink-0" style={{ backgroundColor: applyScope === "cycle" ? "var(--primary-foreground)" : "transparent", borderColor: "currentColor" }} />
-                    <span>
-                      <span className="block font-black uppercase text-xs">Todo o ciclo atual</span>
-                      <span className="block text-[11px] opacity-80">Atualiza também os lançamentos já registrados deste tipo no ciclo em andamento, e recalcula os resultados.</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="ptype-kind" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: DANGER_TEXT }}>*</span></Label>
-              <Select value={watchedKind} onValueChange={v => setValue("kind", v as "penalty" | "merit")} disabled={!!editingType}>
-                <SelectTrigger id="ptype-kind" className="h-11 rounded-lg" style={fieldStyle}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="penalty">Penalidade (−)</SelectItem>
-                  <SelectItem value="merit">Mérito (+)</SelectItem>
-                </SelectContent>
-              </Select>
-              {editingType && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Tipo não pode ser alterado.</p>}
-            </div>
-
-            <div className="flex items-center justify-between py-2" style={{ borderTop: "1px solid var(--border)" }}>
-              <div>
-                <p className="font-bold uppercase text-xs tracking-wider">📍 Exige evento vinculado</p>
-                <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Obriga seleção de evento ao lançar.</p>
-              </div>
-              <Switch aria-label="Exige evento vinculado" checked={watchedRequiresEvent} onCheckedChange={v => setValue("requiresEvent", v)} />
-            </div>
-
-            <div className="flex items-center justify-between py-2" style={{ borderTop: "1px solid var(--border)" }}>
-              <div>
-                <p className="font-bold uppercase text-xs tracking-wider">Ativo</p>
-                <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Aparece no modal de novo lançamento.</p>
-              </div>
-              <Switch aria-label="Tipo ativo" checked={watchedActive} onCheckedChange={v => setValue("active", v)} />
-            </div>
-
-            {/* Preview */}
-            <div
-              className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              <span className="text-xs">Preview:</span>
-              <span className="text-xl leading-none" style={{ fontFamily: CONDENSED }}>{watchedKind === "merit" ? "+" : "-"}{watch("points") || 0} pts por lançamento</span>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              <button
-                type="button"
-                onClick={closeDialog}
-                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors hover:opacity-80"
-                style={{ border: "1px solid var(--border)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                {isPending ? "Salvando..." : (editingType ? "Salvar Alterações" : "Criar Tipo")}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirmation */}
-      <AlertDialog open={deleteTargetId !== null} onOpenChange={v => { if (!v) setDeleteTargetId(null); }}>
-        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Trash2 size={20} /> Remover tipo
-            </AlertDialogTitle>
-            <AlertDialogDescription className="font-bold" style={{ color: "var(--muted-foreground)" }}>
-              O tipo será removido. Registros históricos que usam este tipo <strong>não serão afetados</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
-              className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
-              style={{ backgroundColor: WARNING, color: "#fff" }}
-            >
-              {deleteMutation.isPending ? "Removendo..." : "Sim, remover"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      ))}
     </div>
   );
 }
 
-function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
-  type: PenaltyType;
-  canEdit: boolean;
-  onEdit: (t: PenaltyType) => void;
-  onDelete: (id: number) => void;
-  isFirst: boolean;
-}) {
-  const isMerit = type.kind === "merit";
+export default function PenaltyTypesPage() {
+  const { user } = useAuth();
+  // Espelha o backend: criar/editar/remover admin|rh; restaurar padrões só admin.
+  const isAdmin = hasRole(user, "admin");
+  const canEdit = isAdmin || hasRole(user, "rh");
+
+  const qKey = getGetPenaltyTypesQueryKey();
+  const { data: types, isLoading, isError, refetch } = useGetPenaltyTypes({ query: { queryKey: qKey } });
+  const { data: absences } = useGetAbsences();
+  const state = useTypeForm(qKey, types);
+
+  const usage = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of absences ?? []) m.set(a.penaltyType, (m.get(a.penaltyType) ?? 0) + 1);
+    return m;
+  }, [absences]);
+  const penaltyTypes = (types ?? []).filter(t => t.kind === "penalty");
+  const meritTypes = (types ?? []).filter(t => t.kind === "merit");
+  const seeding = state.seedMutation.isPending;
+  const seedBtn = (cls: string, compact = false) => (
+    <button type="button" onClick={() => state.seedMutation.mutate()} disabled={seeding} aria-busy={seeding || undefined} data-testid="button-seed-types" aria-label="Restaurar padrões"
+      title="Insere os tipos padrão (falta, atraso, conformidade, rei do galpão, estrela, colega top) que ainda não existem" className={cls}>
+      {seeding ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <RefreshCw size={15} aria-hidden />}
+      <span className={compact ? "hidden lg:inline" : undefined}>Restaurar padrões</span>
+    </button>
+  );
+
   return (
-    <div
-      className="px-5 py-3.5 flex items-center gap-4 group transition-colors relative"
-      style={{ opacity: type.active ? 1 : 0.5, borderTop: isFirst ? "none" : "1px solid var(--border)" }}
-    >
-      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: isMerit ? GOOD : WARNING }} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-black uppercase text-sm">{type.label}</span>
-          {!type.active && (
-            <span className="text-[11px] font-bold uppercase rounded px-1.5 py-0.5" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Inativo</span>
-          )}
-          {type.requiresEvent && (
-            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>📍 Evento</span>
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3 lg:gap-5">
+        <Link href="/absences" aria-label="Voltar para Penalidades e méritos" title="Penalidades e méritos" className={cn(btnGhost, "px-2 -ml-1.5 shrink-0")}>
+          <ArrowLeft size={16} aria-hidden />
+        </Link>
+        <h1 className="min-w-0 font-condensed text-[22px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-[0.95] text-foreground sm:truncate">Tipos de lançamento</h1>
+        <p className="hidden xl:block min-w-0 truncate text-[13px] text-muted-foreground">As penalidades e os méritos do formulário, com os pontos padrão de cada um.</p>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {isAdmin && (types?.length ?? 0) > 0 && seedBtn(cn(btnGhost, "px-2.5 lg:px-3"), true)}
+          {canEdit && (
+            <button type="button" onClick={() => state.openCreate()} data-testid="button-create-type" className={cn(btnPrimary, "min-h-11 lg:min-h-9 px-3.5 lg:px-4 text-[13px]")}>
+              <Plus size={15} aria-hidden /> Novo<span className="hidden sm:inline"> tipo</span>
+            </button>
           )}
         </div>
-        <div className="text-xs font-mono mt-0.5" style={{ color: "var(--muted-foreground)" }}>{type.slug}</div>
       </div>
-      <div className="font-black text-lg shrink-0" style={{ fontFamily: CONDENSED, color: isMerit ? GOOD_TEXT : DANGER_TEXT }}>
-        {isMerit ? "+" : "-"}{type.points} pts
+
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-5 max-w-[1680px] w-full mx-auto">
+        {isLoading ? <TypesSkeleton /> : isError || !types ? (
+          <ErrorBlock title="Não foi possível carregar os tipos" onRetry={() => { void refetch(); }} />
+        ) : types.length === 0 ? (
+          <div className={surfaceCls}>
+            <EmptyBlock icon={Tags} title="Nenhum tipo cadastrado" testId="types-empty"
+              action={canEdit ? (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {isAdmin && seedBtn(btnPrimary)}
+                  <button type="button" onClick={() => state.openCreate()} className={isAdmin ? btnSecondary : btnPrimary}><Plus size={15} aria-hidden /> Criar um tipo</button>
+                </div>
+              ) : undefined}>
+              Sem tipos, não há o que lançar em Penalidades e méritos. {isAdmin ? "Restaure os padrões (falta, atraso, estrela do evento…) ou crie o seu." : "Crie o primeiro tipo."}
+            </EmptyBlock>
+          </div>
+        ) : (
+          <>
+            <Notice icon={Info} testId="types-rule-notice">
+              <span className="font-semibold text-foreground">Os pontos padrão entram em cada lançamento novo.</span>{" "}
+              Na nota, eles são divididos pelos eventos com nota do colaborador no ciclo. Tipo inativo some do formulário, mas o que já foi lançado continua valendo.
+            </Notice>
+            <div className="grid lg:grid-cols-2 gap-5 items-start">
+              <TypeColumn kind="penalty" types={penaltyTypes} usage={usage} canEdit={canEdit} togglingId={state.togglingId}
+                onCreate={() => state.openCreate("penalty")} onEdit={state.openEdit} onDelete={state.setDeleteTarget} onToggle={state.toggleActive} />
+              <TypeColumn kind="merit" types={meritTypes} usage={usage} canEdit={canEdit} togglingId={state.togglingId}
+                onCreate={() => state.openCreate("merit")} onEdit={state.openEdit} onDelete={state.setDeleteTarget} onToggle={state.toggleActive} />
+            </div>
+          </>
+        )}
       </div>
-      {canEdit && (
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            className="p-2 rounded-lg transition-colors hover:opacity-80"
-            style={{ color: "var(--muted-foreground)" }}
-            onClick={() => onEdit(type)}
-            title="Editar"
-            aria-label={`Editar ${type.label}`}
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg transition-colors hover:opacity-80"
-            style={{ color: DANGER_TEXT }}
-            onClick={() => onDelete(type.id)}
-            title="Remover"
-            aria-label={`Remover ${type.label}`}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      )}
+
+      <TypeFormDialog state={state} />
+      <DeleteTypeDialog state={state} uses={t => usage.get(t.slug) ?? 0} />
     </div>
   );
 }

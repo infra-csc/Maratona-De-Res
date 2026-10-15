@@ -1,14 +1,24 @@
+// Topo fixo: o único h1, o ciclo que a lista mostra e as ações (tipos,
+// exportar e "Novo lançamento").
+import { useState } from "react";
+import { Link } from "wouter";
 import { exportAbsences } from "@workspace/api-client-react";
-import { Plus, UserMinus, Download } from "lucide-react";
+import { Download, Eye, Loader2, Plus, Tags } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { CycleBadge } from "@/components/cycle-badge";
-import { CONDENSED } from "@/lib/premium-theme";
+import { apiErrorMessage, cn } from "@/lib/utils";
+import { Chip, btnGhost, btnPrimary } from "./absences-ui";
 
-/** Título da tela + ações "Exportar" (CSV) e "Novo Lançamento". */
-export function AbsencesHeader({ canEdit, onCreate }: { canEdit: boolean | null; onCreate: () => void }) {
+export function AbsencesHeader({ canEdit, canManageTypes, onCreate }: {
+  canEdit: boolean;
+  /** Admin e RH abrem o cadastro de tipos (a rota é deles). */
+  canManageTypes: boolean;
+  onCreate: () => void;
+}) {
   const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
+    setExporting(true);
     try {
       const data = await exportAbsences();
       const blob = new Blob([data.data], { type: "text/csv" });
@@ -16,47 +26,40 @@ export function AbsencesHeader({ canEdit, onCreate }: { canEdit: boolean | null;
       a.href = URL.createObjectURL(blob);
       a.download = data.filename;
       a.click();
-    } catch {
-      toast({ title: "Erro ao exportar", variant: "destructive" });
+      toast({ title: "Planilha exportada", description: data.filename });
+    } catch (e) {
+      toast({ title: "Não foi possível exportar", description: apiErrorMessage(e, "Tente de novo em instantes."), variant: "destructive" });
+    } finally {
+      setExporting(false);
     }
   }
 
   return (
-    <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#e84000" }}>
-          <UserMinus size={26} className="text-white" />
-        </div>
-        <div>
-          <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
-            Penalidades e <span style={{ color: "var(--accent-text)" }}>Méritos</span>
-          </h1>
-          <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
-            Penalidades descontam e méritos somam pontos na nota final do colaborador.
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 flex-wrap">
-        <CycleBadge />
-        <button
-          data-testid="button-export-absences"
-          onClick={handleExport}
-          className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-opacity hover:opacity-70"
-          style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
-        >
-          <Download size={14} /> Exportar
+    <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3 lg:gap-5">
+      <h1 data-testid="text-page-title" className="min-w-0 font-condensed text-[22px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-[0.95] text-foreground sm:truncate">
+        Penalidades e méritos
+      </h1>
+      <p className="hidden xl:block min-w-0 truncate text-[13px] text-muted-foreground">O que foi lançado, para quem, e quanto isso mexe na nota.</p>
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {canManageTypes && (
+          <Link href="/penalty-types" data-testid="link-penalty-types" aria-label="Tipos de lançamento" title="Tipos de lançamento"
+            className={cn(btnGhost, "px-2.5 lg:px-3")}>
+            <Tags size={16} aria-hidden /><span className="hidden lg:inline">Tipos</span>
+          </Link>
+        )}
+        <button type="button" data-testid="button-export-absences" onClick={handleExport} disabled={exporting} aria-busy={exporting || undefined}
+          aria-label="Exportar planilha" title="Exportar planilha (CSV)" className={cn(btnGhost, "px-2.5 lg:px-3")}>
+          {exporting ? <Loader2 size={16} aria-hidden className="motion-safe:animate-spin" /> : <Download size={16} aria-hidden />}
+          <span className="hidden lg:inline">{exporting ? "Exportando…" : "Exportar"}</span>
         </button>
-        {canEdit && (
-          <button
-            data-testid="button-register-absence"
-            onClick={onCreate}
-            className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-opacity hover:opacity-85"
-            style={{ backgroundColor: "#e84000", color: "white" }}
-          >
-            <Plus size={15} /> Novo Lançamento
+        {canEdit ? (
+          <button type="button" data-testid="button-register-absence" onClick={onCreate} className={cn(btnPrimary, "hidden md:inline-flex min-h-11 lg:min-h-9 px-3.5 lg:px-4 text-[13px]")}>
+            <Plus size={15} aria-hidden /> Novo<span className="hidden lg:inline"> lançamento</span>
           </button>
+        ) : (
+          <Chip icon={Eye} title="Seu perfil só consulta os lançamentos">Só consulta</Chip>
         )}
       </div>
-    </section>
+    </div>
   );
 }

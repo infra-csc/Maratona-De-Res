@@ -1,105 +1,158 @@
+// Um lançamento: LINHA da tabela (telas largas) ou CARTÃO (celular/tablet).
+// O efeito na nota sai dos pontos ÷ eventos com nota do colaborador no ciclo.
 import type { Absence } from "@workspace/api-client-react";
-import { Trash2, Pencil, AlertTriangle, Award } from "lucide-react";
-import { cn, fmtDate } from "@/lib/utils";
-import { CONDENSED, WARNING, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { DATE_FULL } from "./helpers";
-import type { AbsenceWithAuthor } from "./types";
+import { CalendarDays, Lock, Pencil, Trash2 } from "lucide-react";
+import { cn, fmtDate, fmtDateTime, fmtScore, plural } from "@/lib/utils";
+import { Avatar, Eyebrow, FOCUS_RING, KindChip, SignedNumber, btnSmall, iconBtn, surfaceCls } from "./absences-ui";
+import { DATE_FULL, fmtEffect, scoreEffect, signedPts, totalPoints } from "./helpers";
+import type { AbsenceWithAuthor, EmployeeScore } from "./types";
 
-/** Uma linha da grade de lançamentos (com ações quando o usuário pode editar). */
-export function AbsenceRow({ a, canEdit, typeLabel, onEdit, onDelete }: {
+export interface AbsenceRowProps {
   a: Absence;
-  canEdit: boolean | null;
+  canEdit: boolean;
+  /** Ciclo fechado: a API recusa editar/excluir este lançamento. */
+  locked: boolean;
+  score: EmployeeScore | undefined;
   typeLabel: (slug: string) => string;
   onEdit: (a: Absence) => void;
-  onDelete: (id: number) => void;
-}) {
-  const isMerit = a.kind === "merit";
+  onDelete: (a: Absence) => void;
+  onPickEmployee: (id: number) => void;
+  /** Acabou de ser salvo: destaque curto. */
+  fresh?: boolean;
+}
+
+const LOCK_TEXT = "Ciclo fechado: só consulta";
+
+function author(a: Absence) {
+  const by = (a as AbsenceWithAuthor).registeredByUserName;
+  const at = a.createdAt ? fmtDateTime(a.createdAt, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
+  if (!by && !at) return null;
+  return <>{by && <>por <span className="font-semibold">{by}</span></>}{by && at ? " · " : ""}{at && <span className="tabular-nums" title="Quando foi lançado">{at}</span>}</>;
+}
+
+function EmployeeCell({ a, score, onPickEmployee }: Pick<AbsenceRowProps, "a" | "score" | "onPickEmployee">) {
+  const name = a.employeeName ?? "Colaborador";
   return (
-    <tr
-      data-testid={`row-absence-${a.id}`}
-      className="transition-colors group"
-      style={{ borderTop: "1px solid var(--border)", borderLeft: `3px solid ${isMerit ? GOOD : "#e84000"}` }}
-      onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--secondary)"; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent"; }}
-    >
-      <td className="px-5 py-3.5 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
-        {a.employeeName}
-      </td>
-      <td className="px-5 py-3.5">
-        <span className={cn(
-          "inline-flex items-center gap-1 font-black px-2.5 py-1 rounded text-[11px] uppercase",
-          isMerit ? "bg-[rgba(154,176,0,0.15)] text-[#9ab000]" : "bg-[rgba(229,72,77,0.15)] text-[#e5484d]",
-        )}>
-          {isMerit ? <Award size={11} /> : <AlertTriangle size={11} />}
-          {typeLabel(a.penaltyType)}
+    <div className="flex items-center gap-3 min-w-0">
+      <Avatar name={name} className="w-9 h-9 text-[13px]" />
+      <div className="min-w-0">
+        <button type="button" onClick={() => onPickEmployee(a.employeeId)} title={`Ver só os lançamentos de ${name}`}
+          className={cn("block max-w-full truncate text-left font-semibold text-foreground leading-tight rounded-sm underline-offset-2 hover:underline", FOCUS_RING)}>
+          {name}
+        </button>
+        <span className="block text-[12.5px] text-muted-foreground tabular-nums mt-0.5">
+          {score ? <>{plural(score.eventsCount, "evento", "eventos")} · nota {fmtScore(score.finalResult)}</> : "Sem nota no ciclo ainda"}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function PointsCell({ a }: { a: Absence }) {
+  return (
+    <>
+      <SignedNumber kind={a.kind} className="text-[20px]">{signedPts(a.kind, totalPoints(a))}</SignedNumber>
+      {a.quantity > 1 && <span className="block mt-1 text-[12px] text-muted-foreground tabular-nums">{a.quantity} × {a.points.toLocaleString("pt-BR")} pts</span>}
+    </>
+  );
+}
+
+function EffectCell({ a, score }: { a: Absence; score: EmployeeScore | undefined }) {
+  const effect = scoreEffect(totalPoints(a), score?.eventsCount);
+  if (effect == null) return <span className="text-[13px] text-muted-foreground" title="O colaborador ainda não tem evento com nota neste ciclo">sem eventos</span>;
+  return (
+    <span title={`${totalPoints(a)} pts ÷ ${plural(score!.eventsCount, "evento", "eventos")}`}>
+      <SignedNumber kind={a.kind} className="text-[17px]">{fmtEffect(a.kind, effect)}</SignedNumber>
+      <span className="block mt-1 text-[12px] text-muted-foreground tabular-nums">÷ {plural(score!.eventsCount, "evento", "eventos")}</span>
+    </span>
+  );
+}
+
+function Actions({ a, locked, onEdit, onDelete, layout }: Pick<AbsenceRowProps, "a" | "locked" | "onEdit" | "onDelete"> & { layout: "row" | "card" }) {
+  const who = a.employeeName ?? "colaborador";
+  if (locked) {
+    return layout === "card"
+      ? <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground"><Lock size={13} aria-hidden /> {LOCK_TEXT}</span>
+      : <span className="flex justify-end"><span className="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-secondary text-muted-foreground" title={LOCK_TEXT}><Lock size={14} aria-hidden /><span className="sr-only">{LOCK_TEXT}</span></span></span>;
+  }
+  if (layout === "card") {
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" data-testid={`button-edit-absence-${a.id}`} onClick={() => onEdit(a)} aria-label={`Editar lançamento de ${who}`} className={btnSmall}>
+          <Pencil size={14} aria-hidden /> Editar
+        </button>
+        <button type="button" data-testid={`button-delete-absence-${a.id}`} onClick={() => onDelete(a)} aria-label={`Excluir lançamento de ${who}`}
+          className={cn(btnSmall, "text-[var(--status-danger-text)] enabled:hover:bg-[var(--status-danger-bg)]")}>
+          <Trash2 size={14} aria-hidden /> Excluir
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <button type="button" data-testid={`button-edit-absence-${a.id}`} onClick={() => onEdit(a)} title="Editar" aria-label={`Editar lançamento de ${who}`} className={iconBtn}>
+        <Pencil size={14} aria-hidden />
+      </button>
+      <button type="button" data-testid={`button-delete-absence-${a.id}`} onClick={() => onDelete(a)} title="Excluir" aria-label={`Excluir lançamento de ${who}`}
+        className={cn(iconBtn, "text-muted-foreground hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger)]/40")}>
+        <Trash2 size={14} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+const td = "px-3 py-3.5 align-top";
+
+export function AbsenceRow(p: AbsenceRowProps) {
+  const { a } = p;
+  const by = author(a);
+  return (
+    <tr data-testid={`row-absence-${a.id}`} className={cn("border-t border-border transition-colors duration-500 motion-reduce:transition-none", p.fresh ? "bg-[var(--status-ok-bg)]" : "hover:bg-secondary/40")}>
+      <td className={cn(td, "pl-5")}><EmployeeCell a={a} score={p.score} onPickEmployee={p.onPickEmployee} /></td>
+      <td className={td}>
+        <KindChip kind={a.kind}>{p.typeLabel(a.penaltyType)}</KindChip>
+        <span className="block mt-1.5 text-[12.5px] leading-snug text-muted-foreground">{a.eventName ?? "No ciclo, sem evento"}</span>
       </td>
-      <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
-        {a.eventName || <span className="text-xs opacity-50">Ciclo</span>}
+      <td className={cn(td, "whitespace-nowrap tabular-nums text-[14px] text-foreground")}>{fmtDate(a.date, DATE_FULL)}</td>
+      <td className={cn(td, "text-right")}><PointsCell a={a} /></td>
+      <td className={cn(td, "text-right")}><EffectCell a={a} score={p.score} /></td>
+      <td className={cn(td, "text-[13.5px]")}>
+        {a.reason
+          ? <span className="block leading-snug text-foreground line-clamp-2 break-words" title={a.reason}>{a.reason}</span>
+          : <span className="block text-muted-foreground">Sem observação</span>}
+        {by && <span className="block mt-1 text-[12px] text-muted-foreground">{by}</span>}
       </td>
-      <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
-        {fmtDate(a.date, DATE_FULL)}
-      </td>
-      <td className="px-5 py-3.5 text-center">
-        <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>
-          {String(a.quantity).padStart(2, "0")}
-        </span>
-      </td>
-      <td className="px-5 py-3.5 text-center">
-        <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? GOOD_TEXT : DANGER_TEXT }}>
-          {isMerit ? "+" : "−"}{a.points * a.quantity}
-        </span>
-      </td>
-      <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)", maxWidth: "22rem" }}>
-        <span className="block leading-snug" style={{ wordBreak: "break-word", whiteSpace: "normal" }}>
-          {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
-        </span>
-        {((a as AbsenceWithAuthor).registeredByUserName || a.createdAt) && (
-          <span className="mt-1 flex items-center gap-1.5 flex-wrap text-[11px] opacity-60">
-            {(a as AbsenceWithAuthor).registeredByUserName && (
-              <>
-                <span className="font-bold uppercase tracking-wide">por</span>
-                <span>{(a as AbsenceWithAuthor).registeredByUserName}</span>
-              </>
-            )}
-            {a.createdAt && (
-              <span className="font-mono" title="Data/hora do lançamento">
-                {(a as AbsenceWithAuthor).registeredByUserName ? "·" : ""} {new Date(a.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
-              </span>
-            )}
-          </span>
-        )}
-      </td>
-      {canEdit && (
-        <td className="px-5 py-3.5 text-right">
-          <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              data-testid={`button-edit-absence-${a.id}`}
-              className="p-1.5 rounded transition-opacity hover:opacity-60"
-              style={{ color: "var(--muted-foreground)" }}
-              onClick={() => onEdit(a)}
-              title="Editar"
-              aria-label={`Editar lançamento de ${a.employeeName ?? "colaborador"}`}
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              type="button"
-              data-testid={`button-delete-absence-${a.id}`}
-              className="p-1.5 rounded transition-colors"
-              style={{ color: "var(--muted-foreground)" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = WARNING; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
-              onClick={() => onDelete(a.id)}
-              title="Excluir"
-              aria-label={`Excluir lançamento de ${a.employeeName ?? "colaborador"}`}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </td>
-      )}
+      {p.canEdit && <td className={cn(td, "pr-4")}><Actions a={a} locked={p.locked} onEdit={p.onEdit} onDelete={p.onDelete} layout="row" /></td>}
     </tr>
+  );
+}
+
+export function AbsenceCard(p: AbsenceRowProps) {
+  const { a } = p;
+  const by = author(a);
+  return (
+    <li data-testid={`row-absence-${a.id}`} className={cn(surfaceCls, "p-4 flex flex-col gap-3.5 transition-colors duration-500 motion-reduce:transition-none", p.fresh && "bg-[var(--status-ok-bg)]")}>
+      <div className="flex items-start justify-between gap-3">
+        <EmployeeCell a={a} score={p.score} onPickEmployee={p.onPickEmployee} />
+        <span className="shrink-0 inline-flex items-center gap-1 text-[12.5px] text-muted-foreground tabular-nums pt-0.5">
+          <CalendarDays size={13} aria-hidden />{fmtDate(a.date, DATE_FULL)}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <KindChip kind={a.kind}>{p.typeLabel(a.penaltyType)}</KindChip>
+        <span className="block mt-1.5 text-[13px] leading-snug text-muted-foreground">{a.eventName ?? "No ciclo, sem evento"}</span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 border-t border-border pt-3">
+        <div><dt><Eyebrow as="span">Pontos</Eyebrow></dt><dd className="mt-2"><PointsCell a={a} /></dd></div>
+        <div><dt><Eyebrow as="span">Efeito na nota</Eyebrow></dt><dd className="mt-2"><EffectCell a={a} score={p.score} /></dd></div>
+      </dl>
+      {(a.reason || by) && (
+        <div className="text-[13.5px] leading-snug">
+          {a.reason && <p className="text-foreground break-words">{a.reason}</p>}
+          {by && <p className="mt-1 text-[12px] text-muted-foreground">{by}</p>}
+        </div>
+      )}
+      {p.canEdit && <Actions a={a} locked={p.locked} onEdit={p.onEdit} onDelete={p.onDelete} layout="card" />}
+    </li>
   );
 }
