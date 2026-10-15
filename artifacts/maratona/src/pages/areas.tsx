@@ -1,379 +1,258 @@
-import { useState } from "react";
+// Tela "Áreas": as áreas que avaliam a equipe de Cenografia nos eventos,
+// quem avalia por cada uma e de quais critérios ela é a responsável. Peças
+// em ./areas/ (linha/cartão, diálogos, "Critérios e pessoas" e o resumo).
+import { useMemo, useState } from "react";
 import {
-  useGetAreas,
-  useCreateArea,
-  useUpdateArea,
-  useGetCriteria,
-  useUpdateCriterion,
-  useGetUsers,
-  useUpdateUser,
-  getGetAreasQueryKey,
-  getGetCriteriaQueryKey,
-  getGetUsersQueryKey,
+  useGetAreas, useCreateArea, useUpdateArea, useGetCriteria, useUpdateCriterion, useGetUsers, useUpdateUser, useGetCurrentCycle,
+  getGetAreasQueryKey, getGetCriteriaQueryKey, getGetUsersQueryKey,
 } from "@workspace/api-client-react";
-import type { AreaInput, Area } from "@workspace/api-client-react";
+import type { Area, AreaInput, Criterion, User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Building2, Info, Plus, SearchX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, LayoutGrid, Settings, ListChecks, Users, ArrowRightLeft } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { CONDENSED, BODY, PremiumCard, DANGER_TEXT } from "@/lib/premium-theme";
 import { displayCriterionName } from "@/lib/criterion-name";
+import { cn, plural } from "@/lib/utils";
+import { useWideScreen } from "./events/use-wide-screen";
+import {
+  Bone, EmptyBlock, ErrorBlock, Notice, SearchField, Segmented, StatCell, btnPrimary, btnSecondary, serverMessage, surfaceCls,
+} from "./areas/areas-ui";
+import { AreaCard, AreaRow, type AreaRowProps } from "./areas/area-row";
+import { CreateAreaDialog, DeactivateAreaDialog } from "./areas/area-dialogs";
+import { ManageAreaDialog } from "./areas/manage-area-dialog";
+import { norm, summarize, type AreaFilter, type AreaSummary } from "./areas/model";
 
-const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+function AreasSkeleton() {
+  return (
+    <div role="status" aria-label="Carregando áreas" className="space-y-5">
+      <div className={cn(surfaceCls, "grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden bg-border")}>
+        {Array.from({ length: 4 }, (_, i) => <div key={i} className="bg-card px-5 py-4 space-y-3"><Bone className="h-3 w-24" /><Bone className="h-8 w-16" /><Bone className="h-3 w-36 max-w-full" /></div>)}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2.5"><Bone className="h-11 lg:h-10 w-full sm:w-[300px]" /><Bone className="h-11 lg:h-9 w-full sm:w-[320px]" /></div>
+      <div className={cn(surfaceCls, "divide-y divide-border")}>
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="flex items-start gap-6 px-5 py-4">
+            <div className="flex-1 space-y-2"><Bone className="h-4 w-40 max-w-full" /><Bone className="h-3 w-64 max-w-full" /></div>
+            <div className="hidden md:block space-y-2"><Bone className="h-5 w-36" /><Bone className="h-5 w-28" /></div>
+            <Bone className="h-6 w-24 hidden md:block" /><Bone className="h-6 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
-const requiredText = (message: string) => ({
-  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
-});
+const th = "font-condensed h-11 px-3 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground bg-card border-b border-border md:sticky md:top-16 z-10";
 
 export default function AreasPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const wide = useWideScreen();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterActive, setFilterActive] = useState<"all" | "true" | "false">("all");
-  const [manageArea, setManageArea] = useState<Area | null>(null);
+  const [filterActive, setFilterActive] = useState<AreaFilter>("all");
+  const [onlyAttention, setOnlyAttention] = useState(false);
+  const [manageId, setManageId] = useState<number | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<AreaSummary | null>(null);
 
   const qKey = getGetAreasQueryKey();
   const criteriaKey = getGetCriteriaQueryKey();
   const usersKey = getGetUsersQueryKey();
-
-  const { data: areas, isLoading } = useGetAreas({ query: { queryKey: qKey } });
+  const { data: areas, isLoading, isError, refetch, isRefetching } = useGetAreas({ query: { queryKey: qKey } });
   const { data: criteria } = useGetCriteria({ query: { queryKey: criteriaKey } });
   const { data: users } = useGetUsers({ query: { queryKey: usersKey } });
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AreaInput>();
-  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
-  function setCreateOpen(o: boolean) {
-    setOpen(o);
-    if (!o) reset();
-  }
+  const { data: cycle } = useGetCurrentCycle();
+  const areaMode = !!cycle?.areaEvaluation && cycle.status !== "closed";
 
   const createMutation = useCreateArea({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (a: Area) => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Área criada com sucesso" });
+        toast({ title: "Área criada", description: `${a?.name ?? "A área"} já pode receber avaliadores e critérios.` });
         setCreateOpen(false);
       },
-      onError: (e: { message?: string }) => toast({ title: "Não foi possível criar a área", description: e.message ?? "Tente novamente.", variant: "destructive" }),
+      onError: (e: unknown) => setCreateError(serverMessage(e)),
     },
   });
 
   const updateMutation = useUpdateArea({
     mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
-      onError: (e: { message?: string }) => toast({ title: "Não foi possível atualizar a área", description: e.message ?? "Tente novamente.", variant: "destructive" }),
+      onSuccess: (a: Area, vars) => {
+        qc.invalidateQueries({ queryKey: qKey });
+        if (vars.data.active !== undefined) {
+          const name = a?.name ?? (areas ?? []).find(x => x.id === vars.id)?.name ?? "A área";
+          toast({ title: vars.data.active ? "Área reativada" : "Área desativada", description: vars.data.active ? `${name} volta a aparecer nas escolhas de área.` : `${name} saiu das escolhas de área. Nada foi apagado.` });
+        }
+        setDeactivateTarget(null);
+      },
+      onError: (e: unknown) => toast({ title: "Não foi possível atualizar a área", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
   const updateCriterionMutation = useUpdateCriterion({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: criteriaKey }),
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível mudar o critério", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
   const updateUserMutation = useUpdateUser({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: usersKey }),
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível mudar a pessoa de área", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
-  const filtered = (areas ?? []).filter(a => {
-    const matchSearch =
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      (a.description ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchActive = filterActive === "all" || (filterActive === "true" ? a.active : !a.active);
-    return matchSearch && matchActive;
+  const summaries = useMemo(() => summarize(areas ?? [], criteria ?? [], users ?? []), [areas, criteria, users]);
+  const counts = useMemo(() => ({
+    all: summaries.length,
+    true: summaries.filter(s => s.area.active).length,
+    false: summaries.filter(s => !s.area.active).length,
+  }), [summaries]);
+  const attention = summaries.filter(s => s.needsEvaluator);
+  const evaluatorsTotal = summaries.filter(s => s.area.active).reduce((n, s) => n + s.evaluators.length, 0);
+  const evaluatorsNoArea = (users ?? []).filter(u => u.active && u.role === "avaliador" && u.areaId == null).length;
+  const activeCriteria = (criteria ?? []).filter(c => c.active);
+  const criteriaNoArea = activeCriteria.filter(c => c.responsibleAreaId == null);
+
+  const q = norm(search);
+  const filtered = summaries
+    .filter(s => filterActive === "all" || (filterActive === "true" ? s.area.active : !s.area.active))
+    .filter(s => !onlyAttention || s.needsEvaluator)
+    .filter(s => !q || norm(s.area.name).includes(q) || norm(s.area.description).includes(q) || s.evaluators.some(u => norm(u.name).includes(q)))
+    .sort((a, b) => Number(b.area.active) - Number(a.area.active) || a.area.name.localeCompare(b.area.name, "pt-BR"));
+  const filtering = q !== "" || filterActive !== "all" || onlyAttention;
+  const clearFilters = () => { setSearch(""); setFilterActive("all"); setOnlyAttention(false); };
+
+  const togglingId = updateMutation.isPending && updateMutation.variables?.data.active !== undefined ? updateMutation.variables.id : null;
+  const rowProps = (s: AreaSummary): AreaRowProps => ({
+    s,
+    canEdit: true,
+    toggling: togglingId === s.area.id,
+    onToggle: (sum, next) => {
+      // Desativar pede confirmação (muda as escolhas de área); reativar é direto.
+      if (!next) setDeactivateTarget(sum);
+      else updateMutation.mutate({ id: sum.area.id, data: { active: true } });
+    },
+    onManage: sum => setManageId(sum.area.id),
   });
 
-  const criteriaFor = (areaId: number) => (criteria ?? []).filter(c => c.responsibleAreaId === areaId);
-  const usersFor = (areaId: number) => (users ?? []).filter(u => u.areaId === areaId);
-
-  function toggleCriterion(criterionId: number, belongs: boolean, areaId: number) {
-    updateCriterionMutation.mutate({ id: criterionId, data: { responsibleAreaId: belongs ? null : areaId } });
+  function toggleCriterion(c: Criterion, belongs: boolean) {
+    if (manageId == null) return;
+    updateCriterionMutation.mutate({ id: c.id, data: { responsibleAreaId: belongs ? null : manageId } });
   }
-
-  function toggleUser(userId: number, belongs: boolean, areaId: number) {
-    updateUserMutation.mutate({ id: userId, data: { areaId: belongs ? null : areaId } });
+  function toggleUser(u: User, belongs: boolean) {
+    if (manageId == null) return;
+    updateUserMutation.mutate({ id: u.id, data: { areaId: belongs ? null : manageId } });
   }
+  const openCreate = () => { setCreateError(null); setCreateOpen(true); };
+  const manageArea = manageId != null ? (areas ?? []).find(a => a.id === manageId) ?? null : null;
 
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-      <div className="p-6 md:p-10 space-y-7">
-        {/* Page header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <div>
-            <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
-              Áreas &amp; Departamentos
-            </h1>
-            <p className="text-sm mt-1.5 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
-              Gerencie as unidades organizacionais e relacione os critérios e usuários de cada área.
-            </p>
-          </div>
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3 lg:gap-5">
+        <h1 data-testid="text-page-title" className="min-w-0 font-condensed text-[24px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground truncate">Áreas</h1>
+        <p className="hidden xl:block min-w-0 truncate text-[13px] text-muted-foreground">Quem avalia a equipe de Cenografia em cada evento, e por quais critérios cada área responde.</p>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <button type="button" data-testid="button-create-area" onClick={openCreate} className={cn(btnPrimary, "min-h-11 lg:min-h-9 px-3.5 lg:px-4 text-[13px]")}>
+            <Plus size={15} aria-hidden /> Nova<span className="hidden sm:inline"> área</span>
+          </button>
+        </div>
+      </div>
 
-          <Dialog open={open} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <button
-                data-testid="button-create-area"
-                className="h-10 px-5 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 shrink-0"
-                style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <Plus size={16} /> Nova Área
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Nova Área Organizacional</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
-                <div className="space-y-1.5">
-                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome da Área <span style={{ color: DANGER_TEXT }}>*</span></Label>
-                  <Input data-testid="input-area-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome da área."))} placeholder="Ex: Cenografia, Comercial..." className="h-11 rounded-lg" style={fieldStyle} />
-                  {errors.name?.message && <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{errors.name.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição</Label>
-                  <Input data-testid="input-area-desc" {...register("description")} placeholder="Opcional..." className="h-11 rounded-lg" style={fieldStyle} />
-                </div>
-                <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                  <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-                  <button
-                    data-testid="button-submit-area"
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                  >
-                    {createMutation.isPending ? "Criando..." : "Criar Área"}
-                  </button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </section>
-
-        {/* Filters + search */}
-        <section className="flex flex-col md:flex-row gap-3 items-center flex-wrap justify-between">
-          <div className="flex rounded-lg overflow-hidden w-full md:w-auto" style={{ border: "1px solid var(--border)" }}>
-            {(["all", "true", "false"] as const).map(v => {
-              const active = filterActive === v;
-              return (
-                <button
-                  key={v}
-                  data-testid={`filter-active-${v}`}
-                  onClick={() => setFilterActive(v)}
-                  className="flex-1 md:flex-none px-5 py-2 text-xs font-bold uppercase tracking-wide transition-colors"
-                  style={{ fontFamily: CONDENSED, backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
-                >
-                  {v === "all" ? "Todos" : v === "true" ? "Ativos" : "Inativos"}
-                </button>
-              );
-            })}
-          </div>
-          <div className="relative w-full md:w-80">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-            <input
-              data-testid="input-search-areas"
-              aria-label="Buscar departamento"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 h-10 rounded-lg text-sm outline-none"
-              style={fieldStyle}
-              placeholder="Buscar departamento..."
-            />
-          </div>
-        </section>
-
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-56 rounded-xl animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-24 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
-            <LayoutGrid size={44} className="mx-auto mb-4 opacity-20" />
-            <h3 className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Nenhuma área cadastrada</h3>
-            <p className="mt-1" style={{ color: "var(--muted-foreground)" }}>Tente ajustar os filtros ou criar uma nova área.</p>
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-5 max-w-[1680px] w-full mx-auto">
+        {isLoading ? <AreasSkeleton /> : isError || !areas ? (
+          <ErrorBlock title="Não foi possível carregar as áreas" onRetry={() => { void refetch(); }} />
+        ) : areas.length === 0 ? (
+          <div className={surfaceCls}>
+            <EmptyBlock icon={Building2} title="Nenhuma área cadastrada" testId="areas-empty"
+              action={<button type="button" onClick={openCreate} className={btnPrimary}><Plus size={15} aria-hidden /> Criar a primeira</button>}>
+              Cada área avalia a equipe de Cenografia pelos critérios de que é responsável. Comece por Cenografia, Logística, Produção…
+            </EmptyBlock>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map(a => {
-              const critCount = criteriaFor(a.id).length;
-              const userCount = usersFor(a.id).length;
-              return (
-                <PremiumCard key={a.id} className="flex flex-col" style={{ opacity: a.active ? 1 : 0.65 }}>
-                  <div data-testid={`card-area-${a.id}`} className="p-5 flex flex-col h-full">
-                    <div className="flex justify-between items-start mb-5">
-                      <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-                        <Building2 size={22} style={{ color: "var(--primary-foreground)" }} />
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Status</span>
-                        <Switch aria-label={`Área ${a.name} ${a.active ? "ativa" : "inativa"}`} checked={a.active} onCheckedChange={v => updateMutation.mutate({ id: a.id, data: { active: v } })} />
-                      </div>
-                    </div>
+          <div className={cn("space-y-5 transition-opacity duration-150", isRefetching && "opacity-80")}>
+            <section aria-label="Panorama das áreas" className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px bg-border")}>
+              <StatCell testId="stat-areas-active" label="Áreas ativas" value={counts.true}
+                sub={counts.false > 0 ? `${plural(counts.false, "inativa", "inativas")} fora das escolhas` : "Todas em uso"} />
+              <StatCell testId="stat-areas-evaluators" label="Avaliadores" value={evaluatorsTotal}
+                sub={evaluatorsNoArea > 0 ? <span className="text-[var(--status-warn-text)] font-semibold">{plural(evaluatorsNoArea, "avaliador sem área", "avaliadores sem área")}</span> : "Cada um em uma área só"} />
+              <StatCell testId="stat-areas-criteria" label="Critérios com área" value={activeCriteria.length - criteriaNoArea.length}
+                unit={`de ${activeCriteria.length}`}
+                sub={criteriaNoArea.length > 0
+                  ? <span className="text-[var(--status-warn-text)] font-semibold" title={criteriaNoArea.map(c => displayCriterionName(c.name)).join(", ")}>{plural(criteriaNoArea.length, "critério ativo sem área", "critérios ativos sem área")}</span>
+                  : "Todo critério ativo tem dono"} />
+              <StatCell testId="stat-areas-attention" label="Sem avaliador" value={attention.length} tone={attention.length > 0 ? "warn" : "neutral"}
+                sub={attention.length > 0 ? "Têm critério e ninguém para responder" : "Toda área com critério tem avaliador"}
+                onClick={attention.length > 0 || onlyAttention ? () => setOnlyAttention(v => !v) : undefined}
+                pressed={attention.length > 0 || onlyAttention ? onlyAttention : undefined}
+                action={onlyAttention ? "Ver todas" : "Ver quais"} />
+            </section>
 
-                    <h3 className="text-lg font-black uppercase tracking-tight mb-1.5 line-clamp-1" style={{ fontFamily: CONDENSED }}>{a.name}</h3>
-                    <p className="text-sm mb-4 flex-grow min-h-[44px] line-clamp-3" style={{ color: "var(--muted-foreground)" }}>
-                      {a.description || "Nenhuma descrição fornecida."}
-                    </p>
+            <Notice icon={Info} testId="areas-rule-notice">
+              <span className="font-semibold text-foreground">Os avaliados são sempre a equipe de Cenografia do evento; as áreas avaliam essa equipe.</span>{" "}
+              Cada avaliador pertence a uma área só.
+              {areaMode && <> Neste ciclo, <span className="font-semibold text-foreground">qualquer avaliador da área</span> responde os critérios dela e a primeira resposta enviada fecha o critério para a área.</>}
+            </Notice>
 
-                    <div className="flex items-center gap-2 mb-4 flex-wrap">
-                      <span data-testid={`count-criteria-${a.id}`} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-                        <ListChecks size={12} /> {critCount} {critCount === 1 ? "Critério" : "Critérios"}
-                      </span>
-                      <span data-testid={`count-users-${a.id}`} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-                        <Users size={12} /> {userCount} {userCount === 1 ? "Usuário" : "Usuários"}
-                      </span>
-                    </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+              <Segmented<AreaFilter> label="Filtrar por situação" value={filterActive} onChange={setFilterActive} className="w-full sm:w-auto"
+                options={([["all", "Todas"], ["true", "Ativas"], ["false", "Inativas"]] as const).map(([v, l]) => ({
+                  value: v, testId: `filter-active-${v}`,
+                  label: <>{l} <span className="tabular-nums font-semibold opacity-70">{counts[v]}</span></>,
+                }))} />
+              <SearchField value={search} onChange={setSearch} label="Buscar área ou avaliador" placeholder="Buscar área ou avaliador"
+                testId="input-search-areas" className="flex-1 sm:max-w-[360px] sm:ml-auto" />
+            </div>
 
-                    <div className="pt-4 mt-auto flex items-center justify-between" style={{ borderTop: "1px solid var(--border)" }}>
-                      {a.active ? (
-                        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativa</span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativa</span>
-                      )}
-                      <button
-                        type="button"
-                        data-testid={`button-manage-area-${a.id}`}
-                        onClick={() => setManageArea(a)}
-                        title="Relacionar critérios e usuários"
-                        aria-label={`Relacionar critérios e usuários de ${a.name}`}
-                        className="p-2 rounded-lg transition-colors hover:opacity-80"
-                        style={{ border: "1px solid var(--border)" }}
-                      >
-                        <Settings size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </PremiumCard>
-              );
-            })}
+            {filtered.length === 0 ? (
+              <div className={surfaceCls}>
+                <EmptyBlock icon={SearchX} title="Nenhuma área encontrada" testId="areas-no-results"
+                  action={filtering ? <button type="button" onClick={clearFilters} className={btnSecondary}>Limpar filtros</button> : undefined}>
+                  Nada com essa busca ou esse filtro.
+                </EmptyBlock>
+              </div>
+            ) : wide ? (
+              <div className={cn(surfaceCls, "overflow-clip")}>
+                <table className="w-full border-collapse text-[14px]" aria-label="Áreas">
+                  <thead>
+                    <tr>
+                      <th className={cn(th, "pl-5 w-[30%] rounded-tl-2xl")}>Área</th>
+                      <th className={cn(th, "w-[24%]")}>Avaliadores</th>
+                      <th className={cn(th, "w-[17%]")}>Critérios</th>
+                      <th className={th}>Pessoas</th>
+                      <th className={cn(th, "w-[130px] text-right")}>Situação</th>
+                      <th className={cn(th, "pr-4 w-[80px] xl:w-[210px] rounded-tr-2xl")}><span className="sr-only">Ações</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>{filtered.map(s => <AreaRow key={s.area.id} {...rowProps(s)} />)}</tbody>
+                </table>
+              </div>
+            ) : (
+              <ul className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))]" aria-label="Áreas">
+                {filtered.map(s => <AreaCard key={s.area.id} {...rowProps(s)} />)}
+              </ul>
+            )}
+            {filtered.length > 0 && (
+              <p className="text-[13px] text-muted-foreground tabular-nums" data-testid="areas-count">
+                {filtering ? `Mostrando ${filtered.length} de ${plural(summaries.length, "área", "áreas")}` : plural(summaries.length, "área", "áreas")}
+              </p>
+            )}
           </div>
         )}
       </div>
 
-      {/* Manage area relationships */}
-      <Dialog open={manageArea !== null} onOpenChange={v => !v && setManageArea(null)}>
-        <DialogContent className="max-w-xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Building2 size={22} style={{ color: "var(--accent-text)" }} /> {manageArea?.name}
-            </DialogTitle>
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Relacione os critérios e usuários que pertencem a esta área.</p>
-          </DialogHeader>
-
-          {manageArea && (
-            <Tabs defaultValue="criteria" className="pt-2">
-              <TabsList className="grid grid-cols-2 w-full rounded-lg p-1 h-auto" style={{ backgroundColor: "var(--secondary)" }}>
-                <TabsTrigger value="criteria" data-testid="tab-area-criteria" className="rounded-md font-bold uppercase text-xs py-2 flex items-center gap-1.5">
-                  <ListChecks size={13} /> Critérios
-                </TabsTrigger>
-                <TabsTrigger value="users" data-testid="tab-area-users" className="rounded-md font-bold uppercase text-xs py-2 flex items-center gap-1.5">
-                  <Users size={13} /> Usuários
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Criteria tab */}
-              <TabsContent value="criteria" className="mt-4">
-                <ScrollArea className="h-[360px] rounded-xl" style={{ border: "1px solid var(--border)" }}>
-                  <div>
-                    {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((c, i) => {
-                      const belongs = c.responsibleAreaId === manageArea.id;
-                      const elsewhere = c.responsibleAreaId != null && !belongs;
-                      return (
-                        <label
-                          key={c.id}
-                          data-testid={`manage-criterion-${c.id}`}
-                          className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:opacity-90"
-                          style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: belongs ? "rgba(154,176,0,0.10)" : "transparent" }}
-                        >
-                          <Checkbox
-                            checked={belongs}
-                            disabled={updateCriterionMutation.isPending}
-                            onCheckedChange={() => toggleCriterion(c.id, belongs, manageArea.id)}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold uppercase text-sm truncate">{displayCriterionName(c.name)}</p>
-                            {elsewhere && (
-                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: DANGER_TEXT }}>
-                                <ArrowRightLeft size={11} /> Atualmente em: {c.responsibleAreaName}
-                              </p>
-                            )}
-                          </div>
-                          {!c.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
-                        </label>
-                      );
-                    })}
-                    {(criteria ?? []).length === 0 && (
-                      <p className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério cadastrado.</p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-
-              {/* Users tab */}
-              <TabsContent value="users" className="mt-4">
-                <ScrollArea className="h-[360px] rounded-xl" style={{ border: "1px solid var(--border)" }}>
-                  <div>
-                    {(users ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((u, i) => {
-                      const belongs = u.areaId === manageArea.id;
-                      const elsewhere = u.areaId != null && !belongs;
-                      return (
-                        <label
-                          key={u.id}
-                          data-testid={`manage-user-${u.id}`}
-                          className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:opacity-90"
-                          style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: belongs ? "rgba(154,176,0,0.10)" : "transparent" }}
-                        >
-                          <Checkbox
-                            checked={belongs}
-                            disabled={updateUserMutation.isPending}
-                            onCheckedChange={() => toggleUser(u.id, belongs, manageArea.id)}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-sm break-words">{u.name}</p>
-                            <p className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>{u.email}</p>
-                            {elsewhere && (
-                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: DANGER_TEXT }}>
-                                <ArrowRightLeft size={11} /> Atualmente em: {u.areaName}
-                              </p>
-                            )}
-                          </div>
-                          {!u.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
-                        </label>
-                      );
-                    })}
-                    {(users ?? []).length === 0 && (
-                      <p className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum usuário cadastrado.</p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          )}
-
-          <div className="flex justify-end pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-            <button
-              data-testid="button-close-manage"
-              onClick={() => setManageArea(null)}
-              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              Concluir
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateAreaDialog open={createOpen} onOpenChange={o => { setCreateOpen(o); if (!o) setCreateError(null); }}
+        pending={createMutation.isPending} error={createError}
+        onSubmit={(d: AreaInput) => { setCreateError(null); createMutation.mutate({ data: d }); }} />
+      <DeactivateAreaDialog target={deactivateTarget} pending={updateMutation.isPending}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => deactivateTarget && updateMutation.mutate({ id: deactivateTarget.area.id, data: { active: false } })} />
+      <ManageAreaDialog area={manageArea} areas={areas ?? []} criteria={criteria ?? []} users={users ?? []}
+        onToggleCriterion={toggleCriterion} onToggleUser={toggleUser}
+        pendingCriterionId={updateCriterionMutation.isPending ? updateCriterionMutation.variables?.id ?? null : null}
+        pendingUserId={updateUserMutation.isPending ? updateUserMutation.variables?.id ?? null : null}
+        onClose={() => setManageId(null)} />
     </div>
   );
 }

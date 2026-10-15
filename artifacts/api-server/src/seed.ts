@@ -225,7 +225,7 @@ async function seed() {
     { name: "Sem Bônus",              color: "#64748b", minScore: "0",  maxScore: "69.99", minInclusive: true, maxInclusive: true, bonusValue: "0.00",    bonusPerExtraEvent: "0.00",   description: "Precisa melhorar",  displayOrder: 7 },
   ]);
 
-  console.log("✓ Regras de pelotão criadas (Simulador de Bônus, 7 faixas)");
+  console.log("✓ Faixas de bônus criadas (7 faixas)");
 
   await db.insert(rulesTable).values([
     { key: "absence_penalty_per_absence", value: "50", description: "Penalidade por falta (desconto em pontos no resultado final, escala 0-100)" },

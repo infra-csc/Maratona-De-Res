@@ -284,7 +284,7 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
   const closedData = await closedCycleDataToMove(dupIds, !!canonicalUserRow);
   if (closedData.length > 0) {
     res.status(409).json(closedCycleBody(
-      `Não dá para juntar: o cadastro duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de colaborador.`,
+      `Não dá para mesclar: o cadastro duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de colaborador.`,
       { closedCycleData: closedData },
     ));
     return;

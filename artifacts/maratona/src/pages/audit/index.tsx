@@ -1,13 +1,14 @@
+// Tela "Auditoria": quem fez o quê, e quando. Filtros na URL, ações em
+// grupos por dia (cabeçalho do dia fica preso ao rolar), cada linha abre o
+// "O que mudou". Peças: ./audit-filters (filtros), ./audit-entry (linha).
 import { useEffect, useMemo, useState } from "react";
 import { useGetAuditLogs, useGetUsers, getGetAuditLogsQueryKey, type AuditLog } from "@workspace/api-client-react";
-import { ChevronLeft, ChevronRight, SearchX, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader, EmptyState, LoadingState } from "@/components/shared";
-import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { ACTIONS, CATEGORIES, type CategoryKey } from "./labels";
+import { ChevronLeft, ChevronRight, FolderLock, Lock, SearchX } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Bone, Chip, EmptyBlock, ErrorBlock, btnSecondary, surfaceCls } from "../criteria/criteria-ui";
+import { ACTIONS, CATEGORIES } from "./labels";
 import { AuditEntry } from "./audit-entry";
+import { AuditFilters, EMPTY_FILTERS, type Filters } from "./audit-filters";
 import { dayHeading, dayKey } from "./dates";
 
 const PAGE_SIZE = 50;
@@ -15,8 +16,6 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ── Filtros na URL (?cat=&action=&user=&from=&to=&page=) ───────────────────
 // Recarregar ou mandar o link para alguém abre a mesma consulta.
-interface Filters { cat: CategoryKey | ""; action: string; user: string; from: string; to: string; page: number }
-
 function readFilters(): Filters {
   const p = new URLSearchParams(window.location.search);
   const cat = p.get("cat") ?? "";
@@ -25,7 +24,7 @@ function readFilters(): Filters {
   const to = p.get("to") ?? "";
   const user = p.get("user") ?? "";
   return {
-    cat: CATEGORIES.some(c => c.key === cat) ? (cat as CategoryKey) : "",
+    cat: CATEGORIES.some(c => c.key === cat) ? (cat as Filters["cat"]) : "",
     action: action in ACTIONS ? action : "",
     user: /^\d+$/.test(user) ? user : "",
     from: DATE_RE.test(from) ? from : "",
@@ -42,15 +41,33 @@ function writeFilters(f: Filters) {
   window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
-// Ações em ordem alfabética do rótulo, para o seletor.
-const ACTION_OPTIONS = Object.entries(ACTIONS)
-  .map(([code, d]) => ({ code, label: d.label.charAt(0).toUpperCase() + d.label.slice(1) }))
-  .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+const LEGEND = [
+  { tone: "bg-[var(--status-ok)]", label: "conclui (confirmar, publicar, enviar)" },
+  { tone: "bg-[var(--status-warn)]", label: "mexe em nota, resultado ou acesso" },
+  { tone: "bg-[var(--status-danger)]", label: "apaga ou desfaz" },
+  { tone: "bg-[var(--status-info)]", label: "entrada no sistema" },
+  { tone: "bg-border", label: "cadastro comum" },
+];
+
+function AuditSkeleton() {
+  return (
+    <div role="status" aria-label="Carregando auditoria" className={cn(surfaceCls, "overflow-hidden")}>
+      <div className="px-5 py-2.5 bg-secondary/50 border-b border-border"><Bone className="h-3 w-40" /></div>
+      {Array.from({ length: 7 }, (_, i) => (
+        <div key={i} className="flex items-start gap-4 px-5 py-4 border-t border-border first:border-t-0">
+          <Bone className="h-4 w-10" />
+          <div className="flex-1 space-y-2"><Bone className="h-4 w-[420px] max-w-full" /><Bone className="h-4 w-28" /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AuditPage() {
   const [f, setF] = useState<Filters>(readFilters);
   useEffect(() => writeFilters(f), [f]);
   const update = (patch: Partial<Filters>) => setF(prev => ({ ...prev, page: 1, ...patch }));
+  const clear = () => setF(EMPTY_FILTERS);
   const hasFilters = !!(f.cat || f.action || f.user || f.from || f.to);
 
   const params = {
@@ -62,7 +79,7 @@ export default function AuditPage() {
     from: f.from || undefined,
     to: f.to || undefined,
   };
-  const { data, isLoading, isError, refetch } = useGetAuditLogs(params, { query: { queryKey: getGetAuditLogsQueryKey(params) } });
+  const { data, isLoading, isError, isFetching, refetch } = useGetAuditLogs(params, { query: { queryKey: getGetAuditLogsQueryKey(params) } });
   const { data: users } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
 
   // Quem pode aparecer como autor: equipe interna (colaboradores só entram,
@@ -86,124 +103,65 @@ export default function AuditPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const firstShown = total === 0 ? 0 : (f.page - 1) * PAGE_SIZE + 1;
   const lastShown = Math.min(f.page * PAGE_SIZE, total);
-
-  const label = (text: string, htmlFor: string) => (
-    <label htmlFor={htmlFor} className="block mb-1 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>{text}</label>
-  );
+  const goPage = (page: number) => { setF(p => ({ ...p, page })); window.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
 
   return (
-    <div className="p-4 md:p-8 space-y-5 max-w-5xl mx-auto" style={{ fontFamily: BODY }}>
-      <PageHeader
-        eyebrow="Segurança"
-        title="Auditoria"
-        description="Quem fez o quê, e quando. Cada linha é uma ação registrada automaticamente pelo sistema e não pode ser editada nem apagada. Clique numa linha para ver o que mudou, campo a campo."
-      />
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3 lg:gap-5">
+        <h1 data-testid="text-page-title" className="min-w-0 font-condensed text-[24px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground truncate">Auditoria</h1>
+        <p className="hidden xl:block min-w-0 truncate text-[13px] text-muted-foreground">Quem fez o quê, e quando. Abra uma linha para ver o que mudou, campo a campo.</p>
+        <Chip icon={Lock} className="ml-auto shrink-0" title="Cada ação é gravada pelo próprio sistema e não pode ser editada nem apagada">Somente leitura</Chip>
+      </div>
 
-      <section aria-label="Filtros" className="rounded-xl border p-4" style={{ backgroundColor: "var(--card)", borderColor: "var(--card-border)" }}>
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.4fr_1.2fr_0.9fr_0.9fr]">
-          <div>
-            {label("O quê", "audit-cat")}
-            <Select value={f.cat || "all"} onValueChange={v => update({ cat: v === "all" ? "" : (v as CategoryKey) })}>
-              <SelectTrigger id="audit-cat" data-testid="select-audit-entity" className="h-10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tudo</SelectItem>
-                {CATEGORIES.map(c => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            {label("Ação", "audit-action")}
-            <Select value={f.action || "all"} onValueChange={v => update({ action: v === "all" ? "" : v })}>
-              <SelectTrigger id="audit-action" data-testid="select-audit-action" className="h-10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as ações</SelectItem>
-                {ACTION_OPTIONS.map(a => <SelectItem key={a.code} value={a.code}>{a.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            {label("Quem", "audit-user")}
-            <Select value={f.user || "all"} onValueChange={v => update({ user: v === "all" ? "" : v })}>
-              <SelectTrigger id="audit-user" data-testid="select-audit-user" className="h-10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as pessoas</SelectItem>
-                {people.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            {label("De", "audit-from")}
-            <Input id="audit-from" type="date" value={f.from} max={f.to || undefined} onChange={e => update({ from: e.target.value })} className="h-10" />
-          </div>
-          <div>
-            {label("Até", "audit-to")}
-            <Input id="audit-to" type="date" value={f.to} min={f.from || undefined} onChange={e => update({ to: e.target.value })} className="h-10" />
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[13px]" style={{ color: "var(--muted-foreground)" }} aria-live="polite">
-            {data ? <><strong style={{ color: "var(--foreground)" }}>{total.toLocaleString("pt-BR")}</strong> {total === 1 ? "ação registrada" : "ações registradas"}{hasFilters ? " com estes filtros" : ""}</> : " "}
-          </p>
-          {hasFilters ? (
-            <Button variant="ghost" size="sm" onClick={() => setF({ cat: "", action: "", user: "", from: "", to: "", page: 1 })}>
-              <X size={14} className="mr-1" aria-hidden="true" /> Limpar filtros
-            </Button>
-          ) : null}
-        </div>
-        <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-          Cor do rótulo: <b>verde</b> conclui (confirmar, publicar, enviar) · <b>amarelo</b> mexe em nota, resultado ou acesso sensível · <b>vermelho</b> apaga ou desfaz · <b>azul</b> entrada no sistema · cinza cadastro comum.
-        </p>
-      </section>
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-5 max-w-[1100px] w-full mx-auto">
+        <AuditFilters f={f} update={update} clear={clear} people={people} total={total} loaded={!!data} />
 
-      {isLoading ? (
-        <LoadingState lines={8} />
-      ) : isError ? (
-        <EmptyState
-          icon={SearchX}
-          title="Não foi possível carregar a auditoria"
-          description="Verifique a conexão e tente de novo."
-          action={<Button variant="outline" onClick={() => refetch()}>Tentar de novo</Button>}
-        />
-      ) : groups.length === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title="Nenhuma ação encontrada"
-          description={hasFilters ? "Nenhuma ação combina com estes filtros. Amplie o período ou limpe os filtros." : "Ainda não há ações registradas."}
-          action={hasFilters ? <Button variant="outline" onClick={() => setF({ cat: "", action: "", user: "", from: "", to: "", page: 1 })}>Limpar filtros</Button> : undefined}
-        />
-      ) : (
-        <div className="space-y-4">
-          {groups.map(g => (
-            <section key={g.key} aria-labelledby={`audit-day-${g.key}`} className="rounded-xl border overflow-hidden" style={{ backgroundColor: "var(--card)", borderColor: "var(--card-border)" }}>
-              <h2
-                id={`audit-day-${g.key}`}
-                className="px-4 py-2 text-[12px] font-bold uppercase flex items-center justify-between"
-                style={{ fontFamily: CONDENSED, letterSpacing: "0.08em", color: "var(--muted-foreground)", backgroundColor: "var(--muted)" }}
-              >
-                <span>{dayHeading(g.key)}</span>
-                <span>{g.logs.length} {g.logs.length === 1 ? "ação" : "ações"}</span>
-              </h2>
-              <ul>
-                {g.logs.map(log => <AuditEntry key={log.id} log={log} refs={data?.refs} />)}
-              </ul>
-            </section>
+        <ul aria-label="Legenda das cores" className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-muted-foreground">
+          {LEGEND.map(l => (
+            <li key={l.label} className="inline-flex items-center gap-1.5"><span aria-hidden className={cn("w-[3px] h-3.5 rounded-full", l.tone)} />{l.label}</li>
           ))}
-        </div>
-      )}
+        </ul>
 
-      {totalPages > 1 ? (
-        <nav aria-label="Paginação" className="flex items-center justify-between gap-3">
-          <Button data-testid="button-prev-page" variant="outline" disabled={f.page === 1} onClick={() => setF(p => ({ ...p, page: p.page - 1 }))}>
-            <ChevronLeft size={16} className="mr-1" aria-hidden="true" /> Mais recentes
-          </Button>
-          <span className="text-[13px] text-center" style={{ color: "var(--muted-foreground)" }}>
-            {firstShown}–{lastShown} de {total.toLocaleString("pt-BR")}
-          </span>
-          <Button data-testid="button-next-page" variant="outline" disabled={f.page >= totalPages} onClick={() => setF(p => ({ ...p, page: p.page + 1 }))}>
-            Mais antigas <ChevronRight size={16} className="ml-1" aria-hidden="true" />
-          </Button>
-        </nav>
-      ) : null}
+        {isLoading ? <AuditSkeleton /> : isError ? (
+          <ErrorBlock title="Não foi possível carregar a auditoria" onRetry={() => { void refetch(); }} />
+        ) : groups.length === 0 ? (
+          <div className={surfaceCls}>
+            <EmptyBlock icon={hasFilters ? SearchX : FolderLock} title="Nenhuma ação encontrada" testId="audit-empty"
+              action={hasFilters ? <button type="button" onClick={clear} className={btnSecondary}>Limpar filtros</button> : undefined}>
+              {hasFilters ? "Nada combina com estes filtros. Amplie o período ou limpe os filtros." : "Ainda não há ações registradas."}
+            </EmptyBlock>
+          </div>
+        ) : (
+          <div className={cn("space-y-4 transition-opacity duration-150", isFetching && "opacity-70")}>
+            {groups.map(g => (
+              <section key={g.key} aria-labelledby={`audit-day-${g.key}`} className={cn(surfaceCls, "overflow-clip")}>
+                <h2 id={`audit-day-${g.key}`}
+                  className="md:sticky md:top-16 z-10 px-4 sm:px-5 py-2.5 flex items-center justify-between gap-3 bg-secondary/80 backdrop-blur-sm border-b border-border font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-foreground">
+                  <span>{dayHeading(g.key)}</span>
+                  <span className="text-muted-foreground tabular-nums">{g.logs.length} {g.logs.length === 1 ? "ação" : "ações"}</span>
+                </h2>
+                <ul>
+                  {g.logs.map(log => <AuditEntry key={log.id} log={log} refs={data?.refs} />)}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {totalPages > 1 ? (
+          <nav aria-label="Paginação" className="flex items-center justify-between gap-3">
+            <button type="button" data-testid="button-prev-page" aria-label="Mais recentes" disabled={f.page === 1} onClick={() => goPage(f.page - 1)} className={btnSecondary}>
+              <ChevronLeft size={16} aria-hidden /> <span className="hidden sm:inline">Mais recentes</span>
+            </button>
+            <span className="text-[13px] text-center text-muted-foreground tabular-nums">
+              {firstShown}–{lastShown} de {total.toLocaleString("pt-BR")}<span className="hidden sm:inline"> · página {f.page} de {totalPages}</span>
+            </span>
+            <button type="button" data-testid="button-next-page" aria-label="Mais antigas" disabled={f.page >= totalPages} onClick={() => goPage(f.page + 1)} className={btnSecondary}>
+              <span className="hidden sm:inline">Mais antigas</span> <ChevronRight size={16} aria-hidden />
+            </button>
+          </nav>
+        ) : null}
+      </div>
     </div>
   );
 }

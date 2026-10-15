@@ -1,200 +1,130 @@
-import { plural } from "@/lib/utils";
+// Pesquisa de avaliadores (.xlsx do Forms): lê a planilha, pede a prévia ao
+// servidor (dryRun), exige o vínculo de cada evento e, depois de gravar,
+// mostra o resultado e — uma única vez, como antes — as senhas provisórias
+// dos avaliadores criados. Mesmas chamadas de antes.
+import { useMemo, useState } from "react";
 import { useImportSurvey, useGetEvents, getGetEventsQueryKey, type SurveyImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ClipboardList, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, ClipboardList, KeyRound } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
-import { DIALOG_STYLE } from "./shared";
+import { serverMessage } from "../criteria/helpers";
+import { ActionDialog, Notice, FileButton, ToolRow, btnPrimary, btnSmall, dialogFooterCls } from "./integration-ui";
 import { extractSurveyRows, type SurveyRow } from "./survey-parser";
 import { SurveyPreviewDialog } from "./survey-preview-dialog";
 
-/**
- * Card "Pesquisa de Avaliadores": lê o .xlsx do Forms, pede a prévia ao
- * servidor (dryRun), exige o vínculo de cada evento e, depois de gravar,
- * mostra uma única vez as senhas provisórias dos avaliadores criados.
- */
 export function SurveyImportSection() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const surveyFileRef = useRef<HTMLInputElement>(null);
-  const [surveyRows, setSurveyRows] = useState<SurveyRow[] | null>(null);
-  const [surveyPreview, setSurveyPreview] = useState<SurveyImportResult | null>(null);
-  const [surveyDialogOpen, setSurveyDialogOpen] = useState(false);
-  const [surveyLinkOverrides, setSurveyLinkOverrides] = useState<Record<string, number>>({});
-  const [surveyCommitResult, setSurveyCommitResult] = useState<SurveyImportResult | null>(null);
+  const [rows, setRows] = useState<SurveyRow[] | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [preview, setPreview] = useState<SurveyImportResult | null>(null);
+  const [committed, setCommitted] = useState<SurveyImportResult | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [linkOverrides, setLinkOverrides] = useState<Record<string, number>>({});
+  const [credentials, setCredentials] = useState<SurveyImportResult | null>(null);
 
   const eventsQueryKey = getGetEventsQueryKey();
-  const { data: allEventsForLink } = useGetEvents(undefined, { query: { queryKey: eventsQueryKey, enabled: surveyDialogOpen } });
-  const eventLinkOptions = useMemo(
-    () => [...(allEventsForLink ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [allEventsForLink],
-  );
+  const { data: allEvents } = useGetEvents(undefined, { query: { queryKey: eventsQueryKey, enabled: open } });
+  const eventLinkOptions = useMemo(() => [...(allEvents ?? [])].sort((a, b) => a.name.localeCompare(b.name)), [allEvents]);
 
-  const surveyPreviewMutation = useImportSurvey({
+  const previewMutation = useImportSurvey({
     mutation: {
-      onSuccess: (data) => {
-        setSurveyPreview(data);
-        setSurveyDialogOpen(true);
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao ler arquivo", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
+      onSuccess: (data) => { setPreview(data); setCommitted(null); setCommitError(null); setOpen(true); },
+      onError: (e: unknown) => toast({ title: "Não foi possível ler a planilha", description: serverMessage(e), variant: "destructive" }),
     },
   });
-
-  const surveyCommitMutation = useImportSurvey({
+  const commitMutation = useImportSurvey({
     mutation: {
       onSuccess: (data) => {
-        toast({
-          title: "Pesquisa de avaliadores importada",
-          description: `${plural(data.usersCreated ?? 0, "avaliador criado", "avaliadores criados")}, ${plural(data.evaluationsCreated ?? 0, "avaliação gravada", "avaliações gravadas")}, ${plural(data.conformitiesUpserted ?? 0, "conformidade atualizada", "conformidades atualizadas")}, ${plural(data.eventsUpdated ?? 0, "evento atualizado", "eventos atualizados")}.`,
-        });
-        if (data.warnings && data.warnings.length > 0) {
-          toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
-        }
-        setSurveyDialogOpen(false);
-        setSurveyPreview(null);
-        setSurveyRows(null);
-        setSurveyLinkOverrides({});
-        if (data.createdAvaliadores && data.createdAvaliadores.length > 0) {
-          setSurveyCommitResult(data);
-        }
+        setCommitted(data);
+        setRows(null);
+        if (data.createdAvaliadores && data.createdAvaliadores.length > 0) setCredentials(data);
         qc.invalidateQueries();
       },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao importar", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
+      onError: (e: unknown) => setCommitError(serverMessage(e)),
     },
   });
 
-  async function handleSurveyFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const rows = extractSurveyRows(workbook);
-      if (!rows || rows.length === 0) {
-        toast({
-          title: "Planilha não reconhecida",
-          description: 'Não encontrei a aba de respostas do Forms (cabeçalho "Evento que está avaliando..."). Verifique se o arquivo é o export correto.',
-          variant: "destructive",
-        });
-        e.target.value = "";
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const parsed = extractSurveyRows(workbook);
+      if (!parsed || parsed.length === 0) {
+        toast({ title: "Planilha não reconhecida", description: "Não achei a aba de respostas do Forms (cabeçalho “Evento que está avaliando…”). Confira se é o arquivo exportado certo.", variant: "destructive" });
         return;
       }
-      setSurveyRows(rows);
-      setSurveyLinkOverrides({});
-      surveyPreviewMutation.mutate({ data: { rows, dryRun: true } });
+      setRows(parsed);
+      setFileName(file.name);
+      setLinkOverrides({});
+      previewMutation.mutate({ data: { rows: parsed, dryRun: true } });
     } catch {
-      toast({ title: "Falha ao ler arquivo", description: "Verifique se o arquivo é uma planilha .xlsx válida.", variant: "destructive" });
+      toast({ title: "Não foi possível ler a planilha", description: "Confira se o arquivo é um .xlsx válido.", variant: "destructive" });
     }
-    e.target.value = "";
   }
 
-  function handleSurveyConfirm() {
-    if (!surveyRows) return;
-    surveyCommitMutation.mutate({ data: { rows: surveyRows, dryRun: false, linkOverrides: surveyLinkOverrides } });
-  }
-
-  const surveyAllResolved = !!surveyPreview && surveyPreview.groups.every((g) => !!surveyLinkOverrides[g.groupKey]);
+  const allResolved = !!preview && preview.groups.every(g => !!linkOverrides[g.groupKey]);
+  const closePreview = (o: boolean) => {
+    setOpen(o);
+    if (!o) { setPreview(null); setRows(null); setLinkOverrides({}); setCommitted(null); setCommitError(null); }
+  };
 
   return (
     <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden">
-        <CardHeader className="bg-secondary border-b border-border pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <ClipboardList size={18} className="text-[var(--info)]" /> Pesquisa de Avaliadores
-          </CardTitle>
-          <CardDescription>
-            Importa a planilha de respostas da pesquisa (uma linha por avaliador/evento) — cria avaliadores, vincula a eventos já cadastrados e grava notas por critério e conformidade.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Cada evento da planilha precisa ser <strong>vinculado manualmente</strong> a um evento já existente no sistema — esta importação nunca cria eventos novos.
-            Também atualiza o catálogo de critérios (ativa "Carga na Saída do Galpão" e desativa 3 critérios antigos). Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
-          </p>
-
-          <input
-            ref={surveyFileRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleSurveyFileUpload}
-            data-testid="input-survey-xlsx-file"
-          />
-          <Button
-            data-testid="button-import-survey"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 border-[var(--info)]/50 hover:border-[var(--info)] hover:bg-[var(--info)]/10 transition-colors"
-            onClick={() => surveyFileRef.current?.click()}
-            disabled={surveyPreviewMutation.isPending}
-          >
-            <Upload size={16} className="mr-2 text-[var(--info)]" />
-            {surveyPreviewMutation.isPending ? "Lendo planilha..." : "Selecionar planilha (pré-visualizar)"}
-          </Button>
-        </CardContent>
-      </Card>
+      <ToolRow icon={ClipboardList} title="Pesquisa de avaliadores (Forms, .xlsx)" testId="tool-import-survey"
+        traits={[{ label: "Vincula a eventos existentes" }, { label: "Mostra prévia antes", tone: "ok" }, { label: "Cria avaliadores", tone: "warn" }]}
+        action={<FileButton id="input-survey-xlsx" accept=".xlsx,.xls" onFile={onFile} inputTestId="input-survey-xlsx-file" testId="button-import-survey"
+          label="Escolher planilha" busyLabel="Lendo planilha…" busy={previewMutation.isPending} className={btnSmall} />}>
+        Uma linha por avaliador e evento: cria os avaliadores que faltam, liga cada evento da planilha a um evento <span className="font-semibold text-foreground">já cadastrado</span> (nunca cria evento) e grava as notas e a conformidade. Também ajusta o catálogo de critérios.
+      </ToolRow>
 
       <SurveyPreviewDialog
-        open={surveyDialogOpen}
-        onOpenChange={(open) => { setSurveyDialogOpen(open); if (!open) { setSurveyPreview(null); setSurveyRows(null); setSurveyLinkOverrides({}); } }}
-        preview={surveyPreview}
-        linkOverrides={surveyLinkOverrides}
-        setLinkOverrides={setSurveyLinkOverrides}
+        open={open}
+        onOpenChange={closePreview}
+        fileName={fileName}
+        preview={preview}
+        committed={committed}
+        commitError={commitError}
+        linkOverrides={linkOverrides}
+        setLinkOverrides={setLinkOverrides}
         eventLinkOptions={eventLinkOptions}
-        allResolved={surveyAllResolved}
-        isCommitting={surveyCommitMutation.isPending}
-        onCancel={() => setSurveyDialogOpen(false)}
-        onConfirm={handleSurveyConfirm}
+        allResolved={allResolved}
+        isCommitting={commitMutation.isPending}
+        onConfirm={() => { if (rows) { setCommitError(null); commitMutation.mutate({ data: { rows, dryRun: false, linkOverrides } }); } }}
       />
 
-      <Dialog open={!!surveyCommitResult} onOpenChange={(open) => { if (!open) setSurveyCommitResult(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border-border" style={DIALOG_STYLE}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <KeyRound size={20} className="text-[var(--info)]" />
-              Credenciais dos avaliadores criados
-            </DialogTitle>
-            <DialogDescription>
-              Estas senhas provisórias são exibidas <strong>apenas uma vez</strong>. Copie e distribua para cada avaliador antes de fechar esta janela.
-            </DialogDescription>
-          </DialogHeader>
-          {surveyCommitResult?.createdAvaliadores && (
-            <div className="border border-border rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
-                  <tr>
-                    <th className="text-left p-2">Nome</th>
-                    <th className="text-left p-2">E-mail</th>
-                    <th className="text-left p-2">Senha provisória</th>
+      <ActionDialog open={!!credentials && !open} onOpenChange={o => { if (!o) setCredentials(null); }} icon={KeyRound} wide="lg" testId="dialog-survey-credentials"
+        title="Senhas dos avaliadores criados"
+        description="Estas senhas provisórias aparecem só agora. Copie e entregue a cada avaliador antes de fechar.">
+        <Notice icon={KeyRound} tone="warn">Depois de fechar esta janela, não dá para ver as senhas de novo — só redefinir em Usuários.</Notice>
+        {credentials?.createdAvaliadores && (
+          <div className="rounded-xl border border-border overflow-x-auto">
+            <table className="w-full min-w-[480px] border-collapse text-[13px]" aria-label="Avaliadores criados">
+              <thead>
+                <tr className="bg-secondary/50">
+                  {["Nome", "E-mail", "Senha provisória"].map(h => <th key={h} className="font-condensed px-3 py-2 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {credentials.createdAvaliadores.map((a, i) => (
+                  <tr key={i} className="border-t border-border" data-testid={`row-created-avaliador-${i}`}>
+                    <td className="px-3 py-2 font-semibold text-foreground">{a.name}</td>
+                    <td className="px-3 py-2 font-mono text-[12.5px] text-muted-foreground break-all">{a.email}</td>
+                    <td className="px-3 py-2 font-mono text-[12.5px] text-foreground select-all">{a.tempPassword}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {surveyCommitResult.createdAvaliadores.map((a, i) => (
-                    <tr key={i} className="border-t border-border" data-testid={`row-created-avaliador-${i}`}>
-                      <td className="p-2 font-medium text-foreground">{a.name}</td>
-                      <td className="p-2 text-muted-foreground font-mono">{a.email}</td>
-                      <td className="p-2 text-muted-foreground font-mono">{a.tempPassword}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <DialogFooter>
-            <Button className="bg-primary hover:opacity-90 text-primary-foreground" onClick={() => setSurveyCommitResult(null)}>
-              Já distribuí as senhas
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className={dialogFooterCls}>
+          <button type="button" onClick={() => setCredentials(null)} className={btnPrimary}>Já entreguei as senhas</button>
+        </div>
+      </ActionDialog>
     </>
   );
 }

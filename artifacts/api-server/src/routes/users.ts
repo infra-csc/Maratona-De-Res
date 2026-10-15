@@ -289,7 +289,7 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
   const closedData = await closedCycleUserDataToMove(dupIds);
   if (closedData.length > 0) {
     res.status(409).json(closedCycleBody(
-      `Não dá para juntar: o usuário duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de avaliador.`,
+      `Não dá para mesclar: o usuário duplicado tem dados de ciclo fechado (${closedData.join(", ")}). Ciclo fechado só consulta — o histórico dele não muda de avaliador.`,
       { closedCycleData: closedData },
     ));
     return;
@@ -303,7 +303,7 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
        AND EXISTS (SELECT 1 FROM evaluations c WHERE c.evaluator_user_id = ${canonicalId} AND c.event_id = d.event_id AND c.criterion_id = d.criterion_id)`);
   const clashes = Number(clash.rows[0]?.n ?? 0);
   if (clashes > 0) {
-    res.status(409).json({ error: `Não dá para juntar: os dois usuários têm avaliação no mesmo critério do mesmo evento (${clashes === 1 ? "1 caso" : `${clashes} casos`}). Apague a avaliação que sobra (rascunho) e tente de novo.`, code: "MERGE_EVALUATION_CLASH" });
+    res.status(409).json({ error: `Não dá para mesclar: os dois usuários têm avaliação no mesmo critério do mesmo evento (${clashes === 1 ? "1 caso" : `${clashes} casos`}). Apague a avaliação que sobra (rascunho) e tente de novo.`, code: "MERGE_EVALUATION_CLASH" });
     return;
   }
 

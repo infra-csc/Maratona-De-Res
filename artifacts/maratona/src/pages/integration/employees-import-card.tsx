@@ -1,93 +1,86 @@
-import { plural } from "@/lib/utils";
-import { useImportEmployeesCSV, getGetEmployeesQueryKey } from "@workspace/api-client-react";
+// Importar colaboradores por CSV: escolher o arquivo → confirmar (quantas
+// linhas, de que arquivo) → resultado no mesmo diálogo (inseridos e linhas
+// com problema). Mesma chamada de antes.
+import { useState } from "react";
+import { useImportEmployeesCSV, getGetEmployeesQueryKey, type ImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet } from "lucide-react";
-import { useRef } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
+import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { plural } from "@/lib/utils";
+import { serverMessage } from "../criteria/helpers";
+import { ActionDialog, ConsequenceList, DoneBox, ErrorBox, FileButton, MessageList, NumberStrip, ToolRow, btnPrimary, btnSecondary, btnSmall, dialogFooterCls } from "./integration-ui";
 
-/** Card "Importação Manual": carga em lote de colaboradores via CSV. */
+const dataLines = (csv: string) => csv.split(/\r?\n/).filter(l => l.trim()).length;
+
 export function EmployeesImportCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<{ name: string; csv: string; lines: number } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const importMutation = useImportEmployeesCSV({
     mutation: {
-      onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
-        toast({ title: plural(data.inserted, "colaborador importado", "colaboradores importados") });
-        if (data.errors.length > 0) {
-          toast({
-            title: `${plural(data.errors.length, "linha")} com problema`,
-            description: data.errors.slice(0, 5).join(" · ") + (data.errors.length > 5 ? ` · e mais ${data.errors.length - 5}` : ""),
-            variant: "destructive",
-          });
-        }
-      },
-      onError: (e: { message?: string }) => toast({ title: "Falha na importação", description: e.message ?? "Nenhuma linha foi gravada.", variant: "destructive" }),
+      onSuccess: (data) => { qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() }); setResult(data); },
+      onError: (e: unknown) => setError(serverMessage(e) || "Nenhuma linha foi gravada."),
     },
   });
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const csvData = ev.target?.result as string;
-      importMutation.mutate({ data: { csvData } });
+    reader.onload = ev => {
+      const csv = String(ev.target?.result ?? "");
+      setResult(null); setError(null);
+      setFile({ name: f.name, csv, lines: Math.max(0, dataLines(csv) - 1) });
     };
-    reader.readAsText(file);
+    reader.readAsText(f);
   }
+  const close = () => { if (!importMutation.isPending) { setFile(null); setResult(null); setError(null); } };
 
   return (
-    <Card className="bg-card border border-border shadow-none overflow-hidden">
-      <CardHeader className="bg-secondary border-b border-border pb-4">
-        <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-          <FileSpreadsheet size={18} className="text-accent-text" /> Importação Manual
-        </CardTitle>
-        <CardDescription>Carga em lote via arquivo CSV.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-6 flex flex-col h-full">
-        <div className="flex-1">
-          <h4 className="font-bold text-foreground mb-2">Colaboradores</h4>
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Faça upload de uma planilha contendo a base de funcionários para popular o sistema rapidamente.
-          </p>
+    <>
+      <ToolRow icon={FileSpreadsheet} title="Colaboradores (CSV)" testId="tool-import-employees"
+        columns={["nome", "departamento", "funcao"]} traits={[{ label: "Grava ao confirmar", tone: "warn" }]}
+        action={<FileButton id="input-employees-csv" accept=".csv" onFile={onFile} inputTestId="input-csv-file" testId="button-import-employees"
+          label="Escolher CSV" busyLabel="Importando…" busy={importMutation.isPending} className={btnSmall} />}>
+        Cadastra em lote a base de colaboradores a partir de uma planilha CSV com cabeçalho.
+      </ToolRow>
 
-          <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
-            <p className="text-[11px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas Obrigatórias (Header)</p>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
-              <span className="bg-card px-2 py-1 rounded border border-border">departamento</span>
-              <span className="bg-card px-2 py-1 rounded border border-border">funcao</span>
-            </div>
-          </div>
+      <ActionDialog open={!!file} onOpenChange={o => { if (!o) close(); }} busy={importMutation.isPending}
+        icon={result ? FileSpreadsheet : Upload} tone={result ? "brand" : "neutral"} testId="dialog-import-employees"
+        title={result ? "Importação concluída" : "Importar colaboradores?"}
+        description={file ? <><span className="font-semibold text-foreground break-all">{file.name}</span> · {plural(file.lines, "linha de dados", "linhas de dados")}</> : undefined}>
+        {!result && (
+          <ConsequenceList items={[
+            <>Cada linha vira um colaborador (colunas <span className="font-semibold text-foreground">nome, departamento, funcao</span>).</>,
+            <>Linhas com problema são puladas e listadas no fim; as boas são gravadas.</>,
+          ]} />
+        )}
+        <ErrorBox message={error} title="Falha na importação" />
+        {result && (
+          <>
+            <NumberStrip items={[{ label: "Importados", value: result.inserted, tone: "ok" }, { label: "Com problema", value: result.errors.length, tone: result.errors.length ? "warn" : undefined }]} />
+            {result.errors.length === 0
+              ? <DoneBox>Todas as linhas foram gravadas.</DoneBox>
+              : <MessageList tone="warn" title="Linhas com problema" items={result.errors} />}
+          </>
+        )}
+        <div className={dialogFooterCls}>
+          {result ? (
+            <button type="button" onClick={close} className={btnPrimary}>Fechar</button>
+          ) : (
+            <>
+              <button type="button" onClick={close} disabled={importMutation.isPending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-import-employees" disabled={importMutation.isPending || !file} aria-busy={importMutation.isPending || undefined}
+                onClick={() => { if (file) { setError(null); importMutation.mutate({ data: { csvData: file.csv } }); } }} className={btnPrimary}>
+                {importMutation.isPending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Upload size={15} aria-hidden />}
+                {importMutation.isPending ? "Importando…" : "Importar"}
+              </button>
+            </>
+          )}
         </div>
-
-        <div className="mt-auto">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleFileUpload}
-            data-testid="input-csv-file"
-          />
-          <Button
-            data-testid="button-import-employees"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors"
-            onClick={() => fileRef.current?.click()}
-            disabled={importMutation.isPending}
-          >
-            <Upload size={16} className="mr-2 text-primary" />
-            {importMutation.isPending ? "Processando arquivo..." : "Selecionar arquivo CSV"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </ActionDialog>
+    </>
   );
 }

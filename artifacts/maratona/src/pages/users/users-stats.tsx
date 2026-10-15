@@ -1,25 +1,42 @@
-import { CONDENSED, WARNING, DANGER_TEXT } from "@/lib/premium-theme";
+// Panorama dos acessos: quem entra, quem avalia (e se tem área), quem
+// administra e quem ainda precisa trocar a senha. Os dois de atenção são
+// atalhos de filtro (aria-pressed).
+import { cn, plural } from "@/lib/utils";
+import { StatCell, surfaceCls } from "./users-ui";
 
-/** Três cartões do topo: total, ativos e administradores (barra = % do total). */
-export function UsersStats({ total, ativos, admins }: { total: number; ativos: number; admins: number }) {
-  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+export type UsersQuick = "noArea" | "mustChange" | null;
+
+export function UsersStats({ total, active, evaluators, evaluatorsNoArea, admins, rh, mustChange, quick, onQuick }: {
+  total: number;
+  active: number;
+  evaluators: number;
+  evaluatorsNoArea: number;
+  admins: number;
+  rh: number;
+  mustChange: number;
+  quick: UsersQuick;
+  onQuick: (q: UsersQuick) => void;
+}) {
+  const toggle = (q: Exclude<UsersQuick, null>) => onQuick(quick === q ? null : q);
+  const inactive = total - active;
   return (
-    <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Total de Usuários</span>
-        <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{total}</p>
-        <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
-      </div>
-      <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos Agora</span>
-        <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{ativos}</p>
-        <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
-      </div>
-      <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível Admin</span>
-        <p data-testid="stat-admins" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{admins}</p>
-        <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(admins)}%`, backgroundColor: WARNING }} /></div>
-      </div>
+    <section aria-label="Panorama dos acessos" className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px bg-border")}>
+      <StatCell testId="stat-ativos" label="Ativos" value={active} unit={`de ${total}`}
+        sub={inactive > 0 ? `${plural(inactive, "inativo", "inativos")}, sem entrar no sistema` : "Ninguém desativado"} />
+      <StatCell testId="stat-avaliadores" label="Avaliadores" value={evaluators}
+        sub={evaluatorsNoArea > 0
+          ? <span className="text-[var(--status-warn-text)] font-semibold">{evaluatorsNoArea} sem área definida</span>
+          : "Todos com área definida"}
+        onClick={evaluatorsNoArea > 0 || quick === "noArea" ? () => toggle("noArea") : undefined}
+        pressed={evaluatorsNoArea > 0 || quick === "noArea" ? quick === "noArea" : undefined}
+        action={quick === "noArea" ? "Ver todos" : "Ver quais"} />
+      <StatCell testId="stat-admins" label="Administradores" value={admins}
+        sub={rh > 0 ? `e ${plural(rh, "pessoa", "pessoas")} do RH` : "Nenhum usuário de RH"} />
+      <StatCell testId="stat-must-change" label="Trocar senha" value={mustChange}
+        sub={mustChange > 0 ? "Entram e precisam criar senha nova" : "Ninguém com troca pendente"}
+        onClick={mustChange > 0 || quick === "mustChange" ? () => toggle("mustChange") : undefined}
+        pressed={mustChange > 0 || quick === "mustChange" ? quick === "mustChange" : undefined}
+        action={quick === "mustChange" ? "Ver todos" : "Ver quais"} />
     </section>
   );
 }

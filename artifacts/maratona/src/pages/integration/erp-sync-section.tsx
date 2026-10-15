@@ -1,22 +1,17 @@
-import { useTriggerSync, type getGetIntegrationStatusQueryKey, type IntegrationStatus } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { RefreshCw, CheckCircle2, XCircle, Calendar, Users, Briefcase, AlertTriangle } from "lucide-react";
+// Sincronização com o sistema externo (ERP): situação da conexão, o que já
+// está no banco, "Sincronizar agora" com confirmação do que acontece e o
+// resultado no mesmo diálogo (inclui eventos de ciclo fechado deixados como
+// estavam). Também o registro da última execução.
 import { useState } from "react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { CONDENSED } from "@/lib/premium-theme";
-import { DIALOG_STYLE } from "./shared";
-
-type SyncResult = {
-  success: boolean;
-  message: string;
-  eventsSync?: number;
-  employeesSync?: number;
-  participantsSync?: number;
-};
+import { useTriggerSync, type getGetIntegrationStatusQueryKey, type IntegrationStatus, type SyncResult } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ChevronDown, Lock, PlugZap, RefreshCw, Terminal, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { serverMessage } from "../criteria/helpers";
+import {
+  ActionDialog, Bone, Chip, ClosedCycleSkipped, ConsequenceList, DoneBox, ErrorBox, NumberStrip, StatCell, btnPrimary, btnSecondary,
+  dialogFooterCls, surfaceCls,
+} from "./integration-ui";
 
 type ErpSyncCardProps = {
   status: IntegrationStatus | undefined;
@@ -24,168 +19,157 @@ type ErpSyncCardProps = {
   statusQueryKey: ReturnType<typeof getGetIntegrationStatusQueryKey>;
 };
 
-/**
- * Card "API Externa (ERP)": status da conexão, contadores e o botão de
- * sincronização forçada, mais o diálogo com o resultado da sincronização
- * (renderizado em portal, então a posição no JSX não afeta o layout).
- */
-export function ErpSyncCard({ status, isLoading, statusQueryKey }: ErpSyncCardProps) {
-  const qc = useQueryClient();
-  const [result, setResult] = useState<SyncResult | null>(null);
+const fmtWhen = (iso: string | null | undefined) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+};
 
-  const syncMutation = useTriggerSync({
+/** Estado da sincronização (o botão do topo e o painel usam o mesmo). */
+export function useErpSync(statusQueryKey: ErpSyncCardProps["statusQueryKey"]) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<SyncResult | null>(null);
+  const [error, setError] = useState<{ message: string; closed: boolean } | null>(null);
+  const mutation = useTriggerSync({
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: statusQueryKey });
         setResult({ ...data, success: true });
       },
-      onError: (e: { message?: string }) => {
-        setResult({
-          success: false,
-          message: e.message ?? "Não foi possível concluir a sincronização.",
-          eventsSync: 0,
-          employeesSync: 0,
-          participantsSync: 0,
-        });
+      onError: (e: unknown) => {
+        const data = (e as { data?: { cycleClosed?: boolean } } | null)?.data;
+        qc.invalidateQueries({ queryKey: statusQueryKey });
+        setError({ message: serverMessage(e) || "Não foi possível concluir a sincronização.", closed: data?.cycleClosed === true });
       },
     },
   });
+  return {
+    open, result, error, pending: mutation.isPending,
+    start: () => { setResult(null); setError(null); setOpen(true); },
+    run: () => { setError(null); mutation.mutate(); },
+    close: () => { if (!mutation.isPending) { setOpen(false); } },
+  };
+}
+export type ErpSyncState = ReturnType<typeof useErpSync>;
 
+/** Botão "Sincronizar agora" (topo da tela e painel). */
+export function SyncButton({ sync, status, className, testId = "button-trigger-sync" }: { sync: ErpSyncState; status: IntegrationStatus | undefined; className?: string; testId?: string }) {
   return (
-    <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden">
-        <CardHeader className="bg-secondary border-b border-border pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <RefreshCw size={18} className="text-primary" /> API Externa (ERP)
-          </CardTitle>
-          <CardDescription>Sincronização automática de eventos e participações.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-3 mb-6 p-3 rounded-lg border bg-secondary">
-            <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Status da Conexão</span>
-            {isLoading ? (
-              <div className="h-5 w-24 bg-secondary animate-pulse rounded"></div>
-            ) : status?.configured ? (
-              <span className="flex items-center gap-1.5 text-sm font-bold text-accent-text bg-accent/10 px-2 py-0.5 rounded-full border border-accent/40">
-                <CheckCircle2 size={14} /> Operante
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-sm font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/30">
-                <XCircle size={14} /> Não Configurada
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-              <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.eventsImported ?? "0"}</p>
-              <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
-            </div>
-            <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-              <Users size={18} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.employeesImported ?? "0"}</p>
-              <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
-            </div>
-            <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-              <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.participantsImported ?? "0"}</p>
-              <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
-            </div>
-          </div>
-
-          <Button
-            data-testid="button-trigger-sync"
-            className="w-full"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || !status?.configured}
-          >
-            <RefreshCw size={16} className={`mr-2 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            {syncMutation.isPending ? "Buscando dados..." : "Forçar Sincronização Agora"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!result} onOpenChange={(open) => { if (!open) setResult(null); }}>
-        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-sync-result">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {result?.success ? (
-                <>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15">
-                    <CheckCircle2 className="text-accent-text" size={20} />
-                  </span>
-                  Sincronização concluída
-                </>
-              ) : (
-                <>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
-                    <AlertTriangle className="text-destructive" size={20} />
-                  </span>
-                  Falha na sincronização
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {result?.success
-                ? "Apenas eventos de 2026 já finalizados e participações de Cenotécnica / Cenotécnico (e variantes) / Sup Ceno foram importados. Registros existentes são atualizados, nunca duplicados."
-                : result?.message}
-            </DialogDescription>
-          </DialogHeader>
-
-          {result?.success && (
-            <div className="grid grid-cols-3 gap-3 py-2">
-              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-                <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
-                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-events">{result.eventsSync ?? 0}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
-              </div>
-              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-                <Users size={18} className="mx-auto text-muted-foreground mb-2" />
-                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-employees">{result.employeesSync ?? 0}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
-              </div>
-              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
-                <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
-                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-participants">{result.participantsSync ?? 0}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button onClick={() => setResult(null)} className="w-full" data-testid="button-close-result">
-              Entendi
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <button type="button" data-testid={testId} onClick={sync.start} disabled={sync.pending || !status?.configured}
+      title={!status?.configured ? "A conexão com o sistema externo não está configurada" : undefined} className={className ?? btnPrimary}>
+      <RefreshCw size={15} aria-hidden className={cn(sync.pending && "motion-safe:animate-spin")} />
+      {sync.pending ? "Sincronizando…" : "Sincronizar agora"}
+    </button>
   );
 }
 
-/** "Terminal de Execução": últimos logs da integração devolvidos pelo status. */
-export function IntegrationLogsCard({ logs }: { logs: string[] }) {
+/** Painel: conexão, totais no banco e a última execução. */
+export function ErpSyncCard({ status, isLoading, sync }: Omit<ErpSyncCardProps, "statusQueryKey"> & { sync: ErpSyncState }) {
+  const last = fmtWhen(status?.lastSync);
   return (
-    <Card className="bg-secondary text-foreground border border-border shadow-none font-mono text-xs overflow-hidden">
-      <CardHeader className="border-b border-border pb-3 py-3 px-4 bg-card">
-        <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-          Terminal de Execução
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 max-h-[300px] overflow-y-auto">
-        <div className="space-y-1.5">
-          {logs.map((log, i) => {
-            const isError = log.toLowerCase().includes("erro") || log.toLowerCase().includes("fail");
-            return (
-              <p key={i} className={`flex items-start gap-2 ${isError ? 'text-destructive' : ''}`}>
-                <span className="text-muted-foreground shrink-0">{format(new Date(), "HH:mm:ss", { locale: ptBR })}</span>
-                <span className="break-all">{log}</span>
-              </p>
-            );
-          })}
+    <section aria-label="Sincronização com o sistema externo" data-testid="erp-panel" className={cn(surfaceCls, "overflow-hidden")}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-border">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-foreground">
+            <PlugZap size={16} aria-hidden className="text-muted-foreground" /> Sistema externo (ERP)
+            {isLoading ? <Bone className="h-6 w-24" /> : status?.configured
+              ? <Chip tone="ok" icon={CheckCircle2} data-testid="erp-status">Conectado</Chip>
+              : <Chip tone="danger" icon={XCircle} data-testid="erp-status">Não configurado</Chip>}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Traz os eventos de 2026 já encerrados e a escalação de Cenotécnica / Cenotécnico / Sup Ceno. O que já existe é atualizado, nunca duplicado.
+            {last ? <> Última execução: <span className="font-semibold text-foreground tabular-nums">{last}</span>.</> : " Nenhuma execução desde que o servidor subiu."}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <SyncButton sync={sync} status={status} className={cn(btnSecondary, "self-start sm:hidden")} />
+      </div>
+      <div className="grid grid-cols-3 gap-px bg-border">
+        <StatCell label="Eventos no banco" value={isLoading ? "—" : (status?.eventsImported ?? 0).toLocaleString("pt-BR")} />
+        <StatCell label="Colaboradores" value={isLoading ? "—" : (status?.employeesImported ?? 0).toLocaleString("pt-BR")} />
+        <StatCell label="Participações" value={isLoading ? "—" : (status?.participantsImported ?? 0).toLocaleString("pt-BR")} />
+      </div>
+    </section>
+  );
+}
+
+/** Confirmação → sincronizando → resultado, num diálogo só. */
+export function SyncDialog({ sync }: { sync: ErpSyncState }) {
+  const r = sync.result;
+  const done = !!r;
+  return (
+    <ActionDialog open={sync.open} onOpenChange={o => { if (!o) sync.close(); }} busy={sync.pending}
+      icon={done ? CheckCircle2 : RefreshCw} tone={done ? "brand" : "neutral"}
+      title={done ? "Sincronização concluída" : sync.error ? "A sincronização não foi feita" : "Sincronizar com o sistema externo?"}
+      description={done || sync.error ? undefined : "Grava direto no banco. Leva alguns segundos."}
+      testId={done ? "dialog-sync-result" : "dialog-sync-confirm"}>
+      {!done && !sync.error && (
+        <ConsequenceList items={[
+          <>Importa os <span className="font-semibold text-foreground">eventos de 2026 já encerrados</span> e as participações de Cenotécnica / Cenotécnico / Sup Ceno.</>,
+          <>Registros que já existem são <span className="font-semibold text-foreground">atualizados</span>, nunca duplicados.</>,
+          <>Eventos de <span className="font-semibold text-foreground">ciclo fechado</span> ficam como estão. Com o ciclo atual fechado, nada é gravado.</>,
+          <>No fim, o resultado do ciclo atual é recalculado.</>,
+        ]} />
+      )}
+      {sync.error && (
+        sync.error.closed
+          ? <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-border bg-secondary/60 px-3.5 py-3 text-[13px] leading-snug">
+              <Lock size={15} aria-hidden className="mt-[1px] shrink-0 text-muted-foreground" />
+              <span><span className="block font-semibold text-foreground">Ciclo atual fechado</span><span className="block mt-0.5 text-muted-foreground">{sync.error.message}</span></span>
+            </div>
+          : <ErrorBox message={sync.error.message} title="Falha na sincronização" />
+      )}
+      {done && r && (
+        <>
+          <NumberStrip items={[
+            { label: "Eventos", value: r.eventsSync ?? 0, testId: "text-result-events" },
+            { label: "Colaboradores", value: r.employeesSync ?? 0, testId: "text-result-employees" },
+            { label: "Participações", value: r.participantsSync ?? 0, testId: "text-result-participants" },
+          ]} />
+          <ClosedCycleSkipped items={r.skippedClosedCycle} />
+          <DoneBox>O resultado do ciclo atual já foi recalculado com a escalação nova.</DoneBox>
+        </>
+      )}
+      <div className={dialogFooterCls}>
+        {done || sync.error ? (
+          <button type="button" data-testid="button-close-result" onClick={sync.close} className={btnPrimary}>Fechar</button>
+        ) : (
+          <>
+            <button type="button" onClick={sync.close} disabled={sync.pending} className={btnSecondary}>Cancelar</button>
+            <button type="button" data-testid="button-confirm-sync" onClick={sync.run} disabled={sync.pending} aria-busy={sync.pending || undefined} className={btnPrimary}>
+              <RefreshCw size={15} aria-hidden className={cn(sync.pending && "motion-safe:animate-spin")} />
+              {sync.pending ? "Sincronizando…" : "Sincronizar"}
+            </button>
+          </>
+        )}
+      </div>
+    </ActionDialog>
+  );
+}
+
+/** Registro da última execução (o servidor guarda as linhas da última sincronização). */
+export function IntegrationLogsCard({ logs }: { logs: string[] }) {
+  const [open, setOpen] = useState(false);
+  const errors = logs.filter(l => /erro|fail/i.test(l)).length;
+  return (
+    <section className={cn(surfaceCls, "overflow-hidden")} data-testid="integration-logs">
+      <button type="button" aria-expanded={open} aria-controls="integration-logs-body" onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left transition-colors duration-150 hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        <Terminal size={15} aria-hidden className="text-muted-foreground" />
+        <span className="flex-1 text-[14px] font-semibold text-foreground">Registro da última sincronização</span>
+        <Chip className="h-5 text-[11px]">{logs.length} linhas</Chip>
+        {errors > 0 && <Chip tone="danger" className="h-5 text-[11px]">{errors} com erro</Chip>}
+        <ChevronDown size={16} aria-hidden className={cn("text-muted-foreground transition-transform duration-150", open && "rotate-180")} />
+      </button>
+      {open && (
+        <ol id="integration-logs-body" className="border-t border-border bg-secondary/40 px-4 sm:px-5 py-3 max-h-[300px] overflow-y-auto font-mono text-[12px] leading-relaxed space-y-1">
+          {logs.map((log, i) => (
+            <li key={i} className={cn("break-all", /erro|fail/i.test(log) ? "text-[var(--status-danger-text)]" : "text-foreground/85")}>
+              <span aria-hidden className="text-muted-foreground mr-2 tabular-nums">{String(i + 1).padStart(2, "0")}</span>{log}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }

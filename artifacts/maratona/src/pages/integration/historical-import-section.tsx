@@ -1,137 +1,74 @@
-import { plural } from "@/lib/utils";
+// Resultados históricos (CSV): lê o arquivo, pede a prévia ao servidor
+// (dryRun) e abre o diálogo de prévia; só grava ao confirmar, e o resultado
+// aparece no mesmo diálogo. Mesmas chamadas de antes.
+import { useState } from "react";
 import { useImportHistoricalResults, type HistoricalImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, History } from "lucide-react";
-import { useRef, useState } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
+import { serverMessage } from "../criteria/helpers";
+import { FileButton, ToolRow, btnSmall } from "./integration-ui";
 import { HistoricalPreviewDialog } from "./historical-preview-dialog";
 
-/**
- * Card "Resultados Históricos": lê o CSV, pede a prévia ao servidor (dryRun)
- * e abre o diálogo de pré-visualização; só grava ao confirmar.
- */
 export function HistoricalImportSection() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const historicalFileRef = useRef<HTMLInputElement>(null);
-  const [historicalCsvData, setHistoricalCsvData] = useState<string | null>(null);
-  const [historicalPreview, setHistoricalPreview] = useState<HistoricalImportResult | null>(null);
-  const [historicalDialogOpen, setHistoricalDialogOpen] = useState(false);
+  const [csvData, setCsvData] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>("");
+  const [preview, setPreview] = useState<HistoricalImportResult | null>(null);
+  const [committed, setCommitted] = useState<HistoricalImportResult | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [linkOverrides, setLinkOverrides] = useState<Record<string, number>>({});
 
-  const historicalPreviewMutation = useImportHistoricalResults({
+  const previewMutation = useImportHistoricalResults({
     mutation: {
-      onSuccess: (data) => {
-        setHistoricalPreview(data);
-        setHistoricalDialogOpen(true);
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao ler arquivo", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
+      onSuccess: (data) => { setPreview(data); setCommitted(null); setCommitError(null); setOpen(true); },
+      onError: (e: unknown) => toast({ title: "Não foi possível ler o arquivo", description: serverMessage(e), variant: "destructive" }),
+    },
+  });
+  const commitMutation = useImportHistoricalResults({
+    mutation: {
+      onSuccess: (data) => { setCommitted(data); setCsvData(null); qc.invalidateQueries(); },
+      onError: (e: unknown) => setCommitError(serverMessage(e)),
     },
   });
 
-  const historicalCommitMutation = useImportHistoricalResults({
-    mutation: {
-      onSuccess: (data) => {
-        const employeesCreatedMsg = data.employeesCreated ? `, ${plural(data.employeesCreated, "colaborador novo cadastrado", "colaboradores novos cadastrados")}` : "";
-        toast({
-          title: "Resultados históricos importados",
-          description: `${plural(data.eventsCreated ?? 0, "evento criado", "eventos criados")}, ${plural(data.eventsUpdated ?? 0, "atualizado", "atualizados")}, ${plural(data.participantsLinked ?? 0, "participação vinculada", "participações vinculadas")}${employeesCreatedMsg}.`,
-        });
-        if (data.warnings && data.warnings.length > 0) {
-          toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
-        }
-        setHistoricalDialogOpen(false);
-        setHistoricalPreview(null);
-        setHistoricalCsvData(null);
-        qc.invalidateQueries();
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao importar", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
-  });
-
-  function handleHistoricalFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const csvData = ev.target?.result as string;
-      setHistoricalCsvData(csvData);
+    reader.onload = ev => {
+      const data = ev.target?.result as string;
+      setCsvData(data);
+      setFileName(file.name);
       setLinkOverrides({});
-      historicalPreviewMutation.mutate({ data: { csvData, dryRun: true } });
+      previewMutation.mutate({ data: { csvData: data, dryRun: true } });
     };
     reader.readAsText(file);
-    e.target.value = "";
-  }
-
-  function handleHistoricalConfirm() {
-    if (!historicalCsvData) return;
-    historicalCommitMutation.mutate({ data: { csvData: historicalCsvData, dryRun: false, linkOverrides } });
   }
 
   return (
     <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden">
-        <CardHeader className="bg-secondary border-b border-border pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <History size={18} className="text-[var(--amber)]" /> Resultados Históricos
-          </CardTitle>
-          <CardDescription>
-            Importa provas antigas cuja nota final já veio pronta/calibrada de fora (sem avaliação por critério).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Cria eventos já <strong>fechados</strong> com a nota informada aplicada diretamente ao time.
-            Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
-          </p>
-
-          <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
-            <p className="text-[11px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
-              <span className="bg-card px-2 py-1 rounded border border-border">nota</span>
-              <span className="bg-card px-2 py-1 rounded border border-border">evento</span>
-              <span className="bg-card px-2 py-1 rounded border border-border">data</span>
-            </div>
-          </div>
-
-          <input
-            ref={historicalFileRef}
-            type="file"
-            accept=".csv,.tsv,.txt"
-            className="hidden"
-            onChange={handleHistoricalFileUpload}
-            data-testid="input-historical-csv-file"
-          />
-          <Button
-            data-testid="button-import-historical"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 border-[var(--amber)]/50 hover:border-[var(--amber)] hover:bg-[var(--amber)]/10 transition-colors"
-            onClick={() => historicalFileRef.current?.click()}
-            disabled={historicalPreviewMutation.isPending}
-          >
-            <Upload size={16} className="mr-2 text-[var(--amber)]" />
-            {historicalPreviewMutation.isPending ? "Lendo arquivo..." : "Selecionar arquivo (pré-visualizar)"}
-          </Button>
-        </CardContent>
-      </Card>
+      <ToolRow icon={History} title="Resultados históricos (CSV)" testId="tool-import-historical"
+        columns={["nome", "nota", "evento", "data"]} traits={[{ label: "Mostra prévia antes", tone: "ok" }]}
+        action={<FileButton id="input-historical-csv" accept=".csv,.tsv,.txt" onFile={onFile} inputTestId="input-historical-csv-file" testId="button-import-historical"
+          label="Escolher arquivo" busyLabel="Lendo arquivo…" busy={previewMutation.isPending} className={btnSmall} />}>
+        Provas antigas com a nota final já pronta (sem avaliação por critério): cria eventos <span className="font-semibold text-foreground">fechados</span> com a nota aplicada ao time.
+      </ToolRow>
 
       <HistoricalPreviewDialog
-        open={historicalDialogOpen}
-        onOpenChange={(open) => { setHistoricalDialogOpen(open); if (!open) { setHistoricalPreview(null); setHistoricalCsvData(null); } }}
-        preview={historicalPreview}
+        open={open}
+        onOpenChange={o => { setOpen(o); if (!o) { setPreview(null); setCsvData(null); setCommitted(null); setCommitError(null); } }}
+        fileName={fileName}
+        preview={preview}
+        committed={committed}
+        commitError={commitError}
         linkOverrides={linkOverrides}
         setLinkOverrides={setLinkOverrides}
-        isCommitting={historicalCommitMutation.isPending}
-        onCancel={() => setHistoricalDialogOpen(false)}
-        onConfirm={handleHistoricalConfirm}
+        isCommitting={commitMutation.isPending}
+        onConfirm={() => { if (csvData) { setCommitError(null); commitMutation.mutate({ data: { csvData, dryRun: false, linkOverrides } }); } }}
       />
     </>
   );

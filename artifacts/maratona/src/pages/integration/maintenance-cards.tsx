@@ -1,363 +1,241 @@
-import { plural } from "@/lib/utils";
-import { useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
+// Correções de dados (só admin). Cada uma é uma linha com o que faz e um
+// diálogo único: confirmar (o que acontece) → rodando → resultado, com os
+// eventos de ciclo fechado deixados como estavam. Mesmas chamadas de antes;
+// a limpeza de duplicadas continua com a prévia (dryRun) antes de apagar.
+import { useState, type ReactNode } from "react";
+import {
+  useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations,
+  type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200, type MigrateCriteriaCatalog200,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Eraser, Wrench } from "lucide-react";
-import { useState } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
-import { DIALOG_STYLE } from "./shared";
+import { CheckCircle2, Eraser, Loader2, Repeat, Wrench, type LucideIcon } from "lucide-react";
+import { plural } from "@/lib/utils";
+import { serverMessage } from "../criteria/helpers";
+import {
+  ActionDialog, ClosedCycleSkipped, ConsequenceList, DoneBox, ErrorBox, NumberStrip, ToolRow, btnDanger, btnPrimary, btnSecondary, btnSmall, dialogFooterCls,
+  type Trait,
+} from "./integration-ui";
 
-// Ferramentas de manutenção (só admin): cada card é autocontido, com a sua
-// mutação e o diálogo de resultado/confirmação (renderizado em portal).
+const SAFE: Trait = { label: "Pode repetir sem risco", tone: "ok", icon: Repeat, title: "Rodar de novo não muda o que já está certo" };
 
-/** "Limpar Avaliações Duplicadas": prévia (dryRun) e depois a limpeza confirmada. */
+/** Diálogo confirmar → resultado de uma correção que roda numa chamada só. */
+function RunDialog({ open, onClose, pending, icon, title, doneTitle, description, consequences, done, error, onRun, runLabel, testId, children }: {
+  open: boolean; onClose: () => void; pending: boolean; icon: LucideIcon; title: string; doneTitle: string; description?: ReactNode;
+  consequences: ReactNode[]; done: boolean; error: string | null; onRun: () => void; runLabel: string; testId: string; children?: ReactNode;
+}) {
+  return (
+    <ActionDialog open={open} onOpenChange={o => { if (!o) onClose(); }} busy={pending} icon={done ? CheckCircle2 : icon} tone={done ? "brand" : "neutral"}
+      title={done ? doneTitle : title} description={done ? undefined : description} testId={testId} wide={done ? "lg" : "md"}>
+      {!done && <ConsequenceList items={consequences} />}
+      {done && children}
+      <ErrorBox message={error} />
+      <div className={dialogFooterCls}>
+        {done ? (
+          <button type="button" onClick={onClose} className={btnPrimary}>Fechar</button>
+        ) : (
+          <>
+            <button type="button" onClick={onClose} disabled={pending} className={btnSecondary}>Cancelar</button>
+            <button type="button" data-testid={`${testId}-run`} onClick={onRun} disabled={pending} aria-busy={pending || undefined} className={btnPrimary}>
+              {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+              {pending ? "Executando…" : runLabel}
+            </button>
+          </>
+        )}
+      </div>
+    </ActionDialog>
+  );
+}
+
+/** Limpar avaliações duplicadas: prévia (dryRun) e, confirmando, a limpeza. */
 export function DedupeEvaluationsCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [dedupePreview, setDedupePreview] = useState<DedupeEvaluationsResult | null>(null);
-  const [dedupeDialogOpen, setDedupeDialogOpen] = useState(false);
+  const [preview, setPreview] = useState<DedupeEvaluationsResult | null>(null);
+  const [done, setDone] = useState<DedupeEvaluationsResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const open = !!preview || !!done || !!previewError;
 
-  const dedupePreviewMutation = useDedupeEvaluations({
-    mutation: {
-      onSuccess: (data) => {
-        setDedupePreview(data);
-        setDedupeDialogOpen(true);
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao verificar duplicatas", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
+  const previewMutation = useDedupeEvaluations({
+    mutation: { onSuccess: d => { setPreview(d); setError(null); }, onError: (e: unknown) => setPreviewError(serverMessage(e)) },
   });
-
-  const dedupeCommitMutation = useDedupeEvaluations({
-    mutation: {
-      onSuccess: (data) => {
-        toast({
-          title: "Duplicatas removidas",
-          description: `${plural(data.duplicatesRemoved, "avaliação duplicada apagada", "avaliações duplicadas apagadas")} em ${plural(data.eventsAffected, "evento")}. Resultados recalculados.`,
-        });
-        if (data.warnings && data.warnings.length > 0) {
-          toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
-        }
-        setDedupeDialogOpen(false);
-        setDedupePreview(null);
-        qc.invalidateQueries();
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha ao remover duplicatas", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
+  const commitMutation = useDedupeEvaluations({
+    mutation: { onSuccess: d => { setDone(d); setPreview(null); qc.invalidateQueries(); }, onError: (e: unknown) => setError(serverMessage(e)) },
   });
+  const close = () => { if (!commitMutation.isPending) { setPreview(null); setDone(null); setError(null); setPreviewError(null); } };
+  const none = preview?.duplicatesFound === 0;
 
   return (
     <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden">
-        <CardHeader className="bg-secondary border-b border-border pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Eraser size={18} className="text-foreground" /> Limpar Avaliações Duplicadas
-          </CardTitle>
-          <CardDescription>
-            Remove cópias exatas de avaliações (mesmo evento, quesito, avaliador, nota e comentário), mantendo a primeira gravada. Útil após uma importação repetida.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Avaliações com <strong>conteúdo diferente</strong> nunca são tocadas. Após a limpeza, os resultados dos ciclos afetados são <strong>recalculados automaticamente</strong>.
-            Sempre mostra uma <strong>pré-visualização</strong> antes de apagar qualquer coisa.
-          </p>
-          <Button
-            data-testid="button-dedupe-evaluations"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
-            onClick={() => dedupePreviewMutation.mutate({ data: { dryRun: true } })}
-            disabled={dedupePreviewMutation.isPending}
-          >
-            <Eraser size={16} className="mr-2 text-foreground" />
-            {dedupePreviewMutation.isPending ? "Verificando..." : "Verificar duplicatas (pré-visualizar)"}
-          </Button>
-        </CardContent>
-      </Card>
+      <ToolRow icon={Eraser} title="Limpar avaliações duplicadas" testId="tool-dedupe"
+        traits={[{ label: "Mostra prévia antes", tone: "ok" }, { label: "Recalcula os resultados", tone: "info" }]}
+        action={<button type="button" data-testid="button-dedupe-evaluations" onClick={() => { setPreviewError(null); previewMutation.mutate({ data: { dryRun: true } }); }}
+          disabled={previewMutation.isPending} aria-busy={previewMutation.isPending || undefined} className={btnSmall}>
+          {previewMutation.isPending ? <Loader2 size={14} aria-hidden className="motion-safe:animate-spin" /> : <Eraser size={14} aria-hidden />}
+          {previewMutation.isPending ? "Verificando…" : "Verificar duplicadas"}
+        </button>}>
+        Apaga cópias exatas (mesmo evento, critério, avaliador, nota e comentário) e fica com a primeira gravada. Útil depois de uma importação repetida.
+      </ToolRow>
 
-      <Dialog open={dedupeDialogOpen} onOpenChange={(open) => { setDedupeDialogOpen(open); if (!open) setDedupePreview(null); }}>
-        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-dedupe-confirm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eraser size={20} className="text-foreground" />
-              Avaliações duplicadas encontradas
-            </DialogTitle>
-            <DialogDescription>
-              Nada foi apagado ainda. Confira os números antes de confirmar a limpeza.
-            </DialogDescription>
-          </DialogHeader>
-
-          {dedupePreview && (
-            dedupePreview.duplicatesFound === 0 ? (
-              <div className="py-4 text-center">
-                <CheckCircle2 size={32} className="mx-auto text-accent-text mb-2" />
-                <p className="text-sm font-medium text-foreground" data-testid="text-dedupe-none">Nenhuma avaliação duplicada encontrada. Está tudo limpo!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3 py-2">
-                <div className="bg-secondary rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-found">{dedupePreview.duplicatesFound}</p>
-                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Cópias a apagar</p>
-                </div>
-                <div className="bg-secondary rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-groups">{dedupePreview.groupsAffected}</p>
-                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Notas afetadas</p>
-                </div>
-                <div className="bg-secondary rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-events">{dedupePreview.eventsAffected}</p>
-                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
-                </div>
-              </div>
-            )
+      <ActionDialog open={open} onOpenChange={o => { if (!o) close(); }} busy={commitMutation.isPending} icon={done || none ? CheckCircle2 : Eraser}
+        tone={done || none ? "brand" : "neutral"} testId={done ? "dialog-dedupe-result" : "dialog-dedupe-confirm"}
+        title={done ? "Duplicadas removidas" : previewError ? "Não foi possível verificar" : none ? "Nenhuma duplicada" : "Avaliações duplicadas encontradas"}
+        description={done || previewError ? undefined : none ? "Está tudo limpo. Nada foi apagado." : "Nada foi apagado ainda. Confira os números antes de limpar."}>
+        <ErrorBox message={previewError} />
+        {preview && !none && (
+          <>
+            <NumberStrip items={[
+              { label: "Cópias a apagar", value: preview.duplicatesFound, tone: "warn", testId: "text-dedupe-found" },
+              { label: "Notas afetadas", value: preview.groupsAffected, testId: "text-dedupe-groups" },
+              { label: "Eventos", value: preview.eventsAffected, testId: "text-dedupe-events" },
+            ]} />
+            <ConsequenceList items={[
+              <>Avaliações com <span className="font-semibold text-foreground">conteúdo diferente</span> nunca são tocadas.</>,
+              <>Depois da limpeza, os resultados dos ciclos afetados são <span className="font-semibold text-foreground">recalculados</span> sozinhos.</>,
+              <>Duplicadas em evento de <span className="font-semibold text-foreground">ciclo fechado</span> ficam como estão.</>,
+            ]} />
+            <ClosedCycleSkipped count={preview.skippedClosedCycle} future />
+          </>
+        )}
+        {none && <p className="text-[13.5px] text-muted-foreground" data-testid="text-dedupe-none">Nenhuma avaliação duplicada encontrada.</p>}
+        {done && (
+          <>
+            <NumberStrip items={[{ label: "Cópias apagadas", value: done.duplicatesRemoved, tone: "ok" }, { label: "Eventos", value: done.eventsAffected }]} />
+            <ClosedCycleSkipped count={done.skippedClosedCycle} />
+            {done.warnings.length > 0
+              ? <DoneBox warn>{done.warnings.slice(0, 5).join(" · ")}</DoneBox>
+              : <DoneBox>Resultados recalculados.</DoneBox>}
+          </>
+        )}
+        <ErrorBox message={error} title="Falha ao remover" />
+        <div className={dialogFooterCls}>
+          {done || none || previewError ? (
+            <button type="button" data-testid="button-close-dedupe" onClick={close} className={btnPrimary}>Fechar</button>
+          ) : (
+            <>
+              <button type="button" onClick={close} disabled={commitMutation.isPending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-dedupe" onClick={() => { setError(null); commitMutation.mutate({ data: { dryRun: false } }); }}
+                disabled={commitMutation.isPending} aria-busy={commitMutation.isPending || undefined} className={btnDanger}>
+                {commitMutation.isPending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Eraser size={15} aria-hidden />}
+                {commitMutation.isPending ? "Limpando…" : `Apagar ${plural(preview?.duplicatesFound ?? 0, "cópia", "cópias")}`}
+              </button>
+            </>
           )}
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            {dedupePreview && dedupePreview.duplicatesFound === 0 ? (
-              <Button className="w-full" onClick={() => setDedupeDialogOpen(false)} data-testid="button-close-dedupe">
-                Entendi
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setDedupeDialogOpen(false)}
-                  disabled={dedupeCommitMutation.isPending}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  data-testid="button-confirm-dedupe"
-                  disabled={dedupeCommitMutation.isPending}
-                  onClick={() => dedupeCommitMutation.mutate({ data: { dryRun: false } })}
-                >
-                  <Eraser size={16} className="mr-2" />
-                  {dedupeCommitMutation.isPending ? "Limpando..." : "Confirmar limpeza"}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </ActionDialog>
     </>
   );
 }
 
-/** "Corrigir Calibrações": remapeia calibrações gravadas com IDs de quesitos antigos. */
+/** Corrigir calibrações gravadas com ids de critérios antigos. */
 export function FixCalibrationCriteriaCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [fixCalResult, setFixCalResult] = useState<FixCalibrationCriteria200 | null>(null);
-  const [fixCalDialogOpen, setFixCalDialogOpen] = useState(false);
-  const fixCalMutation = useFixCalibrationCriteria({
-    mutation: {
-      onSuccess: (data) => {
-        setFixCalResult(data);
-        setFixCalDialogOpen(true);
-        qc.invalidateQueries();
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha na correção de calibrações", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<FixCalibrationCriteria200 | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const m = useFixCalibrationCriteria({
+    mutation: { onSuccess: d => { setResult(d); qc.invalidateQueries(); }, onError: (e: unknown) => setError(serverMessage(e)) },
   });
-
+  const close = () => { if (!m.isPending) { setOpen(false); setResult(null); setError(null); } };
+  const n = result?.totalUpdated ?? 0;
   return (
     <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-[var(--amber)]">
-        <CardHeader className="bg-[var(--amber)]/10 border-b border-[var(--amber)]/30 pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-[var(--amber)]" style={{ fontFamily: CONDENSED }}>
-            <Wrench size={18} /> Corrigir Calibrações (Migração de Quesitos)
-          </CardTitle>
-          <CardDescription className="text-[var(--amber)]/80">
-            Recupera calibrações feitas com os quesitos antigos (nomes longos) e remapeia para os equivalentes atuais.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Quando o catálogo de quesitos foi migrado (nomes longos → curtos), as calibrações gravadas ficaram referenciando os IDs antigos e deixaram de aparecer na tela.
-            Este botão corrige os IDs de todas as calibrações afetadas de uma vez. <strong>Operação segura e idempotente</strong> — pode ser executada mais de uma vez sem problema.
-          </p>
-          <Button
-            data-testid="button-fix-calibration-criteria"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 border-[var(--amber)]/50 hover:border-[var(--amber)] hover:bg-[var(--amber)]/10 transition-colors"
-            onClick={() => fixCalMutation.mutate()}
-            disabled={fixCalMutation.isPending}
-          >
-            <Wrench size={16} className="mr-2 text-[var(--amber)]" />
-            {fixCalMutation.isPending ? "Corrigindo..." : "Corrigir calibrações agora"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Dialog open={fixCalDialogOpen} onOpenChange={(open) => { setFixCalDialogOpen(open); if (!open) setFixCalResult(null); }}>
-        <DialogContent className="sm:max-w-lg rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-fix-cal-result">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wrench size={20} className="text-[var(--amber)]" />
-              Calibrações corrigidas
-            </DialogTitle>
-            <DialogDescription>
-              {(fixCalResult?.totalUpdated ?? 0) === 0
-                ? "Nenhuma calibração precisou ser atualizada — já estão com os IDs corretos."
-                : `${plural(fixCalResult?.totalUpdated ?? 0, "calibração atualizada", "calibrações atualizadas")} com sucesso.`}
-            </DialogDescription>
-          </DialogHeader>
-          {fixCalResult && (fixCalResult.results?.length ?? 0) > 0 && (
-            <div className="border border-border rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
-                  <tr>
-                    <th className="text-left p-2">De (quesito antigo)</th>
-                    <th className="text-left p-2">Para (quesito atual)</th>
-                    <th className="text-right p-2">Qtd</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fixCalResult.results?.map((r, i) => (
-                    <tr key={i} className="border-t border-border">
-                      <td className="p-2 text-muted-foreground">{r.from}</td>
-                      <td className="p-2 font-medium text-foreground">{r.to}</td>
-                      <td className="p-2 text-right font-bold">{r.updated}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <DialogFooter>
-            <Button className="bg-primary hover:opacity-90 text-primary-foreground" onClick={() => setFixCalDialogOpen(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ToolRow icon={Wrench} title="Corrigir calibrações de critérios antigos" testId="tool-fix-calibrations" traits={[SAFE]}
+        action={<button type="button" data-testid="button-fix-calibration-criteria" onClick={() => setOpen(true)} className={btnSmall}><Wrench size={14} aria-hidden /> Corrigir…</button>}>
+        Calibrações feitas com os critérios de nome antigo deixam de aparecer; isto as leva para o critério atual equivalente.
+      </ToolRow>
+      <RunDialog open={open} onClose={close} pending={m.isPending} icon={Wrench} testId="dialog-fix-cal" runLabel="Corrigir calibrações"
+        title="Corrigir calibrações?" doneTitle="Calibrações corrigidas" description="Troca o critério antigo pelo atual em todas as calibrações afetadas."
+        consequences={[<>A nota calibrada não muda: só o critério a que ela está ligada.</>, <>Eventos de ciclo fechado ficam como estão.</>, <>Pode rodar de novo sem risco.</>]}
+        done={!!result} error={error} onRun={() => { setError(null); m.mutate(); }}>
+        {result && (
+          <>
+            <DoneBox>{n === 0 ? "Nenhuma calibração precisou mudar — já estavam certas." : `${plural(n, "calibração atualizada", "calibrações atualizadas")}.`}</DoneBox>
+            {(result.results?.length ?? 0) > 0 && (
+              <div className="rounded-xl border border-border overflow-x-auto">
+                <table className="w-full min-w-[420px] border-collapse text-[13px]" aria-label="Calibrações remapeadas">
+                  <thead><tr className="bg-secondary/50">{["De (antigo)", "Para (atual)", "Qtd"].map((h, i) => <th key={h} className={`font-condensed px-3 py-2 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground ${i === 2 ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>
+                  <tbody>{result.results?.map((r, i) => (
+                    <tr key={i} className="border-t border-border"><td className="px-3 py-2 text-muted-foreground">{r.from}</td><td className="px-3 py-2 font-semibold text-foreground">{r.to}</td><td className="px-3 py-2 text-right tabular-nums">{r.updated}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+            <ClosedCycleSkipped items={result.skippedClosedCycle} />
+          </>
+        )}
+      </RunDialog>
     </>
   );
 }
 
-/** "Migrar Catálogo de Quesitos": aplica a migração do catálogo em todos os eventos. */
+/** Migrar o catálogo de critérios em todos os eventos. */
 export function MigrateCriteriaCatalogCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const migrateCriteriaMutation = useMigrateCriteriaCatalog({
-    mutation: {
-      onSuccess: (data) => {
-        toast({
-          title: "Migração concluída",
-          description: `${plural(data.catalogActivated, "quesito ativado", "quesitos ativados")}, ${plural(data.catalogDeactivated, "desativado", "desativados")}, ${plural(data.catalogCreated, "criado", "criados")}. ${plural(data.eventCriteriaFixed, "evento atualizado", "eventos atualizados")}. ${plural((data as { evaluationsRemapped?: number }).evaluationsRemapped ?? 0, "avaliação remapeada", "avaliações remapeadas")} para o catálogo novo.`,
-        });
-        qc.invalidateQueries();
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha na migração", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<MigrateCriteriaCatalog200 | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const m = useMigrateCriteriaCatalog({
+    mutation: { onSuccess: d => { setResult(d); qc.invalidateQueries(); }, onError: (e: unknown) => setError(serverMessage(e)) },
   });
-
+  const close = () => { if (!m.isPending) { setOpen(false); setResult(null); setError(null); } };
   return (
-    <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-border">
-      <CardHeader className="bg-secondary border-b border-border pb-4">
-        <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-foreground" style={{ fontFamily: CONDENSED }}>
-          <Wrench size={18} /> Migrar Catálogo de Quesitos
-        </CardTitle>
-        <CardDescription className="text-muted-foreground">
-          Relaciona os 5 quesitos ativos da Matriz de Performance com todos os eventos e remapeia avaliações que ainda referenciam quesitos antigos — incluindo históricos e confirmados.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-6">
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          Aplica a migração do catálogo de critérios sem precisar importar uma planilha.
-          Desfaz a vinculação com quesitos antigos e ativa os novos em <strong>todos os eventos</strong>.
-          <strong> Operação idempotente</strong> — segura de executar mais de uma vez.
-        </p>
-        <Button
-          data-testid="button-migrate-criteria-catalog"
-          variant="outline"
-          className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
-          onClick={() => migrateCriteriaMutation.mutate()}
-          disabled={migrateCriteriaMutation.isPending}
-        >
-          <Wrench size={16} className="mr-2 text-foreground" />
-          {migrateCriteriaMutation.isPending ? "Migrando..." : "Executar migração de quesitos"}
-        </Button>
-      </CardContent>
-    </Card>
+    <>
+      <ToolRow icon={Wrench} title="Migrar o catálogo de critérios" testId="tool-migrate-catalog" traits={[SAFE, { label: "Mexe em todos os eventos", tone: "warn" }]}
+        action={<button type="button" data-testid="button-migrate-criteria-catalog" onClick={() => setOpen(true)} className={btnSmall}><Wrench size={14} aria-hidden /> Migrar…</button>}>
+        Liga os critérios ativos do catálogo a todos os eventos e leva para eles as avaliações que ainda apontam para critérios antigos — inclusive históricos e confirmados.
+      </ToolRow>
+      <RunDialog open={open} onClose={close} pending={m.isPending} icon={Wrench} testId="dialog-migrate-catalog" runLabel="Migrar catálogo"
+        title="Migrar o catálogo de critérios?" doneTitle="Migração concluída" description="Aplica a migração sem precisar importar planilha."
+        consequences={[
+          <>Desliga os critérios antigos e liga os novos em <span className="font-semibold text-foreground">todos os eventos</span>.</>,
+          <>Avaliações ligadas a critérios antigos passam para o critério novo equivalente.</>,
+          <>Eventos de ciclo fechado ficam como estão. Pode rodar de novo sem risco.</>,
+        ]}
+        done={!!result} error={error} onRun={() => { setError(null); m.mutate(); }}>
+        {result && (
+          <>
+            <NumberStrip items={[
+              { label: "Critérios ativados", value: result.catalogActivated, tone: "ok" },
+              { label: "Desativados", value: result.catalogDeactivated },
+              { label: "Criados", value: result.catalogCreated },
+              { label: "Eventos atualizados", value: result.eventCriteriaFixed },
+              { label: "Avaliações remapeadas", value: result.evaluationsRemapped ?? 0 },
+            ]} />
+            <ClosedCycleSkipped items={result.skippedClosedCycle} />
+          </>
+        )}
+      </RunDialog>
+    </>
   );
 }
 
-/** "Corrigir Avaliações Órfãs": reativa quesitos desativados que ainda têm avaliações. */
+/** Reativar critérios desativados que ainda têm avaliações (notas que sumiram do evento). */
 export function FixOrphanedEvaluationsCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [fixOrphanedResult, setFixOrphanedResult] = useState<FixOrphanedEvaluations200 | null>(null);
-  const [fixOrphanedDialogOpen, setFixOrphanedDialogOpen] = useState(false);
-  const fixOrphanedMutation = useFixOrphanedEvaluations({
-    mutation: {
-      onSuccess: (data) => {
-        setFixOrphanedResult(data);
-        setFixOrphanedDialogOpen(true);
-        qc.invalidateQueries();
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Falha na correção", description: e.message ?? "Tente novamente.", variant: "destructive" });
-      },
-    },
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<FixOrphanedEvaluations200 | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const m = useFixOrphanedEvaluations({
+    mutation: { onSuccess: d => { setResult(d); qc.invalidateQueries(); }, onError: (e: unknown) => setError(serverMessage(e)) },
   });
-
+  const close = () => { if (!m.isPending) { setOpen(false); setResult(null); setError(null); } };
   return (
     <>
-      <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-border">
-        <CardHeader className="bg-secondary border-b border-border pb-4">
-          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-foreground" style={{ fontFamily: CONDENSED }}>
-            <Wrench size={18} /> Corrigir Avaliações Órfãs
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Reativa quesitos desativados que ainda têm avaliações submetidas — evitando que notas desapareçam do evento.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            Quando o catálogo de quesitos é migrado <strong>depois</strong> que avaliadores já submeteram respostas, as avaliações ficam vinculadas a quesitos inativos e somem da visualização do evento.
-            Este botão detecta e reativa automaticamente esses vínculos. <strong>Operação segura e idempotente.</strong>
-          </p>
-          <Button
-            data-testid="button-fix-orphaned-evaluations"
-            variant="outline"
-            className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
-            onClick={() => fixOrphanedMutation.mutate()}
-            disabled={fixOrphanedMutation.isPending}
-          >
-            <Wrench size={16} className="mr-2 text-foreground" />
-            {fixOrphanedMutation.isPending ? "Corrigindo..." : "Reativar quesitos com avaliações"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Dialog open={fixOrphanedDialogOpen} onOpenChange={(open) => { setFixOrphanedDialogOpen(open); if (!open) setFixOrphanedResult(null); }}>
-        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-fix-orphaned-result">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wrench size={20} className="text-foreground" />
-              Avaliações órfãs corrigidas
-            </DialogTitle>
-            <DialogDescription>
-              {(fixOrphanedResult?.fixed ?? 0) === 0
-                ? "Nenhum quesito órfão encontrado — tudo já está correto."
-                : `${plural(fixOrphanedResult?.fixed ?? 0, "quesito reativado", "quesitos reativados")} em ${plural(fixOrphanedResult?.eventsAffected ?? 0, "evento")}.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFixOrphanedDialogOpen(false)}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ToolRow icon={Wrench} title="Corrigir avaliações órfãs" testId="tool-fix-orphaned" traits={[SAFE]}
+        action={<button type="button" data-testid="button-fix-orphaned-evaluations" onClick={() => setOpen(true)} className={btnSmall}><Wrench size={14} aria-hidden /> Corrigir…</button>}>
+        Quando o catálogo muda depois de avaliações enviadas, elas ficam presas a critérios inativos e somem do evento. Isto reativa esses critérios no evento.
+      </ToolRow>
+      <RunDialog open={open} onClose={close} pending={m.isPending} icon={Wrench} testId="dialog-fix-orphaned-result" runLabel="Reativar critérios"
+        title="Corrigir avaliações órfãs?" doneTitle="Avaliações órfãs corrigidas" description="Acha critérios inativos com avaliação enviada e os reativa no evento."
+        consequences={[<>As notas voltam a aparecer no evento.</>, <>Eventos de ciclo fechado ficam como estão.</>, <>Pode rodar de novo sem risco.</>]}
+        done={!!result} error={error} onRun={() => { setError(null); m.mutate(); }}>
+        {result && (
+          <>
+            <DoneBox>{result.fixed === 0 ? "Nenhum critério órfão — tudo já estava certo." : `${plural(result.fixed, "critério reativado", "critérios reativados")} em ${plural(result.eventsAffected, "evento", "eventos")}.`}</DoneBox>
+            <ClosedCycleSkipped count={result.skippedClosedCycle} />
+          </>
+        )}
+      </RunDialog>
     </>
   );
 }

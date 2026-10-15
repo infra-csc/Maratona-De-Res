@@ -14,4 +14,4 @@ export interface EditUserFormValues {
 }
 
 /** Opção simples (área ou colaborador) dos seletores. */
-export type NamedOption = { id: number; name: string };
+export type NamedOption = { id: number; name: string; active?: boolean };
