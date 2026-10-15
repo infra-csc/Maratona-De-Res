@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { ScoreTimelineEntry } from "@workspace/api-client-react";
 import { CONDENSED } from "@/lib/premium-theme";
 import { score, sentenceOf, shortDate } from "./describe";
+import { VizTooltipBox } from "./tl-ui";
 
 const SERIES = "var(--viz-series-1)";
 const GRID = "var(--viz-grid)";
@@ -85,12 +86,7 @@ export function TimelineChart({ entries, currentFinal, platoons, name, height }:
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const r = payload[0].payload as (typeof rows)[number];
-                return (
-                  <div className="rounded-lg px-3 py-2 text-[12px] shadow-md" style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)" }}>
-                    <div className="font-bold">{shortDate(r.at)} · {r.label}</div>
-                    <div className="mt-0.5 flex justify-between gap-6"><span style={{ color: "var(--muted-foreground)" }}>Nota final</span><strong className="tabular-nums">{r.value == null ? "fora do ciclo" : score(r.value)}</strong></div>
-                  </div>
-                );
+                return <VizTooltipBox title={`${shortDate(r.at)} · ${r.label}`} lines={[{ label: "Nota final", value: r.value == null ? "fora do ciclo" : score(r.value) }]} />;
               }}
             />
             <Line type="stepAfter" dataKey="recon" stroke={SERIES} strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 5, fill: SERIES, stroke: "var(--card)", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} />
@@ -99,7 +95,7 @@ export function TimelineChart({ entries, currentFinal, platoons, name, height }:
         </ResponsiveContainer>
       </div>
       {hasRecon && (
-        <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12px]" style={{ color: "var(--muted-foreground)" }}>
+        <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-muted-foreground">
           {legend.map(l => (
             <span key={l.key} className="inline-flex items-center gap-2">
               <svg width="22" height="6" aria-hidden><line x1="0" y1="3" x2="22" y2="3" stroke={SERIES} strokeWidth="2" strokeDasharray={l.dash ? "5 4" : undefined} /></svg>
