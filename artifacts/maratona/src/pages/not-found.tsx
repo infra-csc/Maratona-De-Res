@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 function NotFoundPanel({ loggedIn }: { loggedIn: boolean }) {
   const [location] = useLocation();
-  useEffect(() => { document.title = "Página não encontrada · Maratona de Resultados"; }, []);
+  useEffect(() => { document.title = "Página não encontrada · Maratona"; }, []);
   return (
     <StatePanel
       icon={Compass}
