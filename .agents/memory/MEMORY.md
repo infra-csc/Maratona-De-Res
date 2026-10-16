@@ -82,3 +82,4 @@
 - [Auth limitation for appPreview screenshots](auth-screenshot-limitation.md) — Maratona's JWT-in-localStorage auth blocks Screenshot tool on protected routes; verify via tsc + curl API contracts instead
 - [Platoon tier decimal boundaries](platoon-tier-decimal-boundaries.md) — tiers must be closed-both-ends with a real 0.01 gap (74.99/75), not touching integers + invisible inclusive flags; rename needs a recompute to refresh snapshot labels
 - [Git rebase after conflict resolution](git-rebase-after-merge.md) — a platform-triggered rebase may replay local commits after a merge; recheck final branch and validations after it finishes.
+- [Route-test concurrency](route-test-concurrency.md) — many concurrent PGlite route suites can exhaust the validation budget; prefer bounded concurrency and distinguish timeouts from assertion failures.
