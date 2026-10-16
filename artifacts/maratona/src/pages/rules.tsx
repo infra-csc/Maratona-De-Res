@@ -1,643 +1,113 @@
+// Tela "Regras do Sistema": as regras GERAIS (valem quando o ciclo não
+// define a sua) e as faixas de bônus. O topo mostra o que o ciclo atual usa
+// de fato — as regras próprias do ciclo se mudam em Ciclos. Peças em
+// ./rules/ (regras, faixas, diálogos e o hook das faixas).
 import { useState } from "react";
 import {
-  useGetRules, useUpdateRule,
-  useGetPlatoonRules, useUpdatePlatoonRule, useCreatePlatoonRule, useDeletePlatoonRule,
+  useGetRules, useUpdateRule, useGetPlatoonRules, useGetCurrentCycle,
   getGetRulesQueryKey, getGetPlatoonRulesQueryKey,
-  replaceAllPlatoonRules, ApiError,
 } from "@workspace/api-client-react";
+import type { Rule } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleDollarSign, Plus, Settings, ShieldCheck, Trash2, HelpCircle, RefreshCw } from "lucide-react";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { usePremiumTheme, CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 import { useAuth, hasRole } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
+import { Bone, Chip, ErrorBlock, serverMessage, surfaceCls } from "./rules/rules-ui";
+import { RULE_META, type GroupKey } from "./rules/rule-meta";
+import { CycleRulesPanel, RulesGroup, type RuleEditing } from "./rules/general-rules";
+import { BandsSection } from "./rules/bands-section";
+import { useBands } from "./rules/use-bands";
+import { DeleteBandDialog, ReplaceBandsDialog } from "./rules/rules-dialogs";
 
-/** Campo numérico em edição: NaN (campo apagado) vira "" para o input não exibir "NaN". */
-const numOrEmpty = (v: number | string | undefined | null): number | string => (typeof v === "number" && Number.isNaN(v) ? "" : (v ?? ""));
-
-// Faixas fechadas nas duas pontas, com folga decimal de 0,01 entre elas
-// (ex: 74,99 / 75,00) — evita a ambiguidade de duas faixas “tocando” no
-// mesmo número inteiro (uma nota de 80 pontos precisa cair em UMA faixa
-// só, nunca nas duas ao mesmo tempo nem em nenhuma).
-const NEW_TIERS_2026 = [
-  { name: "Sem Bônus",              minScore: 0,  maxScore: 69.99, minInclusive: true, maxInclusive: true, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
-  { name: "Branco Caminhada",       minScore: 70, maxScore: 74.99, minInclusive: true, maxInclusive: true, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#e2e8f0" },
-  { name: "Branco Corrida",         minScore: 75, maxScore: 79.99, minInclusive: true, maxInclusive: true, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#cbd5e1" },
-  { name: "Verde",                  minScore: 80, maxScore: 84.99, minInclusive: true, maxInclusive: true, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#22c55e" },
-  { name: "Azul",                   minScore: 85, maxScore: 89.99, minInclusive: true, maxInclusive: true, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#3b82f6" },
-  { name: "Quênia",                 minScore: 90, maxScore: 94.99, minInclusive: true, maxInclusive: true, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#ca8a04" },
-  { name: "Quênia Alto Rendimento", minScore: 95, maxScore: 100,   minInclusive: true, maxInclusive: true, bonusValue: 3700, bonusPerExtraEvent: 450, color: "#facc15" },
-];
-
-const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-
-const PAYMENT_OPTIONS = [
-  { value: "caju", label: "Caju" },
-  { value: "pix", label: "PIX" },
-  { value: "transferencia", label: "Transferência Bancária" },
-  { value: "outro", label: "Outro" },
-];
-
-const RULE_META: Record<string, { group: string; label: string; help: string; inputType: "text" | "number" | "select" }> = {
-  max_score: {
-    group: "avaliacao",
-    label: "Pontuação Máxima por Critério",
-    help: "Pontuação máxima por critério em cada avaliação (escala 0–10 por padrão). Atenção: alterar esse valor não recalcula avaliações já lançadas. Recomenda-se mudar somente antes do primeiro evento do ciclo.",
-    inputType: "number",
-  },
-  min_evaluations_to_close: {
-    group: "avaliacao",
-    label: "Mínimo de Avaliações para Fechar Evento",
-    help: "Número mínimo de avaliadores que precisam submeter a avaliação de um evento para que ele possa ser fechado e enviado para calibragem. Por exemplo, se configurado como 1, basta um avaliador submeter para o evento estar fechável.",
-    inputType: "number",
-  },
-  absence_penalty_per_absence: {
-    group: "elegibilidade",
-    label: "Penalidade por Ausência Não Comunicada",
-    help: "Desconto (em pontos, escala 0–100) aplicado à nota final do colaborador por cada lançamento de 'Ausência Não Comunicada' registrado na tela de Penalidades e Méritos. O sistema NÃO lança faltas automaticamente — o RH ou Admin registra cada ocorrência manualmente.",
-    inputType: "number",
-  },
-  min_events_eligibility: {
-    group: "elegibilidade",
-    label: "Mínimo de Eventos para Elegibilidade ao Bônus",
-    help: "Número mínimo de eventos que o colaborador deve ter participado no ciclo para ser elegível ao bônus. Este número reflete em todas as telas: Dashboard do Colaborador, Bônus & Pagamentos e Simulador de Bônus.",
-    inputType: "number",
-  },
-  cycle_bonus_paid_by: {
-    group: "pagamento",
-    label: "Forma de Pagamento do Bônus do Ciclo",
-    help: "Como o bônus do ciclo será pago aos colaboradores. Aparece nas exportações e relatórios para consistência. Escolha uma das opções padronizadas.",
-    inputType: "select",
-  },
-};
-
-const GROUP_META = {
-  avaliacao: {
-    icon: Settings,
-    title: "Regras de Avaliação",
-    subtitle: "Parâmetros que controlam o cálculo das notas e o processo de avaliação de eventos",
-    color: "bg-[#191c1e]",
-  },
-  elegibilidade: {
-    icon: ShieldCheck,
-    title: "Elegibilidade & Penalidade",
-    subtitle: "Critérios de elegibilidade ao bônus e desconto por penalidades",
-    color: "bg-[#191c1e]",
-  },
-  pagamento: {
-    icon: CircleDollarSign,
-    title: "Pagamento & Bônus",
-    subtitle: "Forma de pagamento e simulador de faixas de bônus",
-    color: "bg-[#191c1e]",
-  },
-};
-
-export default function RulesPage() {
-  const { toast } = useToast();
-  const { user } = useAuth();
-  usePremiumTheme();
-  const qc = useQueryClient();
-  // Espelha o backend: DELETE /platoon-rules/:id é admin|rh (diretoria edita, mas não remove faixas).
-  const canDeleteBand = hasRole(user, "admin") || hasRole(user, "rh");
-
-  const rulesQKey = getGetRulesQueryKey();
-  const platoonQKey = getGetPlatoonRulesQueryKey();
-
-  const { data: rules } = useGetRules({ query: { queryKey: rulesQKey } });
-  const { data: platoonRules } = useGetPlatoonRules({ query: { queryKey: platoonQKey } });
-
-  const [ruleValues, setRuleValues] = useState<Record<string, string>>({});
-  const [platoonValues, setPlatoonValues] = useState<Record<number, Partial<{ name: string; minScore: number; maxScore: number; bonusValue: number; bonusPerExtraEvent: number }>>>({});
-  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
-  const [replacing, setReplacing] = useState(false);
-
-  const updateRuleMutation = useUpdateRule({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: rulesQKey }); toast({ title: "Regra atualizada com sucesso" }); },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const updatePlatoonMutation = useUpdatePlatoonRule({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: platoonQKey }); toast({ title: "Faixa atualizada com sucesso" }); },
-      onError: (e: { message?: string }) => toast({ title: "Não foi possível salvar a faixa", description: e.message ?? "Tente novamente.", variant: "destructive" }),
-    },
-  });
-
-  const [newBand, setNewBand] = useState({ name: "", minScore: "", maxScore: "", bonusValue: "", bonusPerExtraEvent: "" });
-
-  const createPlatoonMutation = useCreatePlatoonRule({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: platoonQKey });
-        toast({ title: "Faixa adicionada com sucesso" });
-        setNewBand({ name: "", minScore: "", maxScore: "", bonusValue: "", bonusPerExtraEvent: "" });
-      },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar faixa", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const deletePlatoonMutation = useDeletePlatoonRule({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: platoonQKey }); setDeleteTargetId(null); toast({ title: "Faixa removida" }); },
-      onError: (e: { message?: string }) => toast({ title: "Não foi possível remover a faixa", description: e.message ?? "Tente novamente.", variant: "destructive" }),
-    },
-  });
-
-  async function handleReplaceAll() {
-    setReplacing(true);
-    try {
-      await replaceAllPlatoonRules({ rules: NEW_TIERS_2026 });
-      qc.invalidateQueries({ queryKey: platoonQKey });
-      setPlatoonValues({});
-      setShowReplaceDialog(false);
-      toast({ title: "Faixas substituídas com sucesso", description: `${NEW_TIERS_2026.length} faixas aplicadas.` });
-    } catch (e: unknown) {
-      // Mensagem do servidor ({ error }) sem o prefixo "HTTP 400 ..." do ApiError.
-      const fallback = "Não foi possível substituir as faixas. Tente novamente.";
-      const serverError = e instanceof ApiError ? (e.data as { error?: unknown } | null)?.error : undefined;
-      const description = e instanceof ApiError
-        ? (typeof serverError === "string" && serverError.trim() ? serverError : fallback)
-        : (e as Error).message;
-      toast({ title: "Erro ao substituir faixas", description, variant: "destructive" });
-    } finally {
-      setReplacing(false);
-    }
-  }
-
-  function findOverlappingBand(min: number, max: number, excludeId?: number) {
-    return (platoonRules ?? []).find(p => p.id !== excludeId && min <= Number(p.maxScore) && max >= Number(p.minScore));
-  }
-
-  function handleCreateBand() {
-    if (newBand.minScore.trim() === "" || newBand.maxScore.trim() === "") {
-      toast({ title: "Preencha nota mínima e máxima", variant: "destructive" });
-      return;
-    }
-    const min = parseFloat(newBand.minScore);
-    const max = parseFloat(newBand.maxScore);
-    const bonus = newBand.bonusValue.trim() === "" ? 0 : parseFloat(newBand.bonusValue);
-    const extra = newBand.bonusPerExtraEvent.trim() === "" ? 0 : parseFloat(newBand.bonusPerExtraEvent);
-    if (![min, max, bonus, extra].every(Number.isFinite)) {
-      toast({ title: "Valores inválidos", description: "Nota mínima, nota máxima e valores em R$ precisam ser números.", variant: "destructive" });
-      return;
-    }
-    if (min > max) {
-      toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" });
-      return;
-    }
-    const conflict = findOverlappingBand(min, max);
-    if (conflict) {
-      toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" });
-      return;
-    }
-    const bandName = newBand.name.trim() || `${min}–${max}`;
-    createPlatoonMutation.mutate({
-      data: {
-        name: bandName,
-        color: "#94a3b8",
-        minScore: min,
-        maxScore: max,
-        bonusValue: bonus,
-        bonusPerExtraEvent: extra,
-      },
-    });
-  }
-
-  function getRuleValue(key: string, defaultVal: string) {
-    return ruleValues[key] ?? defaultVal;
-  }
-
-  const rulesByGroup = {
-    avaliacao: (rules ?? []).filter(r => RULE_META[r.key]?.group === "avaliacao"),
-    elegibilidade: (rules ?? []).filter(r => RULE_META[r.key]?.group === "elegibilidade"),
-    pagamento: (rules ?? []).filter(r => RULE_META[r.key]?.group === "pagamento"),
-    unknown: (rules ?? []).filter(r => !RULE_META[r.key]),
-  };
-
+function RulesSkeleton() {
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-      <div className="p-6 md:p-10 space-y-8">
-
-        {/* ── Header ── */}
-        <section className="flex items-start gap-4">
-          <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: "var(--accent)", minHeight: "3.5rem" }} />
-          <div>
-            <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
-              Regras do <span style={{ color: "var(--accent-text)" }}>Sistema</span>
-            </h1>
-            <p className="text-sm mt-1.5 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
-              Defina os parâmetros de cálculo e as bonificações financeiras por faixa de nota. A agressividade das regras dita o ritmo da corrida.
-            </p>
+    <div role="status" aria-label="Carregando regras" className="space-y-6">
+      <div className={cn(surfaceCls, "h-[150px]")}><div className="p-5 space-y-3"><Bone className="h-4 w-64 max-w-full" /><Bone className="h-3 w-96 max-w-full" /></div></div>
+      {[0, 1].map(s => (
+        <div key={s} className="space-y-2.5">
+          <Bone className="h-3 w-40" />
+          <div className={cn(surfaceCls, "divide-y divide-border")}>
+            {[0, 1].map(i => <div key={i} className="px-5 py-4 flex items-start gap-6"><div className="flex-1 space-y-2"><Bone className="h-4 w-56 max-w-full" /><Bone className="h-3 w-[420px] max-w-full" /></div><Bone className="h-10 w-40" /></div>)}
           </div>
-        </section>
-
-        <RuleSection groupKey="avaliacao" rules={rulesByGroup.avaliacao} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
-        <RuleSection groupKey="elegibilidade" rules={rulesByGroup.elegibilidade} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
-
-        {/* ── Pagamento & Bônus ── */}
-        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-          <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
-            <CircleDollarSign size={18} style={{ color: "#d4ff00" }} />
-            <div>
-              <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>Pagamento & Bônus</h3>
-              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(212,255,0,0.55)" }}>Forma de pagamento e simulador de faixas de bônus financeiro</p>
-            </div>
-          </div>
-
-          {rulesByGroup.pagamento.map(rule => {
-            const meta = RULE_META[rule.key];
-            const currentVal = getRuleValue(rule.key, rule.value);
-            const isDirty = ruleValues[rule.key] !== undefined && ruleValues[rule.key] !== rule.value;
-            return (
-              <div key={rule.key} className="p-5" style={{ borderBottom: "1px solid var(--border)" }}>
-                <div className="flex items-start gap-2 mb-3">
-                  <p className="text-sm font-black uppercase tracking-tight flex-1" style={{ color: "var(--foreground)" }}>{meta?.label ?? rule.description}</p>
-                  <HelpTooltip text={meta?.help ?? ""} />
-                </div>
-                <div className="flex gap-2 max-w-xs">
-                  <Select
-                    value={PAYMENT_OPTIONS.some(o => o.value === currentVal) ? currentVal : "outro"}
-                    onValueChange={v => setRuleValues(prev => ({ ...prev, [rule.key]: v }))}
-                  >
-                    <SelectTrigger className="h-10 rounded-lg text-xs font-bold uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <button
-                    data-testid={`button-save-rule-${rule.key}`}
-                    className="h-10 px-4 shrink-0 flex items-center rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
-                    style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--secondary)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
-                    disabled={updateRuleMutation.isPending || !isDirty}
-                    onClick={() => updateRuleMutation.mutate({ key: rule.key, data: { value: currentVal } })}
-                  >
-                    <Save size={14} className="mr-1.5" /> Salvar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="px-5 py-3 flex items-center justify-between gap-4" style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-            <p className="text-sm italic" style={{ color: "var(--muted-foreground)" }}>
-              <span className="font-black" style={{ color: "var(--foreground)" }}>Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowReplaceDialog(true)}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs uppercase transition-opacity hover:opacity-80"
-              style={{ backgroundColor: "rgba(212,255,0,0.12)", color: "#d4ff00", border: "1px solid rgba(212,255,0,0.25)" }}
-            >
-              <RefreshCw size={12} /> Substituir Faixas 2026
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome / Nota</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Bônus/Evento Extra (R$)</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Exemplo (Base+3)</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(platoonRules ?? []).map(p => {
-                  const isDirty = platoonValues[p.id] !== undefined;
-                  const currentBonus = platoonValues[p.id]?.bonusValue ?? Number(p.bonusValue);
-                  const currentExtra = platoonValues[p.id]?.bonusPerExtraEvent ?? Number(p.bonusPerExtraEvent ?? 0);
-                  const currentName = platoonValues[p.id]?.name ?? p.name ?? "";
-                  const total3 = currentBonus + 3 * currentExtra;
-                  return (
-                    <tr
-                      key={p.id}
-                      data-testid={`row-platoon-${p.id}`}
-                      className="transition-colors"
-                      style={{ borderTop: "1px solid var(--border)" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--secondary)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent"; }}
-                    >
-                      <td className="px-5 py-3.5">
-                        <div className="flex flex-col gap-1.5">
-                          <Input placeholder="Nome (opcional)" className="w-36 h-8 rounded-lg text-xs font-bold" value={currentName} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], name: e.target.value } }))} />
-                          <div className="flex items-center gap-1">
-                            <Input data-testid={`input-platoon-min-${p.id}`} aria-label="Nota mínima da faixa" type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={numOrEmpty(platoonValues[p.id]?.minScore ?? p.minScore)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
-                            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
-                            <Input data-testid={`input-platoon-max-${p.id}`} aria-label="Nota máxima da faixa" type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={numOrEmpty(platoonValues[p.id]?.maxScore ?? p.maxScore)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <div className="relative max-w-[120px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent-text)" }}>R$</span>
-                          <Input data-testid={`input-platoon-bonus-${p.id}`} aria-label="Prêmio base da faixa em reais" type="number" min="0" step="100" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentBonus)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <div className="relative max-w-[120px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent-text)" }}>R$</span>
-                          <Input data-testid={`input-platoon-extra-${p.id}`} aria-label="Bônus por evento extra em reais" type="number" min="0" step="50" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentExtra)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className="text-sm font-black" style={{ color: "var(--foreground)" }}>{Number.isFinite(total3) ? fmtBRL(total3) : "—"}</span>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            data-testid={`button-save-platoon-${p.id}`}
-                            className="inline-flex items-center px-3 py-1.5 rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
-                            style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--secondary)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
-                            disabled={!isDirty || updatePlatoonMutation.isPending}
-                            onClick={() => {
-                              const edits = platoonValues[p.id];
-                              if (!edits) return;
-                              // Campo apagado vira NaN no estado — rejeita antes de mandar para a API.
-                              const hasInvalidNumber = (["minScore", "maxScore", "bonusValue", "bonusPerExtraEvent"] as const)
-                                .some(k => edits[k] !== undefined && !Number.isFinite(edits[k]));
-                              if (hasInvalidNumber) {
-                                toast({ title: "Preencha os valores da faixa", description: "Nota mínima, nota máxima e valores em R$ precisam ser números.", variant: "destructive" });
-                                return;
-                              }
-                              const min = edits.minScore ?? Number(p.minScore);
-                              const max = edits.maxScore ?? Number(p.maxScore);
-                              if (min > max) { toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" }); return; }
-                              const conflict = findOverlappingBand(min, max, p.id);
-                              if (conflict) { toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" }); return; }
-                              updatePlatoonMutation.mutate({ id: p.id, data: edits });
-                            }}
-                          >
-                            <Save size={13} className="mr-1" /> Salvar
-                          </button>
-                          {canDeleteBand && (
-                            <button
-                              type="button"
-                              data-testid={`button-delete-platoon-${p.id}`}
-                              className="p-1.5 rounded transition-colors"
-                              style={{ color: "var(--muted-foreground)" }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = WARNING; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
-                              onClick={() => setDeleteTargetId(p.id)}
-                              title="Remover faixa"
-                              aria-label={`Remover faixa ${currentName || `${p.minScore}–${p.maxScore}`}`}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Adicionar nova faixa */}
-          <div className="p-5" style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-            <h4 className="text-sm font-black uppercase tracking-tight mb-4 flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
-              <Plus size={15} /> Adicionar Faixa
-            </h4>
-            <div className="flex flex-wrap items-end gap-3">
-              {[
-                { label: "Nome (opcional)", testId: "", w: "w-32", placeholder: "Ex: Elite", type: "text", val: newBand.name, onChange: (v: string) => setNewBand(b => ({ ...b, name: v })) },
-              ].map(f => (
-                <div key={f.label} className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                  <Input type={f.type} aria-label={f.label} value={f.val} onChange={e => f.onChange(e.target.value)} className={`h-10 ${f.w} rounded-lg font-bold`} placeholder={f.placeholder} />
-                </div>
-              ))}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Mínima</label>
-                <Input data-testid="input-new-platoon-min" type="number" min="0" max="100" step="0.01" value={newBand.minScore} onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="0" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Máxima</label>
-                <Input data-testid="input-new-platoon-max" type="number" min="0" max="100" step="0.01" value={newBand.maxScore} onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="100" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</label>
-                <Input data-testid="input-new-platoon-bonus" type="number" min="0" step="100" value={newBand.bonusValue} onChange={e => setNewBand(v => ({ ...v, bonusValue: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Bônus Extra (R$/ev.)</label>
-                <Input data-testid="input-new-platoon-extra" type="number" min="0" step="50" value={newBand.bonusPerExtraEvent} onChange={e => setNewBand(v => ({ ...v, bonusPerExtraEvent: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
-              </div>
-              <button
-                data-testid="button-add-platoon"
-                className="h-10 px-5 flex items-center rounded-lg font-bold text-sm uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
-                style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)" }}
-                disabled={createPlatoonMutation.isPending}
-                onClick={handleCreateBand}
-              >
-                <Plus size={15} className="mr-1.5" /> Adicionar
-              </button>
-            </div>
-            <p className="text-[11px] italic mt-3 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
-              As faixas devem cobrir de 0 a 100 sem lacunas ou sobreposições. Ajuste os limites das faixas existentes antes de adicionar uma nova.
-            </p>
-          </div>
-        </section>
-
-        {rulesByGroup.unknown.length > 0 && (
-          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-            <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
-              <Settings size={18} style={{ color: "#d4ff00" }} />
-              <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>Outras Regras</h3>
-            </div>
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {rulesByGroup.unknown.map(rule => (
-                <RuleCard key={rule.key} rule={rule} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-
-      <AlertDialog open={deleteTargetId !== null} onOpenChange={v => { if (!v) setDeleteTargetId(null); }}>
-        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
-              <Trash2 size={18} /> Remover faixa
-            </AlertDialogTitle>
-            <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
-              Esta faixa de bônus será removida permanentemente. Colaboradores que já atingiram essa faixa no ciclo atual podem ser afetados no próximo reprocessamento.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deletePlatoonMutation.isPending}
-              onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })}
-              className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
-              style={{ backgroundColor: WARNING, color: "white", border: "none" }}
-            >
-              {deletePlatoonMutation.isPending ? "Removendo…" : "Sim, remover"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Dialog: Substituir todas as faixas ── */}
-      <AlertDialog open={showReplaceDialog} onOpenChange={v => { if (!v) setShowReplaceDialog(false); }}>
-        <AlertDialogContent className="rounded-xl max-w-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
-              <RefreshCw size={18} /> Substituir Faixas 2026
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-                <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
-                  Esta ação <strong>apaga todas as faixas atuais</strong> e cria as 7 novas faixas abaixo. O reprocessamento do ciclo não é executado automaticamente — faça-o após confirmar.
-                </p>
-                <div className="rounded-lg overflow-hidden text-xs" style={{ border: "1px solid var(--border)" }}>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr style={{ backgroundColor: "var(--secondary)" }}>
-                        <th className="px-3 py-2 text-left font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Faixa</th>
-                        <th className="px-3 py-2 text-right font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Base</th>
-                        <th className="px-3 py-2 text-right font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Extra/Prova</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {NEW_TIERS_2026.map((t, i) => (
-                        <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td className="px-3 py-1.5 font-bold" style={{ color: "var(--foreground)" }}>{t.name}</td>
-                          <td className="px-3 py-1.5 text-right font-black" style={{ fontFamily: CONDENSED, color: t.bonusValue > 0 ? "#16a34a" : "var(--muted-foreground)" }}>
-                            {t.bonusValue > 0 ? fmtBRL(t.bonusValue) : "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-right font-black" style={{ fontFamily: CONDENSED, color: t.bonusPerExtraEvent > 0 ? "#16a34a" : "var(--muted-foreground)" }}>
-                            {t.bonusPerExtraEvent > 0 ? fmtBRL(t.bonusPerExtraEvent) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={replacing}
-              onClick={(e) => { e.preventDefault(); void handleReplaceAll(); }}
-              className="rounded-lg font-bold uppercase text-xs"
-              style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)", border: "none", opacity: replacing ? 0.6 : 1 }}
-            >
-              {replacing ? "Aplicando…" : "Confirmar e Aplicar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </div>
+      ))}
     </div>
   );
 }
 
-function HelpTooltip({ text }: { text: string }) {
-  if (!text) return null;
+export default function RulesPage() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  // Espelha o backend: PATCH /rules e /platoon-rules = admin|rh|diretoria; DELETE /platoon-rules/:id = admin|rh.
+  const canEdit = hasRole(user, "admin") || hasRole(user, "rh") || hasRole(user, "diretoria");
+  const canDeleteBand = hasRole(user, "admin") || hasRole(user, "rh");
+
+  const rulesQKey = getGetRulesQueryKey();
+  const bandsQKey = getGetPlatoonRulesQueryKey();
+  const { data: rules, isLoading, isError, refetch } = useGetRules({ query: { queryKey: rulesQKey } });
+  const { data: bands, isLoading: bandsLoading, isError: bandsError, refetch: refetchBands } = useGetPlatoonRules({ query: { queryKey: bandsQKey } });
+  const { data: cycle } = useGetCurrentCycle();
+  const bandsState = useBands(bandsQKey, bands);
+
+  const [values, setValues] = useState<Record<string, string>>({});
+  const updateRule = useUpdateRule({
+    mutation: {
+      onSuccess: (_r, vars) => {
+        qc.invalidateQueries({ queryKey: rulesQKey });
+        setValues(prev => { const n = { ...prev }; delete n[vars.key]; return n; });
+        toast({ title: "Regra salva", description: RULE_META[vars.key]?.label });
+      },
+      onError: (e: unknown) => toast({ title: "Não foi possível salvar a regra", description: serverMessage(e), variant: "destructive" }),
+    },
+  });
+  const editing: RuleEditing = {
+    values,
+    setValue: (k, v) => setValues(prev => ({ ...prev, [k]: v })),
+    reset: k => setValues(prev => { const n = { ...prev }; delete n[k]; return n; }),
+    save: (key, value) => updateRule.mutate({ key, data: { value } }),
+    savingKey: updateRule.isPending ? updateRule.variables?.key ?? null : null,
+    canEdit,
+  };
+
+  const byGroup = (g: GroupKey) => (rules ?? []).filter(r => RULE_META[r.key]?.group === g);
+  const others: Rule[] = (rules ?? []).filter(r => !RULE_META[r.key]);
+  const generalMin = (rules ?? []).find(r => r.key === "min_events_eligibility")?.value;
+
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button type="button" className="shrink-0 transition-opacity hover:opacity-60" style={{ color: "var(--muted-foreground)" }}>
-          <HelpCircle size={14} />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs font-medium rounded-xl p-3 leading-relaxed" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        {text}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-interface RuleSectionProps {
-  groupKey: "avaliacao" | "elegibilidade";
-  rules: Array<{ key: string; value: string; description: string }>;
-  ruleValues: Record<string, string>;
-  setRuleValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  getRuleValue: (key: string, def: string) => string;
-  updateRuleMutation: { isPending: boolean; mutate: (args: { key: string; data: { value: string } }) => void };
-}
-
-function RuleSection({ groupKey, rules, ruleValues, setRuleValues, getRuleValue, updateRuleMutation }: RuleSectionProps) {
-  const meta = GROUP_META[groupKey];
-  const Icon = meta.icon;
-  if (rules.length === 0) return null;
-  return (
-    <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
-        <Icon size={18} style={{ color: "#d4ff00" }} />
-        <div>
-          <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>{meta.title}</h3>
-          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(212,255,0,0.55)" }}>{meta.subtitle}</p>
-        </div>
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3 lg:gap-5">
+        <h1 data-testid="text-page-title" className="min-w-0 font-condensed text-[24px] sm:text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground truncate">Regras do Sistema</h1>
+        <p className="hidden xl:block min-w-0 truncate text-[13px] text-muted-foreground">Regras gerais do cálculo e as faixas de bônus. O que é de cada ciclo fica em Ciclos.</p>
+        {!canEdit && <Chip icon={Eye} className="ml-auto" title="Seu perfil só consulta as regras">Só consulta</Chip>}
       </div>
-      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {rules.map(rule => (
-          <RuleCard key={rule.key} rule={rule} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
-        ))}
-      </div>
-    </section>
-  );
-}
 
-interface RuleCardProps {
-  rule: { key: string; value: string; description: string };
-  ruleValues: Record<string, string>;
-  setRuleValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  getRuleValue: (key: string, def: string) => string;
-  updateRuleMutation: { isPending: boolean; mutate: (args: { key: string; data: { value: string } }) => void };
-}
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-7 max-w-[1280px] w-full mx-auto">
+        {isLoading ? <RulesSkeleton /> : isError || !rules ? (
+          <ErrorBlock title="Não foi possível carregar as regras" onRetry={() => { void refetch(); }} />
+        ) : (
+          <>
+            <CycleRulesPanel cycle={cycle} generalMin={generalMin} />
+            <div className="space-y-7">
+              <RulesGroup group="elegibilidade" rules={byGroup("elegibilidade")} editing={editing} cycle={cycle} />
+              <RulesGroup group="avaliacao" rules={byGroup("avaliacao")} editing={editing} cycle={cycle} />
+              <RulesGroup group="pagamento" rules={byGroup("pagamento")} editing={editing} cycle={cycle} />
+            </div>
+            {bandsLoading ? (
+              <div role="status" aria-label="Carregando faixas" className={cn(surfaceCls, "p-5 space-y-3")}><Bone className="h-7 w-full" />{[0, 1, 2].map(i => <Bone key={i} className="h-10 w-full" />)}</div>
+            ) : bandsError || !bands ? (
+              <ErrorBlock title="Não foi possível carregar as faixas" onRetry={() => { void refetchBands(); }} />
+            ) : (
+              <BandsSection bands={bands} state={bandsState} canEdit={canEdit} canDelete={canDeleteBand} />
+            )}
+            <RulesGroup group="outras" rules={others} editing={editing} cycle={cycle} />
+          </>
+        )}
+      </div>
 
-function RuleCard({ rule, ruleValues, setRuleValues, getRuleValue, updateRuleMutation }: RuleCardProps) {
-  const meta = RULE_META[rule.key];
-  const isDirty = ruleValues[rule.key] !== undefined && ruleValues[rule.key] !== rule.value;
-  const currentVal = getRuleValue(rule.key, rule.value);
-  return (
-    <div data-testid={`row-rule-${rule.key}`} className="p-4 rounded-xl flex flex-col gap-3" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-      <div className="flex items-start gap-2">
-        <p className="text-sm font-black uppercase tracking-tight flex-1" style={{ color: "var(--foreground)" }}>
-          {meta?.label ?? rule.description}
-        </p>
-        <HelpTooltip text={meta?.help ?? ""} />
-      </div>
-      {meta?.help && (
-        <p className="text-[11px] leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-          {meta.help.length > 120 ? meta.help.slice(0, 120) + "…" : meta.help}
-        </p>
-      )}
-      <div className="flex gap-2 mt-auto">
-        <Input
-          data-testid={`input-rule-${rule.key}`}
-          type={meta?.inputType === "number" ? "number" : "text"}
-          className="h-10 rounded-lg font-mono text-sm"
-          value={currentVal}
-          onChange={e => setRuleValues(v => ({ ...v, [rule.key]: e.target.value }))}
-        />
-        <button
-          data-testid={`button-save-rule-${rule.key}`}
-          className="h-10 px-4 shrink-0 flex items-center rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
-          style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--card)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
-          disabled={updateRuleMutation.isPending || !isDirty}
-          onClick={() => updateRuleMutation.mutate({ key: rule.key, data: { value: currentVal } })}
-        >
-          <Save size={14} className="mr-1.5" /> Salvar
-        </button>
-      </div>
+      <DeleteBandDialog state={bandsState} />
+      <ReplaceBandsDialog state={bandsState} currentCount={bands?.length ?? 0} />
     </div>
   );
 }

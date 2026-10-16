@@ -18,3 +18,13 @@ export interface AbsenceFormData {
 
 /** Lançamento com o autor, que o servidor manda mas o contrato ainda não declara. */
 export type AbsenceWithAuthor = Absence & { registeredByUserName?: string | null };
+
+/** Nota do colaborador no ciclo atual (de /results/quarterly): base do "efeito na nota". */
+export interface EmployeeScore {
+  eventsCount: number;
+  grossAverage: number | null;
+  finalResult: number;
+}
+
+/** Como a lista está organizada. */
+export type ListView = "entries" | "people";

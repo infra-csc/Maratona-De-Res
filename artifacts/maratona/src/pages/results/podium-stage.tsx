@@ -1,84 +1,71 @@
+import type { RankingEntry } from "@workspace/api-client-react";
 import { Crown } from "lucide-react";
-import { cn, fmtNum, faixaEdge } from "@/lib/utils";
-import { CONDENSED } from "@/lib/premium-theme";
-import { contrastingTextColor, initials } from "./helpers";
+import { cn, fmtNum } from "@/lib/utils";
+import { initials } from "./helpers";
+import { FaixaBadge } from "./badges";
+import { Eyebrow, FOCUS_RING, surfaceCls } from "./results-ui";
 
-const MEDAL: Record<1 | 2 | 3, { color: string; dimColor: string; bg: string; border: string; platformH: number; label: string }> = {
-  1: { color: "#FFD700", dimColor: "#B8860B", bg: "rgba(255,215,0,0.13)", border: "rgba(255,215,0,0.55)", platformH: 72, label: "Ouro" },
-  2: { color: "#D0D0D0", dimColor: "#888",    bg: "rgba(192,192,192,0.10)", border: "rgba(192,192,192,0.45)", platformH: 56, label: "Prata" },
-  3: { color: "#CD7F32", dimColor: "#8B4513", bg: "rgba(205,127,50,0.11)", border: "rgba(205,127,50,0.45)", platformH: 46, label: "Bronze" },
+/** Medalhas: a cor só no anel/topo do degrau; o texto fica no contraste do tema. */
+export const MEDAL: Record<1 | 2 | 3, { ring: string; tint: string; label: string }> = {
+  1: { ring: "#D4A017", tint: "rgba(212,160,23,0.14)", label: "Ouro" },
+  2: { ring: "#9AA1A9", tint: "rgba(154,161,169,0.16)", label: "Prata" },
+  3: { ring: "#B87333", tint: "rgba(184,115,51,0.14)", label: "Bronze" },
 };
 
-export function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDetail: boolean; onSelect: (id: number) => void }) {
-  // Classic podium layout: 2nd left · 1st centre · 3rd right
-  const slots: [any | undefined, any | undefined, any | undefined] = [top3[1], top3[0], top3[2]];
-  const ranks: (1 | 2 | 3)[] = [2, 1, 3];
+const HEIGHT: Record<1 | 2 | 3, string> = { 1: "h-[72px]", 2: "h-[54px]", 3: "h-[42px]" };
+
+export function PodiumStage({ top3, canViewDetail, onSelect, className }: { top3: RankingEntry[]; canViewDetail: boolean; onSelect: (id: number) => void; className?: string }) {
+  // Pódio clássico na tela: 2º à esquerda · 1º no centro · 3º à direita
+  // (ordem visual por CSS; o leitor de tela ouve 1º, 2º, 3º).
+  const slots: (RankingEntry | undefined)[] = [top3[0], top3[1], top3[2]];
+  const ranks: (1 | 2 | 3)[] = [1, 2, 3];
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="flex items-end">
+    <section aria-label="Pódio" className={cn(surfaceCls, "overflow-hidden", className)}>
+      <div className="px-4 pt-3.5 pb-1 flex items-center justify-between">
+        <Eyebrow as="h2">Pódio</Eyebrow>
+        <span className="text-[12px] text-muted-foreground">Os 3 primeiros</span>
+      </div>
+      <ol className="flex items-end px-2">
         {slots.map((entry, i) => {
           const rank = ranks[i];
           const med = MEDAL[rank];
-          const isFirst = rank === 1;
-          if (!entry) return <div key={i} className="flex-1" />;
+          const first = rank === 1;
+          if (!entry) return <li key={i} className={cn("flex-1", rank === 2 ? "order-1" : rank === 1 ? "order-2" : "order-3")} aria-hidden />;
           return (
-            <button
-              key={entry.employeeId}
-              type="button"
-              data-testid={`podium-card-${entry.employeeId}`}
-              onClick={canViewDetail ? () => onSelect(entry.employeeId) : undefined}
-              className={cn("flex-1 flex flex-col items-center gap-0 pt-4 pb-0 outline-none", canViewDetail && "cursor-pointer hover:opacity-80 transition-opacity")}
-            >
-              {/* Crown / spacer */}
-              <div className="h-5 flex items-center justify-center mb-1">
-                {isFirst && <Crown size={15} style={{ color: med.color }} />}
-              </div>
-
-              {/* Avatar circle */}
-              <div className="rounded-full flex items-center justify-center shrink-0"
-                style={{ width: isFirst ? 54 : 42, height: isFirst ? 54 : 42, backgroundColor: med.bg, border: `2px solid ${med.border}` }}>
-                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 17 : 13, color: med.color }}>
+            <li key={entry.employeeId} className={cn("flex-1 min-w-0", first ? "order-2" : rank === 2 ? "order-1" : "order-3")}>
+              <button
+                type="button"
+                data-testid={`podium-card-${entry.employeeId}`}
+                onClick={canViewDetail ? () => onSelect(entry.employeeId) : undefined}
+                aria-label={`${rank}º lugar: ${entry.employeeName}, nota ${fmtNum(entry.finalResult, 1)}${canViewDetail ? ". Ver ficha" : ""}`}
+                className={cn("group w-full flex flex-col items-center pt-2 rounded-t-lg", canViewDetail ? "cursor-pointer" : "cursor-default", FOCUS_RING)}
+              >
+                <span className="h-4 flex items-center" aria-hidden>{first && <Crown size={14} style={{ color: med.ring }} />}</span>
+                <span
+                  aria-hidden
+                  className={cn("mt-1 rounded-full flex items-center justify-center font-condensed font-black text-foreground transition-transform duration-150 motion-safe:group-hover:-translate-y-0.5", first ? "w-14 h-14 text-[18px]" : "w-11 h-11 text-[14px]")}
+                  style={{ backgroundColor: med.tint, boxShadow: `inset 0 0 0 2px ${med.ring}` }}
+                >
                   {initials(entry.employeeName)}
                 </span>
-              </div>
-
-              {/* Score */}
-              <span className="font-black leading-none mt-1.5"
-                data-testid={`text-podium-result-${entry.employeeId}`}
-                style={{ fontFamily: CONDENSED, fontSize: isFirst ? 22 : 17, color: "var(--foreground)" }}>
-                {fmtNum(entry.finalResult, 1)}
-              </span>
-
-              {/* Tier badge */}
-              {(entry as any).platoonColor && (
-                <span
-                  className="inline-flex items-center text-[11px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5"
-                  style={{ backgroundColor: (entry as any).platoonColor, color: contrastingTextColor((entry as any).platoonColor), ...faixaEdge((entry as any).platoonColor) }}
-                >
-                  {(entry as any).platoon ?? `${(entry as any).platoonMinScore}–${(entry as any).platoonMaxScore}`}
+                <span className={cn("mt-1.5 font-condensed font-black leading-none tabular-nums", first ? "text-[24px]" : "text-[19px]")} data-testid={`text-podium-result-${entry.employeeId}`}>
+                  {fmtNum(entry.finalResult, 1)}
                 </span>
-              )}
-
-              {/* Name (first two words) */}
-              <p data-testid={`text-podium-name-${entry.employeeId}`}
-                className="text-[11px] font-bold uppercase text-center w-full px-1 mt-0.5 mb-2 leading-tight"
-                style={{ color: "var(--muted-foreground)" }}>
-                {entry.employeeName.split(" ").slice(0, 2).join(" ")}
-              </p>
-
-              {/* Platform block */}
-              <div className="w-full flex flex-col items-center justify-center rounded-t-sm"
-                style={{ height: med.platformH, backgroundColor: med.bg, borderTop: `2px solid ${med.border}` }}>
-                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 26 : 20, color: "var(--foreground)", lineHeight: 1 }}>
-                  #{rank}
+                <span data-testid={`text-podium-name-${entry.employeeId}`} className="mt-1 w-full px-1 text-center font-condensed text-[12.5px] font-bold uppercase leading-tight text-muted-foreground group-hover:text-foreground truncate">
+                  {entry.employeeName.split(" ").slice(0, 2).join(" ")}
                 </span>
-                <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>{med.label}</span>
-              </div>
-            </button>
+                {entry.platoon && <span className="mt-1 mb-2 max-w-full"><FaixaBadge name={entry.platoon} color={entry.platoonColor} compact /></span>}
+                {!entry.platoon && <span className="mb-2" />}
+                <span className={cn("w-full flex flex-col items-center justify-center rounded-t-md", HEIGHT[rank])} style={{ backgroundColor: med.tint, borderTop: `3px solid ${med.ring}` }}>
+                  <span className={cn("font-condensed font-black leading-none", first ? "text-[24px]" : "text-[19px]")}>{rank}º</span>
+                  <span className="font-condensed text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{med.label}</span>
+                </span>
+              </button>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ol>
+    </section>
   );
 }

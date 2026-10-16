@@ -1,23 +1,26 @@
-// Eventos históricos: seção "Observações Importadas" com a edição da nota e
-// das observações vindas da planilha (só admin/RH).
+// Eventos históricos: seção "Observações Importadas" — a nota e as observações
+// vindas da planilha, com a edição (só admin/RH).
 import { useState, useEffect } from "react";
 import { useUpdateHistoricalResult, getGetEventQueryKey, getGetEventResultQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { FileText, Loader2, Pencil } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CONDENSED, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle } from "./helpers";
+import { cn, fmtNum } from "@/lib/utils";
+import { matrixTextareaCls } from "../evaluations/conformity-bits";
+import { Eyebrow, FieldLabel, Section, btnPrimary, btnSecondary, btnSmall, inputCls } from "./detail-ui";
 
 type HistoricalResultPanelProps = {
   eventId: number; currentScore: number | null | undefined; currentNotes: string | null | undefined; canManage: boolean;
 };
 
-function HistoricalResultPanel({
-  eventId, currentScore, currentNotes, canManage,
-}: HistoricalResultPanelProps) {
+export type ImportedNotesSectionProps = HistoricalResultPanelProps & {
+  /** Admin/RH/diretoria leem a nota e as observações (o operador não vê nota). */
+  canView?: boolean;
+};
+
+/** Seção inteira (cabeçalho + leitura/edição). O pai só a renderiza quando o evento é histórico. */
+export function ImportedNotesSection({ eventId, currentScore, currentNotes, canManage, canView = false }: ImportedNotesSectionProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -43,82 +46,70 @@ function HistoricalResultPanel({
     },
   });
 
-  if (!canManage) {
-    return null;
-  }
-
-  if (!editing) {
-    return (
-      <div className="mt-4 flex flex-col items-start gap-2">
-        <button
-          type="button"
-          data-testid="button-edit-historical-result"
-          onClick={() => setEditing(true)}
-          className="px-3 py-1.5 rounded-lg font-black uppercase text-[11px] transition-colors hover:opacity-80"
-          style={{ border: "1px solid var(--border)" }}
-        >
-          Editar nota/observações importadas
-        </button>
-      </div>
-    );
-  }
-
   const parsedScore = parseFloat(score.replace(",", "."));
   const scoreValid = score.trim() !== "" && !Number.isNaN(parsedScore) && parsedScore >= 0 && parsedScore <= 100;
+  const scoreInvalid = !scoreValid && score.trim() !== "";
+  if (!canManage && !canView) return null;
 
   return (
-    <div data-testid="panel-historical-result-edit" className="mt-4 p-3 rounded-lg space-y-2 w-full max-w-md" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-      <p className="text-[11px] font-black uppercase" style={{ color: AMBER_TEXT }}>Evento Histórico — editar nota e observações importadas</p>
-      <div>
-        <Label className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota (0-100)</Label>
-        <Input data-testid="input-historical-score" type="text" inputMode="decimal" value={score} onChange={(e) => setScore(e.target.value)} className="text-sm rounded-lg mt-1" style={fieldStyle} />
-      </div>
-      <div>
-        <Label className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Observações</Label>
-        <Textarea data-testid="textarea-historical-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Comentários de conformidade/performance da planilha..." className="text-xs rounded-lg min-h-[80px] mt-1" style={fieldStyle} />
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          data-testid="button-save-historical-result"
-          disabled={!scoreValid || updateHistorical.isPending}
-          onClick={() => updateHistorical.mutate({ id: eventId, data: { importedScore: parsedScore, importedNotes: notes.trim() || null } })}
-          className="px-3 py-1 rounded-lg font-black uppercase text-[11px] transition-opacity disabled:opacity-50 hover:opacity-90"
-          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-        >
-          {updateHistorical.isPending ? "Salvando..." : "Salvar"}
+    <Section
+      id="event-imported"
+      title="Observações importadas"
+      icon={FileText}
+      description="Evento histórico: a nota e as observações vieram da planilha."
+      action={canManage && !editing ? (
+        <button type="button" data-testid="button-edit-historical-result" onClick={() => setEditing(true)} className={btnSmall}>
+          <Pencil size={14} aria-hidden /> Editar
         </button>
-        <button
-          type="button"
-          data-testid="button-cancel-historical-result"
-          disabled={updateHistorical.isPending}
-          onClick={() => setEditing(false)}
-          className="px-3 py-1 rounded-lg font-black uppercase text-[11px] transition-colors disabled:opacity-50 hover:opacity-80"
-          style={{ border: "1px solid var(--border)" }}
-        >
-          Cancelar
-        </button>
-      </div>
-      {!scoreValid && score.trim() !== "" && (
-        <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Nota deve ser um número entre 0 e 100</p>
+      ) : undefined}
+    >
+      {!editing ? (
+        <div className="px-4 sm:px-5 py-4 grid sm:grid-cols-[160px_minmax(0,1fr)] gap-4">
+          <div>
+            <Eyebrow as="p">Nota importada</Eyebrow>
+            <p className="mt-1.5 font-condensed text-[30px] font-black leading-none tabular-nums text-foreground">
+              {currentScore != null ? fmtNum(currentScore, 1) : <span className="text-muted-foreground/60">—</span>}
+              {currentScore != null && <span className="ml-1 text-[15px] font-bold text-muted-foreground">/100</span>}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <Eyebrow as="p">Observações</Eyebrow>
+            <p className="mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap break-words text-foreground">{currentNotes?.trim() ? currentNotes : <span className="text-muted-foreground">Sem observações.</span>}</p>
+          </div>
+        </div>
+      ) : (
+        <div data-testid="panel-historical-result-edit" className="px-4 sm:px-5 py-4 space-y-4 max-w-2xl">
+          <div className="max-w-[200px]">
+            <FieldLabel htmlFor="input-historical-score" hint="0 a 100">Nota</FieldLabel>
+            <input id="input-historical-score" data-testid="input-historical-score" type="text" inputMode="decimal" value={score}
+              onChange={(e) => setScore(e.target.value)} aria-invalid={scoreInvalid || undefined}
+              aria-describedby={scoreInvalid ? "historical-score-error" : undefined}
+              className={cn(inputCls, "font-condensed text-[18px] font-bold tabular-nums", scoreInvalid && "border-[var(--status-danger)]")} />
+            {scoreInvalid && <p id="historical-score-error" role="alert" className="mt-1.5 text-[13px] font-semibold text-[var(--status-danger-text)]">Nota deve ser um número entre 0 e 100</p>}
+          </div>
+          <div>
+            <FieldLabel htmlFor="textarea-historical-notes">Observações</FieldLabel>
+            <Textarea id="textarea-historical-notes" data-testid="textarea-historical-notes" value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Comentários de conformidade/performance da planilha…" className={cn(matrixTextareaCls, "min-h-[120px]")} />
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <button type="button" data-testid="button-cancel-historical-result" disabled={updateHistorical.isPending} onClick={() => setEditing(false)} className={btnSecondary}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              data-testid="button-save-historical-result"
+              disabled={!scoreValid || updateHistorical.isPending}
+              aria-busy={updateHistorical.isPending || undefined}
+              onClick={() => updateHistorical.mutate({ id: eventId, data: { importedScore: parsedScore, importedNotes: notes.trim() || null } })}
+              className={btnPrimary}
+            >
+              {updateHistorical.isPending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+              {updateHistorical.isPending ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        </div>
       )}
-    </div>
-  );
-}
-
-export type ImportedNotesSectionProps = HistoricalResultPanelProps;
-
-/** Seção inteira (cabeçalho + painel). O pai só a renderiza quando o evento é histórico. */
-export function ImportedNotesSection(props: ImportedNotesSectionProps) {
-  return (
-    <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-        <MessageSquare size={16} style={{ color: "var(--accent-text)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Observações Importadas</span>
-      </div>
-      <div className="p-5">
-        <HistoricalResultPanel {...props} />
-      </div>
-    </section>
+    </Section>
   );
 }

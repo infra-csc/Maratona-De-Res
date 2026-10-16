@@ -31,10 +31,10 @@ export function useCreateCriterionForm(qKey: QueryKey) {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Critério criado" });
+        toast({ title: "Critério criado", description: "Entra nos eventos novos. Nos já criados, use “Sincronizar todos os eventos”." });
         setCreateOpen(false);
       },
-      onError: (e: { message?: string }) => toast({ title: "Não foi possível criar o critério", description: e.message ?? "Tente novamente.", variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível criar o critério", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
@@ -66,11 +66,11 @@ export function useDuplicateCriterion(qKey: QueryKey, criteria: Criterion[] | un
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Critério duplicado" });
+        toast({ title: "Critério duplicado", description: "A cópia já aparece na lista, com a nova área." });
         setDuplicateSourceId(null);
         setDuplicateAreaId("");
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao duplicar", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível duplicar", description: serverMessage(e), variant: "destructive" }),
     },
   });
 
@@ -119,7 +119,7 @@ export function useCriterionAreasEditor(qKey: QueryKey) {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Áreas que avaliam atualizadas", description: "Vale para eventos novos. Em eventos já criados, use \"Aplicar áreas do padrão\" na Central." });
+        toast({ title: "Áreas que avaliam atualizadas", description: "Vale para eventos novos. Em eventos já criados, use “Aplicar áreas do padrão” na Central." });
         setTarget(null);
       },
       onError: (e: unknown) => toast({ title: "Não foi possível salvar as áreas", description: serverMessage(e), variant: "destructive" }),

@@ -3,48 +3,62 @@ import { useMergeUser } from "@workspace/api-client-react";
 import type { MergeUserResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { errorStatus, serverMessage } from "./users-ui";
+
+export type MergeError = { message: string; status?: number; closedCycle: boolean };
 
 /**
- * "Mesclar Avaliadores": seleção dos duplicados, escolha do canônico (conta
- * mantida) e o resultado exibido depois da mescla.
+ * "Mesclar duplicados": seleção dos duplicados, escolha da conta mantida
+ * (canônica), confirmação e o resultado exibido depois. A recusa do servidor
+ * (409: dado de ciclo fechado ou avaliação no mesmo critério) fica dentro da
+ * confirmação, com a explicação dele.
  */
 export function useUserMerge(qKey: QueryKey) {
-  const { toast } = useToast();
   const qc = useQueryClient();
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeUserResult | null>(null);
+  const [confirmOpen, setConfirmOpenState] = useState(false);
+  const [mergeError, setMergeError] = useState<MergeError | null>(null);
 
   const mergeMutation = useMergeUser({
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
+        setConfirmOpenState(false);
         setMergeResult(data);
         setMergeMode(false);
         setSelectedIds(new Set());
         setCanonicalId(null);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => {
+        const data = (e as { data?: { cycleClosed?: boolean } } | null)?.data;
+        setMergeError({ message: serverMessage(e, "Não foi possível mesclar os usuários."), status: errorStatus(e), closedCycle: data?.cycleClosed === true });
+      },
     },
   });
 
-  /** Liga/desliga o modo mescla, sempre zerando a seleção. */
-  function toggleMergeMode() {
-    setMergeMode(v => !v);
+  function reset() {
     setSelectedIds(new Set());
     setCanonicalId(null);
+    setMergeError(null);
+  }
+
+  /** Liga/desliga o modo de mescla, sempre zerando a seleção. */
+  function toggleMergeMode() {
+    setMergeMode(v => !v);
+    reset();
   }
 
   function cancelMerge() {
     setMergeMode(false);
-    setSelectedIds(new Set());
-    setCanonicalId(null);
+    reset();
   }
 
   /** Marca/desmarca um avaliador; desmarcar o canônico também limpa o canônico. */
   function toggleSelected(id: number) {
+    setMergeError(null);
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -57,8 +71,14 @@ export function useUserMerge(qKey: QueryKey) {
     });
   }
 
+  function setConfirmOpen(o: boolean) {
+    setMergeError(null);
+    setConfirmOpenState(o);
+  }
+
   function confirmMerge() {
     if (!canonicalId) return;
+    setMergeError(null);
     const dups = [...selectedIds].filter(id => id !== canonicalId);
     mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dups } });
   }
@@ -66,6 +86,7 @@ export function useUserMerge(qKey: QueryKey) {
   return {
     mergeMode, selectedIds, canonicalId, setCanonicalId, mergeResult, setMergeResult,
     mergeMutation, toggleMergeMode, cancelMerge, toggleSelected, confirmMerge,
+    confirmOpen, setConfirmOpen, mergeError,
   };
 }
 

@@ -1,64 +1,72 @@
-import { plural } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// Diálogos da tela: novo critério, duplicar para outra área, áreas que
+// avaliam e a confirmação de desativar. Todos no padrão do app (cabeçalho
+// com ícone, campos com rótulo ligado, rodapé Cancelar/ação, foco devolvido).
+import type { Criterion } from "@workspace/api-client-react";
+import { Copy, Info, Loader2, Plus, Power, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Copy, Users } from "lucide-react";
-import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle, requiredText } from "./helpers";
-import { FieldError } from "./form-bits";
+import { displayCriterionName } from "@/lib/criterion-name";
+import { cn, fmtNum, plural } from "@/lib/utils";
+import {
+  AreaChip, ConsequenceList, DialogHeading, FieldErrorText, FieldLabel, Notice, btnDanger, btnPrimary, btnSecondary,
+  dialogCls, dialogFooterCls, inputCls, useReturnFocus,
+} from "./criteria-ui";
+import { requiredText } from "./helpers";
 import type { CreateCriterionForm, CriterionAreasEditor, DuplicateCriterionState } from "./use-criterion-forms";
 import { EvaluatingAreasField } from "./evaluating-areas";
-import type { AreaOption, ResyncSummary } from "./types";
+import type { AreaOption } from "./types";
 
-/** Conteúdo do diálogo "Novo Critério de Avaliação" (o botão que abre fica no cabeçalho). */
+const invalidCls = "border-[var(--status-danger)] focus:border-[var(--status-danger)]";
+
+/** "Novo critério de avaliação". */
 export function CreateCriterionDialog({ state, areas }: { state: CreateCriterionForm; areas: AreaOption[] | undefined }) {
   const { open, setCreateOpen, form, createMutation, areasValue, setAreasValue, submit } = state;
   const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
   const responsibleAreaId = watch("responsibleAreaId");
+  const pending = createMutation.isPending;
+  const onCloseAutoFocus = useReturnFocus(open);
+  const activeAreas = (areas ?? []).filter(a => a.active !== false);
   return (
-    <Dialog open={open} onOpenChange={setCreateOpen}>
-      <DialogContent className="max-w-md rounded-xl max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Critério de Avaliação</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(submit)} className="space-y-5 pt-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="create-criterion-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input id="create-criterion-name" data-testid="input-criterion-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
-            <FieldError message={errors.name?.message} />
+    <Dialog open={open} onOpenChange={o => { if (!pending) setCreateOpen(o); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[560px] max-h-[92dvh] overflow-y-auto")} data-testid="create-criterion-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Plus} tone="brand" Title={DialogTitle} Description={DialogDescription} title="Novo critério"
+          description="Entra nos eventos novos. Para levar aos eventos já criados, use “Sincronizar todos os eventos” em Mais ações." />
+        <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
+          <div>
+            <FieldLabel htmlFor="create-criterion-name" required>Nome</FieldLabel>
+            <input id="create-criterion-name" data-testid="input-criterion-name" autoComplete="off" aria-invalid={!!errors.name}
+              aria-describedby={errors.name ? "create-criterion-name-error" : undefined}
+              {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex.: Pontualidade"
+              className={cn(inputCls, errors.name && invalidCls)} />
+            <FieldErrorText id="create-criterion-name-error" message={errors.name?.message} />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="create-criterion-desc" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição do que é avaliado</Label>
-            <Input id="create-criterion-desc" data-testid="input-criterion-desc" {...register("description")} placeholder="Instruções para o avaliador..." className="h-11 rounded-lg" style={fieldStyle} />
+          <div>
+            <FieldLabel htmlFor="create-criterion-desc" hint="o avaliador lê isto">O que é avaliado</FieldLabel>
+            <textarea id="create-criterion-desc" data-testid="input-criterion-desc" rows={2} {...register("description")}
+              placeholder="Ex.: chegou no horário combinado e cumpriu o cronograma da montagem."
+              className={cn(inputCls, "h-auto min-h-[76px] py-2.5 leading-snug resize-y")} />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="create-criterion-weight" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Peso Padrão</Label>
-            <Input
-              id="create-criterion-weight"
-              data-testid="input-criterion-weight"
-              type="number"
-              min="0"
-              step="1"
-              aria-invalid={!!errors.defaultWeight}
-              {...register("defaultWeight", { valueAsNumber: true, validate: v => (v == null || (Number.isFinite(v) && v >= 0)) || "Informe um peso maior ou igual a zero." })}
-              className="h-11 rounded-lg"
-              style={fieldStyle}
-            />
-            <FieldError message={errors.defaultWeight?.message} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="create-criterion-area" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
-            <Select onValueChange={v => setValue("responsibleAreaId", Number(v))}>
-              <SelectTrigger id="create-criterion-area" data-testid="select-criterion-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(areas ?? []).map(a => (
-                  <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+            <div>
+              <FieldLabel htmlFor="create-criterion-weight">Peso padrão</FieldLabel>
+              <input id="create-criterion-weight" data-testid="input-criterion-weight" type="number" inputMode="decimal" min="0" step="1"
+                aria-invalid={!!errors.defaultWeight} aria-describedby={errors.defaultWeight ? "create-criterion-weight-error" : undefined}
+                {...register("defaultWeight", { valueAsNumber: true, validate: v => (v == null || (Number.isFinite(v) && v >= 0)) || "Use um número maior ou igual a zero." })}
+                className={cn(inputCls, "tabular-nums", errors.defaultWeight && invalidCls)} />
+              <FieldErrorText id="create-criterion-weight-error" message={errors.defaultWeight?.message} />
+            </div>
+            <div>
+              <FieldLabel htmlFor="create-criterion-area" hint="opcional">Área responsável</FieldLabel>
+              <Select value={responsibleAreaId != null ? String(responsibleAreaId) : undefined} onValueChange={v => setValue("responsibleAreaId", Number(v))}>
+                <SelectTrigger id="create-criterion-area" data-testid="select-criterion-area" className={cn(inputCls, "justify-between")}>
+                  <SelectValue placeholder="Selecione a área…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeAreas.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <EvaluatingAreasField
             idPrefix="create-criterion-areas"
@@ -66,17 +74,13 @@ export function CreateCriterionDialog({ state, areas }: { state: CreateCriterion
             onChange={setAreasValue}
             areas={areas}
             responsibleAreaId={responsibleAreaId}
+            disabled={pending}
           />
-          <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-            <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-            <button
-              data-testid="button-submit-criterion"
-              type="submit"
-              disabled={createMutation.isPending}
-              className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              {createMutation.isPending ? "Criando..." : "Criar Critério"}
+          <div className={cn(dialogFooterCls, "pt-1")}>
+            <button type="button" onClick={() => setCreateOpen(false)} disabled={pending} className={btnSecondary}>Cancelar</button>
+            <button data-testid="button-submit-criterion" type="submit" disabled={pending} aria-busy={pending || undefined} className={btnPrimary}>
+              {pending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Plus size={15} aria-hidden />}
+              {pending ? "Criando…" : "Criar critério"}
             </button>
           </div>
         </form>
@@ -85,160 +89,124 @@ export function CreateCriterionDialog({ state, areas }: { state: CreateCriterion
   );
 }
 
-/** Diálogo "Duplicar Critério": mesma descrição e peso, outra área responsável. */
+/** "Duplicar para outra área": mesma descrição e peso, outra área responsável. */
 export function DuplicateCriterionDialog({ state, areas }: { state: DuplicateCriterionState; areas: AreaOption[] | undefined }) {
   const { duplicateSourceId, duplicateSource, duplicateAreaId, setDuplicateAreaId, duplicateMutation, closeDuplicate, handleDuplicate } = state;
+  const open = duplicateSourceId !== null;
+  const pending = duplicateMutation.isPending;
+  const onCloseAutoFocus = useReturnFocus(open);
+  const name = displayCriterionName(duplicateSource?.name);
   return (
-    <Dialog open={duplicateSourceId !== null} onOpenChange={(v) => { if (!v) closeDuplicate(); }}>
-      <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Copy size={18} /> Duplicar Critério
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={v => { if (!v && !pending) closeDuplicate(); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[500px]")} data-testid="duplicate-criterion-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Copy} Title={DialogTitle} Description={DialogDescription} title="Duplicar para outra área"
+          description={<>Cria uma cópia de <span className="font-semibold text-foreground">“{name}”</span> — mesma descrição e peso — com outra área responsável.</>} />
         {duplicateSource && (
-          <div className="space-y-5 pt-2">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Cria uma cópia de <span className="font-bold" style={{ color: "var(--foreground)" }}>"{duplicateSource.name}"</span> (mesma descrição e peso) vinculada a outra área. Útil quando mais de uma área avalia o mesmo quesito e a nota final é a média entre elas.
-            </p>
-            <div className="space-y-1.5">
-              <Label htmlFor="duplicate-criterion-area" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Área Responsável <span style={{ color: DANGER_TEXT }}>*</span></Label>
-              <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
-                <SelectTrigger id="duplicate-criterion-area" data-testid="select-duplicate-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
-                  <SelectValue placeholder="Selecione a área..." />
+          <>
+            <div className="rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted-foreground">
+              <span>Hoje:</span>
+              {duplicateSource.responsibleAreaName ? <AreaChip name={duplicateSource.responsibleAreaName} responsible /> : <span>sem área</span>}
+              <span className="tabular-nums">peso {fmtNum(Number(duplicateSource.defaultWeight), Number.isInteger(Number(duplicateSource.defaultWeight)) ? 0 : 1)}</span>
+            </div>
+            <div>
+              <FieldLabel htmlFor="duplicate-criterion-area" required>Nova área responsável</FieldLabel>
+              <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId} disabled={pending}>
+                <SelectTrigger id="duplicate-criterion-area" data-testid="select-duplicate-area" className={cn(inputCls, "justify-between")}>
+                  <SelectValue placeholder="Selecione a área…" />
                 </SelectTrigger>
                 <SelectContent>
                   {(areas ?? [])
-                    .filter(a => a.id !== duplicateSource.responsibleAreaId)
-                    .map(a => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                    ))}
+                    .filter(a => a.id !== duplicateSource.responsibleAreaId && a.active !== false)
+                    .map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              <button type="button" onClick={closeDuplicate} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-              <button
-                type="button"
-                data-testid="button-confirm-duplicate"
-                disabled={!duplicateAreaId || duplicateMutation.isPending}
-                onClick={handleDuplicate}
-                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                {duplicateMutation.isPending ? "Duplicando..." : "Duplicar Critério"}
+            <Notice icon={Info} tone="neutral">
+              Para a <span className="font-semibold text-foreground">mesma nota</span> vir de várias áreas (média), prefira “Áreas que avaliam” no critério original — a cópia vira um critério separado, com peso próprio.
+            </Notice>
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={closeDuplicate} disabled={pending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-duplicate" disabled={!duplicateAreaId || pending} aria-busy={pending || undefined}
+                onClick={handleDuplicate} className={btnPrimary}>
+                {pending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Copy size={15} aria-hidden />}
+                {pending ? "Duplicando…" : "Duplicar critério"}
               </button>
             </div>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-/** Diálogo "Áreas que avaliam" de um critério já existente. */
+/** "Áreas que avaliam" de um critério já existente. */
 export function CriterionAreasDialog({ editor, areas }: { editor: CriterionAreasEditor; areas: AreaOption[] | undefined }) {
   const { target, value, setValue, mutation, close, save } = editor;
+  const open = target !== null;
+  const pending = mutation.isPending;
+  const onCloseAutoFocus = useReturnFocus(open);
   return (
-    <Dialog open={target !== null} onOpenChange={(v) => { if (!v) close(); }}>
-      <DialogContent className="max-w-md rounded-xl max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Users size={18} aria-hidden="true" /> Áreas que avaliam
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={v => { if (!v && !pending) close(); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[560px] max-h-[92dvh] overflow-y-auto")} data-testid="criterion-areas-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Users} Title={DialogTitle} Description={DialogDescription} title="Áreas que avaliam"
+          description={target ? <><span className="font-semibold text-foreground">{displayCriterionName(target.name)}</span>{target.responsibleAreaName ? <> · responsável: {target.responsibleAreaName}</> : " · sem área responsável"}</> : undefined} />
         {target && (
-          <div className="space-y-5 pt-1">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              <span className="font-bold" style={{ color: "var(--foreground)" }}>{target.name}</span>
-              {" — "}área responsável: <span className="font-bold" style={{ color: "var(--foreground)" }}>{target.responsibleAreaName ?? "nenhuma"}</span>.
-            </p>
+          <>
             <EvaluatingAreasField
               idPrefix={`criterion-areas-${target.id}`}
               value={value}
               onChange={setValue}
               areas={areas}
               responsibleAreaId={target.responsibleAreaId}
-              disabled={mutation.isPending}
+              disabled={pending}
             />
-            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              <button type="button" onClick={close} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-              <button
-                type="button"
-                data-testid="button-save-criterion-areas"
-                disabled={mutation.isPending}
-                onClick={save}
-                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                {mutation.isPending ? "Salvando..." : "Salvar"}
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={close} disabled={pending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-save-criterion-areas" disabled={pending} aria-busy={pending || undefined} onClick={save} className={btnPrimary}>
+                {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+                {pending ? "Salvando…" : "Salvar áreas"}
               </button>
             </div>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-/** Resumo de "Sync. Todos os Eventos": contadores + lista por evento. */
-export function ResyncSummaryDialog({ summary, onClose }: { summary: ResyncSummary | null; onClose: () => void }) {
+/** Confirmação de desativar: o que sai, o que fica (reativar não pede confirmação). */
+export function DeactivateCriterionDialog({ target, pending, onConfirm, onClose }: {
+  target: Criterion | null;
+  pending: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const onCloseAutoFocus = useReturnFocus(!!target);
+  const events = (target as { eventCount?: number } | null)?.eventCount ?? 0;
   return (
-    <Dialog open={summary != null} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Sincronização em Massa</DialogTitle>
-        </DialogHeader>
-        {summary && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-3 text-center">
-              {[
-                { val: summary.processed, label: "Atualizados" },
-                { val: summary.totalAdded, label: "Adicionados" },
-                { val: summary.totalActivated, label: "Reativados" },
-                { val: summary.totalDeactivated, label: "Desativados" },
-              ].map((s, i) => (
-                <div key={i} className="rounded-lg p-3" style={{ backgroundColor: "var(--secondary)" }}>
-                  <p className="text-2xl font-black" style={{ fontFamily: CONDENSED }}>{s.val}</p>
-                  <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{s.label}</p>
-                </div>
-              ))}
+    <AlertDialog open={!!target} onOpenChange={o => { if (!o && !pending) onClose(); }}>
+      <AlertDialogContent className={cn(dialogCls, "max-w-[500px]")} data-testid="deactivate-criterion-dialog" onCloseAutoFocus={onCloseAutoFocus}
+        onEscapeKeyDown={e => { if (pending) e.preventDefault(); }}>
+        {target && (
+          <>
+            <DialogHeading icon={Power} tone="danger" Title={AlertDialogTitle} Description={AlertDialogDescription}
+              title={`Desativar “${displayCriterionName(target.name)}”?`}
+              description="O critério sai do catálogo ativo. Nada é apagado e dá para reativar depois." />
+            <ConsequenceList items={[
+              <>Sai dos <span className="font-semibold text-foreground">eventos novos</span> e dos eventos <span className="font-semibold text-foreground">ainda não confirmados</span>.</>,
+              <>Eventos já confirmados <span className="font-semibold text-foreground">mantêm</span> o critério e as notas como histórico.</>,
+              events > 0 ? <>Hoje aparece em {plural(events, "evento", "eventos")}, contando os já confirmados.</> : <>Hoje não aparece em nenhum evento.</>,
+            ]} />
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onClose} disabled={pending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-deactivate" onClick={onConfirm} disabled={pending} aria-busy={pending || undefined} className={btnDanger}>
+                {pending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <Power size={15} aria-hidden />}
+                {pending ? "Desativando…" : "Desativar"}
+              </button>
             </div>
-            {summary.skipped > 0 && (
-              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {plural(summary.skipped, "evento pulado", "eventos pulados")} por erro interno.
-              </p>
-            )}
-            {summary.processed === 0 && summary.skipped === 0 && (
-              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                Todos os eventos já estavam sincronizados com o catálogo ativo.
-              </p>
-            )}
-            {summary.events.length > 0 && (
-              <div className="max-h-64 overflow-y-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>
-                {summary.events.map((ev, i) => (
-                  <div key={ev.id} className="px-4 py-2 flex items-center justify-between gap-3" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                    <span className="font-bold uppercase text-xs truncate">{ev.name}</span>
-                    <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
-                      +{plural(ev.added, "novo", "novos")}{ev.activated > 0 ? ` ↺${plural(ev.activated, "reativado", "reativados")}` : ""}{ev.deactivated > 0 ? ` -${ev.deactivated}` : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </>
         )}
-        <DialogFooter>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 px-5 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-          >
-            Fechar
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

@@ -7089,6 +7089,9 @@ components:
         eventsAfterEnd:
           type: integer
           description: Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)
+        evaluationsSubmitted:
+          type: integer
+          description: Avaliações enviadas nos eventos do ciclo. Com alguma, a avaliação por área não pode mais ser ligada/desligada (409 CYCLE_HAS_EVALUATIONS).
         eventsStored:
           type: integer
           description: |

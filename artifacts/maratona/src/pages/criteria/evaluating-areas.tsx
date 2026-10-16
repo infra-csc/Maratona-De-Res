@@ -1,5 +1,7 @@
-import { Users } from "lucide-react";
+import { Check } from "lucide-react";
 import type { Criterion } from "@workspace/api-client-react";
+import { cn, plural } from "@/lib/utils";
+import { AreaChip, Chip, Eyebrow } from "./criteria-ui";
 import type { AreaOption } from "./types";
 
 /**
@@ -38,13 +40,13 @@ export function extraAreasOf(c: Pick<Criterion, "evaluateAllAreas" | "evaluating
   return areas.filter(a => ids.has(a.id));
 }
 
-const MODES: { value: AreaMode; label: string }[] = [
-  { value: "responsible", label: "Só a área responsável" },
-  { value: "all", label: "Todas as áreas" },
-  { value: "chosen", label: "Áreas escolhidas" },
+const MODES: { value: AreaMode; label: string; hint: string }[] = [
+  { value: "responsible", label: "Só a responsável", hint: "Uma área responde." },
+  { value: "chosen", label: "Áreas escolhidas", hint: "A responsável e as marcadas." },
+  { value: "all", label: "Todas as áreas", hint: "Toda área ativa responde." },
 ];
 
-/** Campo do diálogo de criar/editar critério. */
+/** Campo "Áreas que avaliam" dos diálogos de criar critério e de editar as áreas. */
 export function EvaluatingAreasField({ idPrefix, value, onChange, areas, responsibleAreaId, disabled }: {
   idPrefix: string;
   value: EvaluatingAreasValue;
@@ -54,11 +56,13 @@ export function EvaluatingAreasField({ idPrefix, value, onChange, areas, respons
   disabled?: boolean;
 }) {
   const options = (areas ?? []).filter(a => isActive(a) && a.id !== responsibleAreaId);
+  const responsible = (areas ?? []).find(a => a.id === responsibleAreaId);
   const helpId = `${idPrefix}-help`;
-  const chosenCount = value.areaIds.filter(id => options.some(a => a.id === id)).length;
+  const chosen = options.filter(a => value.areaIds.includes(a.id));
+  const total = 1 + (value.mode === "all" ? options.length : value.mode === "chosen" ? chosen.length : 0);
   return (
-    <fieldset className="space-y-2" aria-describedby={helpId} disabled={disabled}>
-      <legend className="font-bold uppercase text-xs tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Áreas que avaliam</legend>
+    <fieldset className="min-w-0 space-y-2.5" aria-describedby={helpId} disabled={disabled}>
+      <legend className="font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Áreas que avaliam</legend>
       <div role="radiogroup" aria-label="Áreas que avaliam" className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
         {MODES.map(m => {
           const checked = value.mode === m.value;
@@ -67,10 +71,11 @@ export function EvaluatingAreasField({ idPrefix, value, onChange, areas, respons
             <label
               key={m.value}
               htmlFor={id}
-              className="flex items-center justify-center text-center rounded-lg px-2 py-2 text-xs font-bold uppercase cursor-pointer transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)]"
-              style={checked
-                ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)", border: "1px solid var(--primary)" }
-                : { backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}
+              className={cn(
+                "relative flex sm:flex-col items-center sm:items-start gap-x-2 gap-y-0.5 rounded-xl border px-3 py-2.5 min-h-11 cursor-pointer transition-[background-color,border-color,box-shadow] duration-150",
+                "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
+                checked ? "border-foreground bg-secondary/60 shadow-[inset_0_0_0_1px_var(--foreground)]" : "border-border hover:border-foreground/30",
+              )}
             >
               <input
                 id={id}
@@ -82,71 +87,109 @@ export function EvaluatingAreasField({ idPrefix, value, onChange, areas, respons
                 className="sr-only"
                 data-testid={`${idPrefix}-mode-${m.value}`}
               />
-              {m.label}
+              <span className="font-condensed text-[14px] font-bold uppercase tracking-[0.04em] leading-tight text-foreground">{m.label}</span>
+              <span className="text-[12.5px] leading-snug text-muted-foreground">{m.hint}</span>
+              {checked && <Check size={14} aria-hidden className="absolute right-2.5 top-2.5 hidden sm:block text-foreground" />}
             </label>
           );
         })}
       </div>
-      <p id={helpId} className="text-[11px] leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-        Cada área responde o critério e a nota é a média das áreas. Vale para eventos novos; em eventos já criados use "Aplicar áreas do padrão" na Central.
-      </p>
-      {value.mode === "all" && (
-        <p className="text-xs font-bold" style={{ color: "var(--foreground)" }}>
-          {options.length === 0
-            ? "Não há outras áreas ativas além da responsável."
-            : `${options.length} área${options.length !== 1 ? "s" : ""} além da responsável: ${options.map(a => a.name).join(", ")}.`}
-        </p>
-      )}
+
       {value.mode === "chosen" && (
-        <div className="rounded-lg p-3 space-y-1.5 max-h-48 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+        <div className="rounded-xl border border-border p-3">
           {options.length === 0 ? (
-            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não há outras áreas ativas além da responsável.</p>
-          ) : options.map(a => {
-            const id = `${idPrefix}-area-${a.id}`;
-            const checked = value.areaIds.includes(a.id);
-            return (
-              <label key={a.id} htmlFor={id} className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer">
-                <input
-                  id={id}
-                  type="checkbox"
-                  checked={checked}
-                  onChange={e => onChange({
-                    mode: "chosen",
-                    areaIds: e.target.checked ? [...value.areaIds, a.id] : value.areaIds.filter(x => x !== a.id),
-                  })}
-                  className="h-4 w-4 shrink-0"
-                  data-testid={`${idPrefix}-area-${a.id}`}
-                />
-                {a.name}
-              </label>
-            );
-          })}
-          {options.length > 0 && chosenCount === 0 && (
-            <p className="text-[11px] pt-1" style={{ color: "var(--muted-foreground)" }}>Nenhuma área marcada: só a responsável responde.</p>
+            <p className="text-[13px] text-muted-foreground">Não há outras áreas ativas além da responsável.</p>
+          ) : (
+            <>
+              <Eyebrow as="p" className="mb-2">Marque as áreas que também respondem</Eyebrow>
+              <div className="flex flex-wrap gap-1.5">
+                {options.map(a => {
+                  const id = `${idPrefix}-area-${a.id}`;
+                  const checked = value.areaIds.includes(a.id);
+                  return (
+                    <label key={a.id} htmlFor={id}
+                      className={cn(
+                        "font-condensed inline-flex items-center gap-1.5 min-h-11 sm:min-h-9 px-3 rounded-lg border text-[13px] font-bold uppercase tracking-[0.04em] cursor-pointer select-none transition-[background-color,border-color,color] duration-150",
+                        "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+                        checked ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                      )}>
+                      <input
+                        id={id}
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => onChange({
+                          mode: "chosen",
+                          areaIds: e.target.checked ? [...value.areaIds, a.id] : value.areaIds.filter(x => x !== a.id),
+                        })}
+                        className="sr-only"
+                        data-testid={`${idPrefix}-area-${a.id}`}
+                      />
+                      {checked && <Check size={13} aria-hidden />}
+                      {a.name}
+                    </label>
+                  );
+                })}
+              </div>
+              {chosen.length === 0 && (
+                <p className="mt-2 text-[12.5px] text-muted-foreground">Nenhuma marcada: só a responsável responde.</p>
+              )}
+            </>
           )}
+        </div>
+      )}
+
+      <p id={helpId} className="text-[12.5px] leading-relaxed text-muted-foreground">
+        {responsible
+          ? <><span className="font-semibold text-foreground">{plural(total, "área responde", "áreas respondem")}</span>{total > 1 ? " — a nota do critério é a média das áreas." : ` — ${responsible.name}.`}</>
+          : "Escolha a área responsável para definir quem avalia."}
+        {" "}Vale para eventos novos; nos já criados, use “Aplicar áreas do padrão” na Central.
+      </p>
+      {value.mode === "all" && options.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Áreas que respondem">
+          {responsible && <AreaChip name={responsible.name} responsible />}
+          {options.map(a => <AreaChip key={a.id} name={a.name} />)}
         </div>
       )}
     </fieldset>
   );
 }
 
-/** Chip discreto da linha do catálogo quando mais de uma área responde o critério. */
-export function EvaluatingAreasChip({ criterion, areas }: { criterion: Criterion; areas: AreaOption[] }) {
+/**
+ * Quem avalia, na linha do catálogo: a área responsável em destaque e as que
+ * também respondem. Com "todas as áreas", um selo só (a lista vai no título).
+ */
+export function EvaluatingAreasCell({ criterion, areas, max = 3 }: { criterion: Criterion; areas: AreaOption[]; max?: number }) {
   const extras = extraAreasOf(criterion, areas);
-  if (!criterion.evaluateAllAreas && extras.length === 0) return null;
-  const label = criterion.evaluateAllAreas ? "Todas as áreas" : `+${extras.length} área${extras.length !== 1 ? "s" : ""}`;
-  const title = extras.length > 0
-    ? `Também avaliam: ${extras.map(a => a.name).join(", ")}. A nota é a média das áreas.`
-    : "Todas as áreas ativas avaliam. A nota é a média das áreas.";
+  const all = !!criterion.evaluateAllAreas;
+  const shown = all ? [] : extras.slice(0, max);
+  const hidden = all ? [] : extras.slice(max);
+  const count = 1 + extras.length;
   return (
-    <span
-      data-testid={`chip-evaluating-areas-${criterion.id}`}
-      title={title}
-      className="rounded-lg px-2 py-1 font-bold text-[11px] uppercase inline-flex items-center gap-1 whitespace-nowrap"
-      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
-    >
-      <Users size={11} aria-hidden="true" /> {label}
-      <span className="sr-only"> — {title}</span>
+    <span className="flex flex-col gap-1.5 min-w-0">
+      <span className="flex flex-wrap items-center gap-1">
+        {criterion.responsibleAreaName
+          ? <AreaChip name={criterion.responsibleAreaName} responsible />
+          : <Chip tone="warn" title="Critério sem área responsável">Sem área</Chip>}
+        {all && (
+          <Chip tone="info" data-testid={`chip-evaluating-areas-${criterion.id}`}
+            title={extras.length > 0 ? `Também avaliam: ${extras.map(a => a.name).join(", ")}` : "Todas as áreas ativas avaliam"}>
+            + Todas as áreas
+          </Chip>
+        )}
+        {shown.map((a, i) => (
+          <span key={a.id} data-testid={i === 0 ? `chip-evaluating-areas-${criterion.id}` : undefined} className="contents">
+            <AreaChip name={a.name} />
+          </span>
+        ))}
+        {hidden.length > 0 && (
+          <span title={hidden.map(a => a.name).join(", ")} className="font-condensed inline-flex items-center h-6 px-1.5 text-[12px] font-bold text-muted-foreground">
+            +{hidden.length}<span className="sr-only"> {hidden.map(a => a.name).join(", ")}</span>
+          </span>
+        )}
+      </span>
+      {extras.length > 0 && (
+        <span className="text-[12.5px] leading-snug text-muted-foreground">Nota = média das {count} áreas</span>
+      )}
     </span>
   );
 }

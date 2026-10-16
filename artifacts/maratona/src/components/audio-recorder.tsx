@@ -27,14 +27,14 @@ export function AudioPlayer({ objectPath, className }: { objectPath: string; cla
 
   if (failed) {
     return (
-      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase text-destructive", className)}>
+      <p className={cn("flex items-center gap-1.5 text-[12px] font-semibold text-[var(--status-danger-text)]", className)}>
         <AlertCircle size={12} /> Falha ao carregar o áudio
       </p>
     );
   }
   if (!src) {
     return (
-      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase text-muted-foreground", className)} data-testid="audio-loading">
+      <p className={cn("flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground", className)} data-testid="audio-loading">
         <Loader2 size={12} className="animate-spin" /> Carregando áudio...
       </p>
     );
@@ -137,7 +137,7 @@ export function AudioRecorder({
             type="button"
             onClick={() => onChange(null)}
             data-testid="button-rerecord-audio"
-            className="inline-flex items-center gap-1.5 border border-border rounded-lg bg-card text-foreground px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors hover:bg-secondary"
+            className="font-condensed inline-flex min-h-11 md:min-h-9 items-center gap-1.5 border border-border rounded-lg bg-card text-foreground px-3 text-[13px] font-bold uppercase tracking-[0.06em] transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <RotateCcw size={12} /> Regravar áudio
           </button>
@@ -154,7 +154,7 @@ export function AudioRecorder({
           disabled={disabled || uploading}
           onClick={startRecording}
           data-testid="button-record-audio"
-          className="inline-flex items-center gap-2 border border-primary rounded-lg bg-primary text-primary-foreground px-4 py-2 text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="font-condensed inline-flex min-h-11 md:min-h-9 items-center gap-2 border border-border rounded-lg bg-card text-foreground px-3.5 text-[13px] font-bold uppercase tracking-[0.06em] transition-colors duration-150 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {uploading ? (
             <>
@@ -171,13 +171,13 @@ export function AudioRecorder({
           type="button"
           onClick={stopRecording}
           data-testid="button-stop-audio"
-          className="inline-flex items-center gap-2 border border-destructive rounded-lg bg-destructive px-4 py-2 text-xs font-bold uppercase tracking-wider text-destructive-foreground transition-opacity hover:opacity-90"
+          className="font-condensed inline-flex min-h-11 md:min-h-9 items-center gap-2 border border-destructive rounded-lg bg-destructive px-3.5 text-[13px] font-bold uppercase tracking-[0.06em] text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Square size={14} /> Parar ({mmss})
+          <Square size={14} /> Parar ({mmss})<span className="sr-only"> — gravando</span>
         </button>
       )}
       {error && (
-        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-destructive">
+        <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--status-danger-text)]">
           <AlertCircle size={12} /> {error}
         </p>
       )}

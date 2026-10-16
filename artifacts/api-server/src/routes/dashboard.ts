@@ -223,8 +223,11 @@ router.get("/dashboard/summary", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    // Mesmo recorte do Ranking (quem aparece lá) e só quem tem evento com nota.
     .where(and(
       eq(quarterlyResultsTable.cycleId, opCycleId),
+      rankingScope({ activeOnlyInCycleId: opCycle?.isCurrent ? opCycleId : null }),
+      sql`${quarterlyResultsTable.eventsCount} > 0`,
       sql`${quarterlyResultsTable.finalResult}::numeric < 50`
     ))
     .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric ASC`)
@@ -375,9 +378,17 @@ router.get("/dashboard/quarterly-evolution", async (_req, res) => {
   if (cycles.length === 0) { res.json([]); return; }
 
   const cycleIds = cycles.map(c => c.id);
-  const allResults = await db.select({ cycleId: quarterlyResultsTable.cycleId, finalResult: quarterlyResultsTable.finalResult })
+  // Mesma conta da "Nota média" de cada ciclo: recorte do Ranking e só quem
+  // tem evento com nota (no ciclo atual, só ativos).
+  const current = cycles.find(c => c.isCurrent);
+  const allResults = (await db.select({ cycleId: quarterlyResultsTable.cycleId, finalResult: quarterlyResultsTable.finalResult })
     .from(quarterlyResultsTable)
-    .where(inArray(quarterlyResultsTable.cycleId, cycleIds));
+    .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    .where(and(
+      inArray(quarterlyResultsTable.cycleId, cycleIds),
+      rankingScope({ activeOnlyInCycleId: current?.id ?? null }),
+      sql`${quarterlyResultsTable.eventsCount} > 0`,
+    )));
 
   const points = cycles
     .map(c => {

@@ -1,7 +1,6 @@
 // Helpers puros da página de Detalhe do Evento: parse das observações
 // importadas, casamento de critério por nome, cargos de participante,
-// itens da Matriz de Conformidade e estilos compartilhados.
-import type React from "react";
+// itens da Matriz de Conformidade.
 import { fmtNum } from "@/lib/utils";
 import type {
   ConformityItem,
@@ -10,8 +9,6 @@ import type {
   ImportedConformityRatio,
   ImportedCriterionScore,
 } from "./types";
-
-export const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 /** Nota com 1 casa decimal (vírgula), como no restante da página. */
 export const fmt = (v: number) => `${fmtNum(v, 1)}`;

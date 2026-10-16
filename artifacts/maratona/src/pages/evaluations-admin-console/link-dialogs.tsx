@@ -1,16 +1,18 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AdminPublicToken } from "@/lib/routing-api";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { Link2, Copy, X, CheckCircle, RotateCcw } from "lucide-react";
-import { CONDENSED, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
-import { fieldStyle, fmtDT } from "./helpers";
+import { Check, Link2, Loader2, RotateCcw, ShieldCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeading, Notice, btnGhost, btnPrimary, btnSecondary, dialogCls, inputCls } from "./console-ui";
 import { AreaEvaluatorSelect } from "./pickers";
+import { LinkEventCard, LinkHistory, LinkItems, LinkUrlBox } from "./link-bits";
 import type { ToastFn } from "./use-event-mutations";
 import type { ConformityLinkDialogState, LinkDialogState } from "./types";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
+const labelCls = "font-condensed block text-[12px] font-bold uppercase tracking-[0.08em] text-foreground mb-1.5";
 
-/** Link Freelancer dialog (critério) */
+/** Link para freela (critérios de uma área / de um avaliador). */
 export function LinkDialog(props: {
   linkDialog: LinkDialogState;
   setLinkDialog: SetState<LinkDialogState | null>;
@@ -34,55 +36,42 @@ export function LinkDialog(props: {
     linkCopied, setLinkCopied, linkReusedName, setLinkReusedName, handleGenerateLink, generating, allTokens, batchEventHeader, toast,
   } = props;
   const needsEvaluator = linkDialog.areaMode && linkDialog.assignedToId == null;
+  const close = () => { setLinkDialog(null); setGeneratedLinkUrl(null); };
+  const relevantTokens = (allTokens ?? []).filter(t =>
+    (t.tokenType === "criteria" || t.tokenType === "criteria_with_conformity")
+    && (t.criterionIds ?? []).some(id => linkDialog.criterionIds.includes(id)),
+  );
+  const generate = () => { if (!generating && !needsEvaluator) handleGenerateLink(); };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={`Link para freela: ${linkDialog.criterionNames.join(", ")}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        {/* header */}
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>
-              Link para freela{linkDialog.criterionIds.length > 1 ? ` · ${linkDialog.criterionIds.length} critérios` : ""}
-            </p>
-            {linkDialog.criterionNames.length === 1 ? (
-              <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{linkDialog.criterionNames[0]}</h3>
-            ) : (
-              <ul className="mt-0.5 space-y-0.5">
-                {linkDialog.criterionNames.map((n, i) => (
-                  <li key={i} className="font-black uppercase text-[12.5px] truncate leading-tight" style={{ fontFamily: CONDENSED }}>{n}</li>
-                ))}
-              </ul>
-            )}
-            {linkDialog.areaMode ? (
-              <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Área: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.areaName}</span></p>
-            ) : (
-              <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.assignedToName}</span></p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => { setLinkDialog(null); setGeneratedLinkUrl(null); }}
-            aria-label="Fechar diálogo de link"
-            title="Fechar"
-            className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
-            style={{ border: "1px solid var(--border)" }}
-          >
-            <X size={14} />
-          </button>
-        </div>
+    <Dialog open onOpenChange={o => { if (!o) close(); }}>
+      <DialogContent className={dialogCls} data-testid="dialog-freela-link">
+        <DialogHeading
+          icon={generatedLinkUrl ? Check : Link2}
+          tone={generatedLinkUrl ? "brand" : "neutral"}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={generatedLinkUrl ? "Link pronto" : "Link para freela"}
+          description={generatedLinkUrl
+            ? <>Copie e envie. A resposta conta como a de <b className="font-semibold text-foreground">{linkDialog.assignedToName ?? "avaliador da área"}</b>.</>
+            : linkDialog.areaMode
+              ? <>Um freela responde o formulário de <b className="font-semibold text-foreground">{linkDialog.areaName}</b> em nome de um avaliador da área.</>
+              : <>Um freela responde estes critérios em nome de <b className="font-semibold text-foreground">{linkDialog.assignedToName}</b>.</>}
+        />
 
-        <div className="px-5 py-4 space-y-4">
-          {/* nota de conformidade bundled */}
-          {linkDialog?.includeConformity && (
-            <div className="rounded-lg px-3 py-2 text-[11px] flex items-start gap-2" style={{ border: "1px solid var(--primary)", backgroundColor: "var(--secondary)" }}>
-              <CheckCircle size={13} className="shrink-0 mt-0.5" style={{ color: GOOD_TEXT }} />
-              <span>Este link incluirá o critério <strong>e</strong> a Matriz de Conformidade de Cenografia no mesmo questionário.</span>
-            </div>
-          )}
+        <div className="space-y-4">
+          <LinkEventCard
+            header={batchEventHeader}
+            formLine={linkDialog.areaMode
+              ? <>Formulário <b className="font-semibold">{linkDialog.areaName}</b></>
+              : <>Avaliador <b className="font-semibold">{linkDialog.assignedToName}</b></>}
+          />
+          <LinkItems names={linkDialog.criterionNames} withMatrix={linkDialog.includeConformity} />
+
           {/* Ciclo por área: em nome de qual avaliador da área o link responde. */}
           {linkDialog.areaMode && linkDialog.areaId != null && (
             <div>
-              <label htmlFor="link-area-evaluator" className="block text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
-                Em nome de qual avaliador da área?
+              <label htmlFor="link-area-evaluator" className={labelCls}>
+                Em nome de qual avaliador? <span className="text-[var(--status-danger-text)]">· obrigatório</span>
               </label>
               <AreaEvaluatorSelect
                 id="link-area-evaluator"
@@ -95,123 +84,81 @@ export function LinkDialog(props: {
                   setLinkReusedName(null);
                 }}
               />
-              <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>
+              <p className="text-[12.5px] mt-1.5 leading-snug text-muted-foreground">
                 No ciclo por área, a resposta do link conta como a desse avaliador de {linkDialog.areaName}.
               </p>
             </div>
           )}
-          {/* recipient + generate */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
-              Para quem é o link? <span className="font-normal normal-case">(opcional)</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={linkRecipientName}
-                aria-label="Para quem é o link"
-                onChange={e => setLinkRecipientName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleGenerateLink(); }}
-                placeholder="Nome do freela"
-                className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
-                style={fieldStyle}
-              />
-              <button
-                type="button"
-                onClick={handleGenerateLink}
-                disabled={generating || needsEvaluator}
-                title={needsEvaluator ? "Escolha antes o avaliador da área" : undefined}
-                className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <Link2 size={12} /> {generating ? "Gerando…" : "Gerar Link"}
-              </button>
-            </div>
-          </div>
 
-          {/* generated URL */}
-          {generatedLinkUrl && (
-            <div className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              {linkReusedName ? (
-                <p className="text-[11px] font-bold leading-snug flex items-start gap-1.5" style={{ color: AMBER_TEXT }} data-testid="link-reused-notice">
-                  <RotateCcw size={11} className="shrink-0 mt-[2px]" aria-hidden />
-                  <span>Link já existente reaproveitado — o nome foi atualizado para {linkReusedName}.</span>
-                </p>
-              ) : (
-                <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: GOOD_TEXT }}>Link gerado — copie e envie</p>
+          {!generatedLinkUrl ? (
+            <div>
+              <label htmlFor="link-recipient" className={labelCls}>
+                Para quem é o link <span className="font-body normal-case tracking-normal font-normal text-muted-foreground">(opcional)</span>
+              </label>
+              <input
+                id="link-recipient"
+                type="text"
+                autoComplete="off"
+                value={linkRecipientName}
+                onChange={e => setLinkRecipientName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") generate(); }}
+                placeholder="Nome do freela — ex.: João da Silva"
+                className={inputCls}
+              />
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {linkReusedName && (
+                <Notice icon={RotateCcw} tone="warn" testId="link-reused-notice">
+                  <b className="font-semibold">Link já existente reaproveitado</b> — o nome foi atualizado para {linkReusedName}. O mesmo link continua valendo.
+                </Notice>
               )}
-              <div className="flex gap-2 items-start">
-                <input
-                  readOnly
-                  aria-label="Link gerado"
-                  value={generatedLinkUrl}
-                  className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
-                  style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
-                  onFocus={e => e.target.select()}
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const text = `${batchEventHeader} — ${linkDialog?.assignedToName ?? "Avaliador"}: ${generatedLinkUrl}`;
-                    if (await copyToClipboard(text)) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }
-                    else toast(COPY_FAILED_TOAST);
-                  }}
-                  className="rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase flex items-center gap-1 shrink-0 transition-colors hover:opacity-80"
-                  style={{ border: "1px solid var(--border)" }}
-                >
-                  {linkCopied ? <><CheckCircle size={11} style={{ color: GOOD_TEXT }} /> Copiado!</> : <><Copy size={11} /> Copiar</>}
-                </button>
-              </div>
+              <LinkUrlBox
+                id="freela-link-url"
+                url={generatedLinkUrl}
+                copied={linkCopied}
+                onCopy={async () => {
+                  const text = `${batchEventHeader} — ${linkDialog.assignedToName ?? "Avaliador"}: ${generatedLinkUrl}`;
+                  if (await copyToClipboard(text)) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }
+                  else toast(COPY_FAILED_TOAST);
+                }}
+              />
             </div>
           )}
 
-          {/* history */}
-          {(() => {
-            const relevantTokens: AdminPublicToken[] = (allTokens ?? []).filter(t =>
-              (t.tokenType === "criteria" || t.tokenType === "criteria_with_conformity")
-              && (t.criterionIds ?? []).some(id => linkDialog.criterionIds.includes(id)),
-            );
-            if (relevantTokens.length === 0) return null;
-            return (
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Histórico de links enviados</p>
-                <div className="rounded-lg max-h-48 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
-                  {relevantTokens.map((t, i) => (
-                    <div key={t.id} className="flex items-start justify-between px-3 py-2.5 gap-3" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-[11px] font-bold truncate">
-                          {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
-                        </p>
-                        {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
-                          <p className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>Para: {t.recipientName}</p>
-                        )}
-                        <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Enviado: {fmtDT(t.createdAt)}</p>
-                        {t.usedAt && (
-                          <p className="text-[11px] font-bold" style={{ color: GOOD_TEXT }}>Respondido: {fmtDT(t.usedAt)}</p>
-                        )}
-                      </div>
-                      {t.usedAt ? (
-                        <span className="shrink-0 text-[11px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 mt-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>
-                          <CheckCircle size={10} /> Respondido
-                        </span>
-                      ) : (
-                        <span className="shrink-0 text-[11px] font-bold uppercase px-2 py-0.5 rounded-full mt-0.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-                          Pendente
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          <LinkHistory tokens={relevantTokens} />
         </div>
-      </div>
-    </div>
+
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          {generatedLinkUrl ? (
+            <>
+              <button type="button" onClick={() => { setGeneratedLinkUrl(null); setLinkReusedName(null); setLinkRecipientName(""); setLinkCopied(false); }} className={btnGhost}>
+                <Link2 size={14} aria-hidden /> Gerar outro link
+              </button>
+              <button type="button" onClick={close} className={btnSecondary}>Fechar</button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={close} className={btnSecondary}>Cancelar</button>
+              <button
+                type="button"
+                data-testid="button-generate-freela-link"
+                onClick={generate}
+                disabled={generating || needsEvaluator}
+                title={needsEvaluator ? "Escolha antes o avaliador da área" : undefined}
+                className={btnPrimary}
+              >
+                {generating ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Gerando...</> : <><Link2 size={15} aria-hidden /> Gerar link</>}
+              </button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/** Conformity Link dialog */
+/** Link para freela da Matriz de Conformidade (Cenografia ou Ferramentas). */
 export function ConformityLinkDialog(props: {
   conformityLinkDialog: ConformityLinkDialogState;
   setConformityLinkDialog: SetState<ConformityLinkDialogState | null>;
@@ -231,93 +178,74 @@ export function ConformityLinkDialog(props: {
     conformityLinkUrl, setConformityLinkUrl, conformityLinkCopied, setConformityLinkCopied,
     handleGenerateConformityLink, generating, batchEventHeader, toast,
   } = props;
+  const canGenerate = !!conformityLinkRecipientName.trim() && !generating;
+  const close = () => setConformityLinkDialog(null);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={`Link para freela da conformidade: ${conformityLinkDialog.label}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Link para freela · Conformidade</p>
-            <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{conformityLinkDialog.label}</h3>
-            {conformityLinkDialog.evaluatorName && (
-              <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{conformityLinkDialog.evaluatorName}</span></p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setConformityLinkDialog(null)}
-            aria-label="Fechar diálogo de link de conformidade"
-            title="Fechar"
-            className="shrink-0 ml-3 transition-colors hover:opacity-70"
-            style={{ color: "var(--muted-foreground)" }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <div className="px-5 py-4 space-y-4">
+    <Dialog open onOpenChange={o => { if (!o) close(); }}>
+      <DialogContent className={dialogCls} data-testid="dialog-conformity-link">
+        <DialogHeading
+          icon={conformityLinkUrl ? Check : ShieldCheck}
+          tone={conformityLinkUrl ? "brand" : "neutral"}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={conformityLinkUrl ? "Link pronto" : `Link · ${conformityLinkDialog.label}`}
+          description={conformityLinkUrl
+            ? <>Copie e envie para <b className="font-semibold text-foreground">{conformityLinkRecipientName.trim() || "o freela"}</b>.</>
+            : <>Um freela preenche a {conformityLinkDialog.key === "cenografia" ? "Matriz de Conformidade da Cenografia" : "Guarda de Ferramentas"} deste evento.</>}
+        />
+        <div className="space-y-4">
+          <LinkEventCard
+            header={batchEventHeader}
+            formLine={conformityLinkDialog.evaluatorName ? <>Responsável <b className="font-semibold">{conformityLinkDialog.evaluatorName}</b></> : undefined}
+          />
           {!conformityLinkUrl ? (
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
-                Para quem é o link?
+              <label htmlFor="conformity-link-recipient" className={labelCls}>
+                Para quem é o link <span className="text-[var(--status-danger-text)]">· obrigatório</span>
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={conformityLinkRecipientName}
-                  aria-label="Para quem é o link"
-                  onChange={e => setConformityLinkRecipientName(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleGenerateConformityLink(); }}
-                  placeholder="Nome do freela"
-                  className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
-                  style={fieldStyle}
-                />
-                <button
-                  type="button"
-                  onClick={handleGenerateConformityLink}
-                  disabled={generating}
-                  className="rounded-lg px-3 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                >
-                  <Link2 size={12} /> Gerar Link
-                </button>
-              </div>
+              <input
+                id="conformity-link-recipient"
+                type="text"
+                autoComplete="off"
+                value={conformityLinkRecipientName}
+                onChange={e => setConformityLinkRecipientName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && canGenerate) handleGenerateConformityLink(); }}
+                placeholder="Nome do freela — ex.: João da Silva"
+                className={inputCls}
+              />
             </div>
           ) : (
-            <div className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: GOOD_TEXT }}>Link gerado — copie e envie</p>
-              <div className="flex gap-2 items-start">
-                <input
-                  readOnly
-                  aria-label="Link gerado"
-                  value={conformityLinkUrl}
-                  className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
-                  style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
-                  onFocus={e => e.target.select()}
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const text = `${batchEventHeader} — Matriz ${conformityLinkDialog?.label ?? "de Conformidade"}: ${conformityLinkUrl}`;
-                    if (await copyToClipboard(text)) { setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }
-                    else toast(COPY_FAILED_TOAST);
-                  }}
-                  className="shrink-0 rounded-lg px-2.5 py-2 flex items-center gap-1 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                  style={{ border: "1px solid var(--border)" }}
-                >
-                  {conformityLinkCopied ? <><CheckCircle size={12} style={{ color: GOOD_TEXT }} /> Copiado</> : <><Copy size={12} /> Copiar</>}
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setConformityLinkUrl(null); setConformityLinkRecipientName(""); }}
-                className="text-[11px] font-bold uppercase underline transition-colors hover:opacity-70"
-                style={{ color: "var(--muted-foreground)" }}
-              >
-                Gerar outro link
-              </button>
-            </div>
+            <LinkUrlBox
+              id="conformity-link-url"
+              url={conformityLinkUrl}
+              copied={conformityLinkCopied}
+              onCopy={async () => {
+                const text = `${batchEventHeader} — Matriz ${conformityLinkDialog?.label ?? "de Conformidade"}: ${conformityLinkUrl}`;
+                if (await copyToClipboard(text)) { setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }
+                else toast(COPY_FAILED_TOAST);
+              }}
+            />
           )}
         </div>
-      </div>
-    </div>
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          {conformityLinkUrl ? (
+            <>
+              <button type="button" onClick={() => { setConformityLinkUrl(null); setConformityLinkRecipientName(""); }} className={btnGhost}>
+                <Link2 size={14} aria-hidden /> Gerar outro link
+              </button>
+              <button type="button" onClick={close} className={btnSecondary}>Fechar</button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={close} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-generate-conformity-link" disabled={!canGenerate} onClick={handleGenerateConformityLink} className={btnPrimary}
+                title={!conformityLinkRecipientName.trim() ? "Informe para quem é o link" : undefined}>
+                {generating ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Gerando...</> : <><Link2 size={15} aria-hidden /> Gerar link</>}
+              </button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

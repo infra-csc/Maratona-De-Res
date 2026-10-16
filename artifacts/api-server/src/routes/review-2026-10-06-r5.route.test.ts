@@ -224,3 +224,12 @@ test("GET /events traz areaResponses no ciclo por área (critério ativo; feito 
   const oldList = (await h.api("GET", `/events?cycleId=${atual}`, { role: "admin", userId: adminU })).data as { id: number; areaResponses: unknown }[];
   assert.equal(oldList.find(e => e.id === old)?.areaResponses, null);
 });
+
+test("GET /cycles traz stats.evaluationsSubmitted; histórico traz effectiveMinEvents", async () => {
+  const ev = await openEvent(areaCycle, [critA], "Evento stats R8", "2024-10-01");
+  await h.fx.evaluation({ eventId: ev, criterionId: critA, evaluatorUserId: ana, score: 7 });
+  const list = (await h.api("GET", "/cycles", { role: "admin", userId: adminU })).data as { id: number; stats: { evaluationsSubmitted: number } }[];
+  assert.ok((list.find(c => c.id === areaCycle)?.stats.evaluationsSubmitted ?? 0) >= 1);
+  const hist = (await h.api("GET", `/cycles/${areaCycle}/history`, { role: "admin", userId: adminU })).data as { cycle: { effectiveMinEvents?: number } };
+  assert.equal(typeof hist.cycle.effectiveMinEvents, "number");
+});

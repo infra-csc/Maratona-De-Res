@@ -1,190 +1,182 @@
-import { plural } from "@/lib/utils";
+// Atualizar datas dos eventos (só admin), num diálogo em passos: a planilha
+// lida → o que muda no banco (prévia do servidor, dryRun) → digitar APLICAR
+// → resultado (inclui os eventos de ciclo fechado deixados de fora). Mesmas
+// chamadas de antes.
+import { useState } from "react";
 import { getGetEventsQueryKey, bulkSyncEventDates, type BulkDateSyncResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Upload, CheckCircle2, CalendarCheck } from "lucide-react";
-import { ConfirmDialog } from "@/components/shared";
-import { useRef, useState } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
+import { ArrowRight, CalendarCheck, Loader2 } from "lucide-react";
+import { cn, plural } from "@/lib/utils";
 import { serverErrorMessage } from "./shared";
 import { parseDateSyncRows, type DateSyncEntry } from "./date-sync-parser";
+import {
+  ActionDialog, ClosedCycleSkipped, ConsequenceList, DoneBox, ErrorBox, FieldLabel, FileButton, NumberStrip, ToolRow,
+  btnDanger, btnPrimary, btnSecondary, btnSmall, dialogFooterCls, inputCls,
+} from "./integration-ui";
 
-/** Quantas mudanças de data mostrar na prévia antes do "+N mais". */
-const DATE_PREVIEW_LIMIT = 10;
+const PREVIEW_LIMIT = 10;
+const PHRASE = "APLICAR";
+type Done = { updated: number; notFound: number; notFoundIds: string[]; skipped: BulkDateSyncResult["skippedClosedCycle"] };
 
-/**
- * Card "Atualizar Datas dos Eventos" (só admin): lê a planilha, mostra as
- * linhas lidas, pede ao servidor a prévia do que muda e só grava depois de
- * digitar APLICAR.
- */
 export function DateSyncCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [dateSyncPreview, setDateSyncPreview] = useState<DateSyncEntry[] | null>(null);
-  const [dateSyncPending, setDateSyncPending] = useState(false);
-  const [dateSyncResult, setDateSyncResult] = useState<{ updated: number; notFound: number; notFoundIds: string[] } | null>(null);
-  const [dateSyncServerPreview, setDateSyncServerPreview] = useState<BulkDateSyncResult | null>(null);
-  const dateSyncFileRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<DateSyncEntry[] | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [server, setServer] = useState<BulkDateSyncResult | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const open = rows !== null || done !== null;
 
-  function handleDateSyncFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+    setServer(null); setDone(null); setError(null); setTyped("");
     file.arrayBuffer().then(buffer => {
       const wb = XLSX.read(buffer, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
-      const parsed = parseDateSyncRows(rows);
-      setDateSyncPreview(parsed);
-      setDateSyncResult(null);
-    }).catch(() => toast({ title: "Erro ao ler arquivo", variant: "destructive" }));
-    e.target.value = "";
+      const raw = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
+      setFileName(file.name);
+      setRows(parseDateSyncRows(raw));
+    }).catch(() => { setFileName(file.name); setRows([]); setError("Não deu para ler o arquivo. Confira se é uma planilha .xlsx."); });
   }
+  const payload = () => (rows ?? []).map(r => ({ externalId: r.externalId, name: r.name, date: r.date }));
 
-  // Atualização de datas em dois passos: a planilha vira uma prévia calculada
-  // pelo SERVIDOR (dryRun: o que muda de fato, o que já está certo, o que não
-  // foi achado); só depois de digitar APLICAR o lote é gravado.
-  const dateSyncRows = () => (dateSyncPreview ?? []).map(e => ({ externalId: e.externalId, name: e.name, date: e.date }));
-
-  async function handleDateSyncPreview() {
-    if (!dateSyncPreview) return;
-    setDateSyncPending(true);
+  async function check() {
+    setPending(true); setError(null);
     try {
-      const data = await bulkSyncEventDates({ updates: dateSyncRows(), dryRun: true });
-      if (data.changeCount === 0) {
-        setDateSyncServerPreview(null);
-        toast({
-          title: "Nenhuma data para atualizar",
-          description: `${data.unchanged === 1 ? "A data localizada já está correta" : `As ${data.unchanged} datas localizadas já estão corretas`}${data.notFound > 0 ? `; ${plural(data.notFound, "evento não encontrado", "eventos não encontrados")} no banco` : ""}.`,
-        });
-        return;
-      }
-      setDateSyncServerPreview(data);
+      setServer(await bulkSyncEventDates({ updates: payload(), dryRun: true }));
     } catch (err: unknown) {
-      toast({ title: "Falha ao gerar a prévia", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
-    } finally {
-      setDateSyncPending(false);
-    }
+      setError(serverErrorMessage(err, "Não foi possível gerar a prévia."));
+    } finally { setPending(false); }
   }
-
-  async function handleDateSyncApply() {
-    if (!dateSyncPreview) return;
-    setDateSyncPending(true);
+  async function apply() {
+    setPending(true); setError(null);
     try {
-      const data = await bulkSyncEventDates({ updates: dateSyncRows(), confirm: "APLICAR" });
-      setDateSyncResult({ updated: data.updated, notFound: data.notFound, notFoundIds: data.notFoundIds });
-      setDateSyncServerPreview(null);
-      setDateSyncPreview(null);
+      const data = await bulkSyncEventDates({ updates: payload(), confirm: PHRASE });
+      setDone({ updated: data.updated, notFound: data.notFound, notFoundIds: data.notFoundIds, skipped: data.skippedClosedCycle });
+      setRows(null); setServer(null);
       qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      toast({ title: `${plural(data.updated, "evento atualizado", "eventos atualizados")}${data.notFound > 0 ? `, ${plural(data.notFound, "não encontrado", "não encontrados")}` : ""}` });
     } catch (err: unknown) {
-      toast({ title: "Falha ao atualizar datas", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
-    } finally {
-      setDateSyncPending(false);
-    }
+      setError(serverErrorMessage(err, "Não foi possível atualizar as datas."));
+    } finally { setPending(false); }
   }
+  const close = () => { if (!pending) { setRows(null); setServer(null); setDone(null); setError(null); setTyped(""); } };
+
+  const step = done ? "done" : server ? "confirm" : "read";
+  const nothing = server && server.changeCount === 0;
 
   return (
-    <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-[var(--info)]">
-      <CardHeader className="bg-[var(--info)]/10 border-b border-[var(--info)]/30 pb-4">
-        <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-[var(--info)]" style={{ fontFamily: CONDENSED }}>
-          <CalendarCheck size={18} /> Atualizar Datas dos Eventos
-        </CardTitle>
-        <CardDescription className="text-[var(--info)]/80">
-          Importa a planilha de eventos (colunas: SKU, ID Evento, Evento, Data Evento) e define a data de cada evento usando o ID externo como chave.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-6 space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Útil quando os eventos têm data única (não período). O sistema iguala <strong>início = fim = data da planilha</strong> para cada evento localizado pelo ID externo.
-        </p>
+    <>
+      <ToolRow icon={CalendarCheck} title="Datas dos eventos (.xlsx)" testId="tool-date-sync"
+        columns={["SKU", "ID Evento", "Evento", "Data Evento"]} traits={[{ label: "Mostra prévia antes", tone: "ok" }, { label: "Pede APLICAR", tone: "warn" }]}
+        action={<FileButton id="input-date-sync" accept=".xlsx" onFile={onFile} label="Escolher planilha" busyLabel="Lendo…" className={btnSmall} testId="button-date-sync" />}>
+        Para eventos de um dia só: acha cada evento pelo ID externo e iguala <span className="font-semibold text-foreground">início = fim = data da planilha</span>.
+      </ToolRow>
 
-        <input ref={dateSyncFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleDateSyncFileUpload} />
-        <Button
-          variant="outline"
-          className="w-full bg-card border-dashed border-2 border-[var(--info)]/50 hover:border-[var(--info)] hover:bg-[var(--info)]/10 transition-colors"
-          onClick={() => { setDateSyncPreview(null); setDateSyncResult(null); dateSyncFileRef.current?.click(); }}
-        >
-          <Upload size={16} className="mr-2 text-[var(--info)]" />
-          Selecionar planilha .xlsx
-        </Button>
+      <ActionDialog open={open} onOpenChange={o => { if (!o) close(); }} busy={pending} wide="lg" icon={CalendarCheck}
+        tone={step === "done" ? "brand" : step === "confirm" && !nothing ? "danger" : "neutral"}
+        testId={step === "confirm" ? "dialog-bulk-date-sync" : "dialog-date-sync"}
+        title={step === "done" ? "Datas atualizadas" : step === "confirm" ? (nothing ? "Nenhuma data para mudar" : `Atualizar a data de ${plural(server?.changeCount ?? 0, "evento", "eventos")}?`) : "Planilha lida"}
+        description={step === "read" ? <span className="break-all">{fileName}</span> : step === "confirm" && !nothing ? "Grava direto no banco. Confira a lista antes." : undefined}>
 
-        {dateSyncPreview && (
-          <div className="space-y-3">
-            <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-[var(--info)]">{plural(dateSyncPreview.length, "evento encontrado", "eventos encontrados")} na planilha</span>
-              <span className="text-xs text-[var(--info)]">{dateSyncPreview[0]?.date} → {dateSyncPreview[dateSyncPreview.length - 1]?.date}</span>
-            </div>
-            <div className="max-h-40 overflow-y-auto border rounded-lg divide-y text-xs">
-              {dateSyncPreview.slice(0, 10).map(e => (
-                <div key={e.externalId} className="px-3 py-1.5 flex items-center justify-between gap-2 bg-card">
-                  <span className="text-muted-foreground truncate">{e.name}</span>
-                  <span className="font-mono font-bold text-[var(--info)] shrink-0">{e.date}</span>
+        {step === "read" && rows && (
+          <>
+            {rows.length > 0 ? (
+              <>
+                <p className="text-[13.5px] text-foreground">
+                  <span className="font-semibold">{plural(rows.length, "evento encontrado", "eventos encontrados")}</span>
+                  <span className="text-muted-foreground"> · datas de {rows[0]?.date} a {rows[rows.length - 1]?.date}</span>
+                </p>
+                <ul className="rounded-xl border border-border divide-y divide-border max-h-52 overflow-y-auto text-[13px]">
+                  {rows.slice(0, PREVIEW_LIMIT).map(r => (
+                    <li key={r.externalId} className="px-3.5 py-2 flex items-center justify-between gap-3">
+                      <span className="truncate text-foreground">{r.name}</span>
+                      <span className="shrink-0 font-mono tabular-nums text-muted-foreground">{r.date}</span>
+                    </li>
+                  ))}
+                  {rows.length > PREVIEW_LIMIT && <li className="px-3.5 py-2 text-center text-muted-foreground">e mais {rows.length - PREVIEW_LIMIT}</li>}
+                </ul>
+                <p className="text-[12.5px] text-muted-foreground">Próximo passo: o sistema confere no banco o que muda de fato. Nada é gravado ainda.</p>
+              </>
+            ) : !error && <p className="text-[13.5px] text-muted-foreground">Nenhuma linha válida na planilha (ID do evento e data).</p>}
+          </>
+        )}
+
+        {step === "confirm" && server && (
+          <>
+            <NumberStrip items={[
+              { label: "Mudam", value: server.changeCount, tone: server.changeCount > 0 ? "warn" : undefined },
+              { label: "Já certos", value: server.unchanged },
+              { label: "Não encontrados", value: server.notFound, tone: server.notFound > 0 ? "danger" : undefined },
+            ]} />
+            {server.changes.length > 0 && (
+              <ul className="rounded-xl border border-border divide-y divide-border max-h-60 overflow-y-auto text-[13px]">
+                {server.changes.slice(0, PREVIEW_LIMIT).map((c, i) => (
+                  <li key={`${c.eventId}-${i}`} className="px-3.5 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3">
+                    <span className="min-w-0 truncate text-foreground">{c.eventName}{c.newName && <span className="text-muted-foreground"> → {c.newName}</span>}</span>
+                    <span className="shrink-0 inline-flex items-center gap-1.5 font-mono tabular-nums text-muted-foreground">
+                      {c.startDateBefore}{c.endDateBefore !== c.startDateBefore ? `…${c.endDateBefore}` : ""}
+                      <ArrowRight size={12} aria-hidden /> <span className="font-semibold text-foreground">{c.startDateAfter}</span>
+                    </span>
+                  </li>
+                ))}
+                {server.changes.length > PREVIEW_LIMIT && <li className="px-3.5 py-2 text-center text-muted-foreground">e mais {server.changes.length - PREVIEW_LIMIT}</li>}
+              </ul>
+            )}
+            <ClosedCycleSkipped items={server.skippedClosedCycle} future />
+            {!nothing && (
+              <>
+                <ConsequenceList items={[
+                  <>Início e fim de cada evento listado passam a ser a data da planilha.</>,
+                  server.notFound > 0 ? <>{plural(server.notFound, "linha sem evento correspondente é ignorada", "linhas sem evento correspondente são ignoradas")}.</> : <>Todas as linhas acharam o evento.</>,
+                ]} />
+                <div>
+                  <FieldLabel htmlFor="date-sync-phrase">Digite {PHRASE} para confirmar</FieldLabel>
+                  <input id="date-sync-phrase" data-testid="input-date-sync-confirm" value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off" placeholder={PHRASE}
+                    className={cn(inputCls, "font-mono tracking-[0.08em]")} />
                 </div>
-              ))}
-              {dateSyncPreview.length > 10 && (
-                <div className="px-3 py-1.5 text-muted-foreground text-center">+{dateSyncPreview.length - 10} mais…</div>
-              )}
-            </div>
-            <Button
-              className="w-full bg-primary hover:opacity-90 text-primary-foreground"
-              disabled={dateSyncPending}
-              onClick={handleDateSyncPreview}
-            >
-              <CalendarCheck size={16} className="mr-2" />
-              {dateSyncPending ? "Conferindo…" : `Conferir o que muda no banco (${dateSyncPreview.length} linhas)`}
-            </Button>
-          </div>
+              </>
+            )}
+          </>
         )}
 
-        <ConfirmDialog
-          open={!!dateSyncServerPreview}
-          onOpenChange={(open) => { if (!open) setDateSyncServerPreview(null); }}
-          title={`Atualizar datas de ${plural(dateSyncServerPreview?.changeCount ?? 0, "evento")}`}
-          description={dateSyncServerPreview
-            ? `Grava direto em produção: início = fim = data da planilha${dateSyncServerPreview.unchanged > 0 ? `; ${dateSyncServerPreview.unchanged === 1 ? "1 evento já está correto e fica como está" : `${dateSyncServerPreview.unchanged} eventos já estão corretos e ficam como estão`}` : ""}${dateSyncServerPreview.notFound > 0 ? `; ${dateSyncServerPreview.notFound === 1 ? "1 linha sem evento correspondente será ignorada" : `${dateSyncServerPreview.notFound} linhas sem evento correspondente serão ignoradas`}` : ""}.`
-            : undefined}
-          confirmLabel="Aplicar"
-          confirmText="APLICAR"
-          destructive
-          isPending={dateSyncPending}
-          onConfirm={handleDateSyncApply}
-          data-testid="dialog-bulk-date-sync"
-        >
-          {dateSyncServerPreview && (
-            <ul className="max-h-60 overflow-y-auto rounded-lg text-xs divide-y border border-border">
-              {dateSyncServerPreview.changes.slice(0, DATE_PREVIEW_LIMIT).map((c, i) => (
-                <li key={`${c.eventId}-${i}`} className="px-3 py-1.5 flex items-center justify-between gap-2">
-                  <span className="truncate">
-                    {c.eventName}
-                    {c.newName && <span className="text-muted-foreground"> → {c.newName}</span>}
-                  </span>
-                  <span className="font-mono shrink-0 text-muted-foreground">
-                    {c.startDateBefore}{c.endDateBefore !== c.startDateBefore ? `…${c.endDateBefore}` : ""} → <span className="font-bold text-foreground">{c.startDateAfter}</span>
-                  </span>
-                </li>
-              ))}
-              {dateSyncServerPreview.changes.length > DATE_PREVIEW_LIMIT && (
-                <li className="px-3 py-1.5 text-muted-foreground text-center">+{dateSyncServerPreview.changes.length - DATE_PREVIEW_LIMIT} mais…</li>
+        {step === "done" && done && (
+          <>
+            <NumberStrip items={[{ label: "Eventos atualizados", value: done.updated, tone: "ok" }, { label: "IDs não encontrados", value: done.notFound, tone: done.notFound > 0 ? "warn" : undefined }]} />
+            <ClosedCycleSkipped items={done.skipped} />
+            {done.notFoundIds.length > 0
+              ? <DoneBox warn><span className="font-semibold">IDs não encontrados:</span> <span className="break-all">{done.notFoundIds.join(", ")}</span></DoneBox>
+              : <DoneBox>Todas as datas foram gravadas.</DoneBox>}
+          </>
+        )}
+
+        <ErrorBox message={error} />
+        <div className={dialogFooterCls}>
+          {step === "done" || nothing ? (
+            <button type="button" onClick={close} className={btnPrimary}>Fechar</button>
+          ) : (
+            <>
+              <button type="button" onClick={close} disabled={pending} className={btnSecondary}>Cancelar</button>
+              {step === "read" ? (
+                <button type="button" data-testid="button-date-sync-check" onClick={check} disabled={pending || !rows?.length} aria-busy={pending || undefined} className={btnPrimary}>
+                  {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+                  {pending ? "Conferindo…" : "Conferir no banco"}
+                </button>
+              ) : (
+                <button type="button" data-testid="button-date-sync-apply" onClick={apply} disabled={pending || typed.trim() !== PHRASE} aria-busy={pending || undefined} className={btnDanger}>
+                  {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+                  {pending ? "Aplicando…" : "Aplicar"}
+                </button>
               )}
-            </ul>
+            </>
           )}
-        </ConfirmDialog>
-
-        {dateSyncResult && (
-          <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
-            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-            <div>
-              <p>{plural(dateSyncResult.updated, "evento atualizado", "eventos atualizados")}{dateSyncResult.notFound > 0 ? `, ${plural(dateSyncResult.notFound, "ID não encontrado", "IDs não encontrados")} no banco.` : " com sucesso."}</p>
-              {dateSyncResult.notFoundIds.length > 0 && (
-                <p className="text-xs mt-1 opacity-70">IDs não encontrados: {dateSyncResult.notFoundIds.join(", ")}</p>
-              )}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      </ActionDialog>
+    </>
   );
 }
+

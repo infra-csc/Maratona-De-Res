@@ -1,12 +1,24 @@
+// Acessos ao app: geração em massa (prévia → geração → CSV com as senhas) e
+// as credenciais do colaborador recém-criado (mostradas uma vez só).
 import type { BulkGenerateAccessResult, CollaboratorsWithoutAccessPreview } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, AlertTriangle } from "lucide-react";
-import { CONDENSED, WARNING, DANGER_TEXT } from "@/lib/premium-theme";
-import { downloadCredentialsCsv } from "./utils";
+import { AlertTriangle, CheckCircle2, Download, KeyRound, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn, plural } from "@/lib/utils";
+import { Bone, DialogHeading, Eyebrow, Notice, Segmented, btnPrimary, btnSecondary, dialogCls, dialogFooterCls, useReturnFocus } from "./ui";
+import { downloadCredentialsCsv, toTitleCase } from "./utils";
 import type { BulkTypeFilter } from "./types";
 
+function CountTile({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {
+  return (
+    <div className="rounded-xl border border-border px-4 py-3">
+      <Eyebrow as="span" className="block">{label}</Eyebrow>
+      <span className={cn("mt-2 block font-condensed text-[30px] font-black leading-none tabular-nums", tone === "warn" && value > 0 && "text-[var(--status-warn-text)]")}>{value}</span>
+    </div>
+  );
+}
+
 /**
- * "Gerar Acessos em Massa": prévia (prontos / sem CPF) → geração → CSV com as senhas.
+ * "Gerar acessos em massa": prévia (prontos / sem CPF) → geração → CSV com as senhas.
  * A prévia (query), a mutação e o estado ficam no pai.
  */
 export function BulkAccessDialog({
@@ -36,100 +48,74 @@ export function BulkAccessDialog({
   /** "Fechar" depois de gerar (limpa o resultado e recarrega a prévia). */
   onDone: () => void;
 }) {
+  const onCloseAutoFocus = useReturnFocus(open);
+  const ready = preview?.eligibleCount ?? 0;
+  const typeText = typeFilter === "all" ? "ativos" : typeFilter === "casa" ? "casa" : "freela";
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Gerar Acessos em Massa</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-5 pt-2">
-          {isPreviewLoading ? (
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Carregando prévia...</p>
-          ) : !result ? (
-            <>
-              <div className="flex gap-2">
-                {(["casa", "freela", "all"] as const).map(t => {
-                  const active = typeFilter === t;
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => onTypeFilterChange(t)}
-                      className="px-4 py-2 rounded-lg font-bold text-[11px] uppercase transition-colors"
-                      style={active ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
-                    >
-                      {t === "all" ? "Todos" : t.toUpperCase()}
-                    </button>
-                  );
-                })}
+    <Dialog open={open} onOpenChange={v => { if (!isGenerating) onOpenChange(v); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[520px] max-h-[90dvh] overflow-y-auto")} data-testid="bulk-access-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={KeyRound} Title={DialogTitle} Description={DialogDescription} title="Gerar acessos em massa"
+          description={result ? "Pronto. As senhas só ficam no arquivo CSV — não aparecem de novo." : "Cria o login por CPF de quem ainda não entra no app. A senha inicial aparece uma vez só, no arquivo CSV."} />
+        {!result ? (
+          <>
+            <div>
+              <Eyebrow as="span" className="block mb-2" id="bulk-access-type">Para quem</Eyebrow>
+              <Segmented<BulkTypeFilter>
+                label="Tipo de colaborador"
+                value={typeFilter}
+                onChange={onTypeFilterChange}
+                disabled={isGenerating}
+                options={[{ value: "casa", label: "Casa" }, { value: "freela", label: "Freela" }, { value: "all", label: "Todos" }]}
+              />
+            </div>
+            {isPreviewLoading ? (
+              <div role="status" aria-label="Carregando a prévia" className="grid grid-cols-2 gap-3">
+                {[0, 1].map(i => <div key={i} className="rounded-xl border border-border px-4 py-3 space-y-3"><Bone className="h-3 w-24" /><Bone className="h-7 w-12" /></div>)}
               </div>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Serão criados logins por CPF para colaboradores {typeFilter === "all" ? "ativos" : `tipo ${typeFilter.toUpperCase()}`} sem acesso à plataforma. A senha inicial será gerada automaticamente e exibida apenas uma vez, junto com o arquivo CSV para download.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
-                  <p className="text-3xl font-black" style={{ fontFamily: CONDENSED }}>{preview?.eligibleCount ?? 0}</p>
-                  <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Prontos para gerar acesso</p>
-                </div>
-                <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
-                  <p className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{preview?.missingCpfCount ?? 0}</p>
-                  <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF cadastrado</p>
-                </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3" aria-live="polite">
+                <CountTile label="Prontos para gerar" value={ready} />
+                <CountTile label="Sem CPF cadastrado" value={preview?.missingCpfCount ?? 0} tone="warn" />
               </div>
-              {preview && preview.missingCpf.length > 0 && (
-                <div className="rounded-lg max-h-40 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
-                  <div className="px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold uppercase" style={{ backgroundColor: WARNING, color: "#fff" }}>
-                    <AlertTriangle size={14} /> Precisam de CPF cadastrado
-                  </div>
-                  <ul>
-                    {preview.missingCpf.map((m, i) => (
-                      <li key={m.id} className="px-3 py-2 text-sm" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>{m.name}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                <button type="button" onClick={() => onCancel()} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-                <button
-                  data-testid="button-confirm-bulk-generate"
-                  disabled={!preview || preview.eligibleCount === 0 || isGenerating}
-                  onClick={() => onGenerate()}
-                  className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                >
-                  {isGenerating ? "Gerando..." : `Gerar ${preview?.eligibleCount ?? 0} Acessos`}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                <strong style={{ color: "var(--foreground)" }}>{result.createdCount}</strong> {result.createdCount === 1 ? "acesso gerado" : "acessos gerados"} com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
-              </p>
-              {result.conflicts.length > 0 && (
-                <p className="text-xs" style={{ color: DANGER_TEXT }}>{result.conflicts.length === 1 ? "1 colaborador já possuía acesso e foi ignorado." : `${result.conflicts.length} colaboradores já possuíam acesso e foram ignorados.`}</p>
-              )}
-              <button
-                data-testid="button-download-credentials-csv"
-                onClick={() => downloadCredentialsCsv(result.created)}
-                disabled={result.created.length === 0}
-                className="w-full h-12 rounded-lg font-black uppercase text-[13px] tracking-tight flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <Download size={16} /> Baixar CSV com Credenciais
+            )}
+            {!isPreviewLoading && preview && preview.missingCpf.length > 0 && (
+              <Notice icon={AlertTriangle} tone="warn">
+                <p className="font-semibold text-foreground">Precisam de CPF antes de ter acesso</p>
+                <ul className="mt-1.5 max-h-32 overflow-y-auto space-y-0.5 pr-1">
+                  {preview.missingCpf.map(m => <li key={m.id}>{toTitleCase(m.name)}</li>)}
+                </ul>
+                <p className="mt-1.5 text-muted-foreground">Preencha em Editar ou em “Importar CPFs”.</p>
+              </Notice>
+            )}
+            {!isPreviewLoading && preview && ready === 0 && preview.missingCpf.length === 0 && (
+              <Notice icon={CheckCircle2} tone="ok">Todo colaborador {typeText} já tem acesso. Nada a gerar.</Notice>
+            )}
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onCancel} disabled={isGenerating} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-bulk-generate" disabled={!preview || ready === 0 || isGenerating || isPreviewLoading}
+                aria-busy={isGenerating || undefined} onClick={onGenerate} className={btnPrimary}>
+                {isGenerating ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <KeyRound size={15} aria-hidden />}
+                {isGenerating ? "Gerando…" : `Gerar ${plural(ready, "acesso", "acessos")}`}
               </button>
-              <div className="flex justify-end pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                <button
-                  type="button"
-                  onClick={() => onDone()}
-                  className="h-10 px-4 rounded-lg font-bold uppercase text-xs transition-colors hover:opacity-80"
-                  style={{ border: "1px solid var(--border)" }}
-                >
-                  Fechar
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Notice icon={CheckCircle2} tone="ok" testId="bulk-access-result">
+              <p><strong className="text-foreground">{plural(result.createdCount, "acesso gerado", "acessos gerados")}.</strong> Baixe o arquivo antes de fechar.</p>
+            </Notice>
+            {result.conflicts.length > 0 && (
+              <Notice icon={AlertTriangle} tone="warn">{result.conflicts.length === 1 ? "1 colaborador já tinha acesso e foi ignorado." : `${result.conflicts.length} colaboradores já tinham acesso e foram ignorados.`}</Notice>
+            )}
+            <button type="button" data-testid="button-download-credentials-csv" onClick={() => downloadCredentialsCsv(result.created)} disabled={result.created.length === 0}
+              className={cn(btnPrimary, "w-full min-h-12")}>
+              <Download size={16} aria-hidden /> Baixar CSV com as credenciais
+            </button>
+            <div className={dialogFooterCls}>
+              <button type="button" onClick={onDone} className={btnSecondary}>Fechar</button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -145,32 +131,21 @@ export function NewAccessDialog({
 }) {
   return (
     <Dialog open={!!newAccess} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Acesso Gerado</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Anote ou compartilhe estas credenciais agora — a senha não será exibida novamente.</p>
-          <div className="rounded-lg p-4 space-y-2" style={{ backgroundColor: "var(--secondary)" }}>
-            <div>
-              <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Login (CPF)</p>
-              <p className="text-lg font-black" data-testid="text-new-access-cpf">{newAccess?.cpfLogin}</p>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Senha Inicial</p>
-              <p className="text-lg font-black" data-testid="text-new-access-password">{newAccess?.password}</p>
-            </div>
+      <DialogContent className={cn(dialogCls, "max-w-[420px]")} data-testid="new-access-dialog">
+        <DialogHeading icon={KeyRound} tone="brand" Title={DialogTitle} Description={DialogDescription} title="Acesso gerado"
+          description="Anote ou compartilhe agora — a senha não aparece de novo." />
+        <dl className="rounded-xl border border-border divide-y divide-border">
+          <div className="px-4 py-3">
+            <dt><Eyebrow as="span">Login (CPF)</Eyebrow></dt>
+            <dd className="mt-1.5 font-mono text-[18px] font-bold tracking-wider" data-testid="text-new-access-cpf">{newAccess?.cpfLogin}</dd>
           </div>
-          <div className="flex justify-end pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-            <button
-              data-testid="button-close-new-access"
-              onClick={() => onClose()}
-              className="h-10 px-4 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              Entendi
-            </button>
+          <div className="px-4 py-3 bg-secondary/50">
+            <dt><Eyebrow as="span">Senha inicial</Eyebrow></dt>
+            <dd className="mt-1.5 font-mono text-[18px] font-bold tracking-wider" data-testid="text-new-access-password">{newAccess?.password}</dd>
           </div>
+        </dl>
+        <div className={dialogFooterCls}>
+          <button type="button" data-testid="button-close-new-access" onClick={onClose} className={btnPrimary}>Entendi</button>
         </div>
       </DialogContent>
     </Dialog>

@@ -384,7 +384,7 @@ export function useCalibrationSaveFlow(params: CalibrationSaveFlowParams) {
     if (okPublish > 0) invalidateCycleResults(qc);
 
     if (sessionExpired) {
-      toast({ ...SESSION_EXPIRED_TOAST, description: `${SESSION_EXPIRED_TOAST.description}${totalOk > 0 ? ` ${totalOk} item(ns) já haviam sido salvos.` : ""}` });
+      toast({ ...SESSION_EXPIRED_TOAST, description: `${SESSION_EXPIRED_TOAST.description}${totalOk > 0 ? ` ${plural(totalOk, "item já tinha sido salvo", "itens já tinham sido salvos")}.` : ""}` });
       return;
     }
 

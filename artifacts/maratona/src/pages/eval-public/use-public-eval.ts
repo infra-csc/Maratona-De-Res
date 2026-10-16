@@ -13,9 +13,47 @@ import { displayCriterionName } from "../../lib/criterion-name";
  * de critérios e das matrizes de conformidade, regras de envio, lista de
  * pendências e os dois envios (critérios [+ cenografia] / só conformidade).
  */
+/** Rascunho local (só neste aparelho) — some no envio. Conexão ruim/recarga não apaga o que a pessoa já preencheu. */
+const draftKey = (token: string) => `maratona_eval_draft:${token}`;
+type LocalDraft = {
+  submitterName?: string;
+  answers?: Record<number, CriterionAnswer>;
+  cenoAnswers?: ConformityAnswers;
+  ferramentasAnswer?: boolean | null;
+  ferramentasComment?: string;
+};
+function readDraft(token: string): LocalDraft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(token));
+    return raw ? (JSON.parse(raw) as LocalDraft) : null;
+  } catch { return null; }
+}
+/** O rascunho tem alguma resposta de verdade (não só o estado vazio inicial)? */
+function draftHasContent(d: LocalDraft | null): boolean {
+  if (!d) return false;
+  if (d.submitterName?.trim()) return true;
+  if (Object.values(d.answers ?? {}).some(a => a?.score != null || !!a?.comments?.trim())) return true;
+  const c = d.cenoAnswers;
+  if (c && (c.epi !== null || c.estaiamentos !== null || c.conduta !== null || c.standoutResponse !== null
+    || !!c.absencesReport?.trim() || !!c.epiComment?.trim() || !!c.estaiamentosComment?.trim() || !!c.condutaComment?.trim() || !!c.standoutJustification?.trim())) return true;
+  return (d.ferramentasAnswer ?? null) !== null || !!d.ferramentasComment?.trim();
+}
+function clearDraft(token: string | undefined) {
+  if (!token) return;
+  try { localStorage.removeItem(draftKey(token)); } catch { /* armazenamento indisponível */ }
+}
+
+/** Falha de rede (sem resposta do servidor): mensagem humana em vez de "Failed to fetch". */
+const NETWORK_SUBMIT_ERROR = "Não foi possível enviar: a conexão falhou. Suas respostas continuam aqui — confira o sinal e toque em Enviar de novo.";
+
 export function usePublicEval(token: string | undefined) {
   const [info, setInfo] = useState<PublicEvalInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Status HTTP da falha ao abrir (404 = link inválido; 0 = sem conexão; 5xx = servidor).
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  // Havia respostas guardadas neste aparelho e elas foram restauradas.
+  const [draftRestored, setDraftRestored] = useState(false);
   // Evento do próximo ciclo (409 EVENT_NEXT_CYCLE): a mensagem do servidor
   // vai para uma tela própria — o link volta a valer quando o ciclo novo existir.
   const [nextCycleMessage, setNextCycleMessage] = useState<string | null>(null);
@@ -32,6 +70,7 @@ export function usePublicEval(token: string | undefined) {
   // link combinado, a matriz) — e o que de fato foi gravado.
   const [rejected, setRejected] = useState<PublicEvalSubmitRejected[]>([]);
   const [savedCount, setSavedCount] = useState(0);
+  const [savedIds, setSavedIds] = useState<number[]>([]);
   const [conformitySaved, setConformitySaved] = useState(false);
   // Tudo já estava respondido: nada foi gravado (o link continua sem uso).
   const [nothingSaved, setNothingSaved] = useState(false);
@@ -55,19 +94,53 @@ export function usePublicEval(token: string | undefined) {
 
   useEffect(() => {
     if (!token) return;
+    setLoadError(null);
+    setLoadErrorStatus(null);
     getPublicEval(token)
       .then((data) => {
         setInfo(data);
-        setSubmitterName("");
+        // Link já usado: o rascunho local não serve mais.
+        const saved = data.isUsed ? null : readDraft(token);
+        const draft = draftHasContent(saved) ? saved : null;
+        if (data.isUsed) clearDraft(token);
+        setSubmitterName(draft?.submitterName ?? "");
         setAnswers(
           Object.fromEntries(
             // score: null = ainda não selecionado (0 é nota válida)
-            (data.criteria ?? []).map((c) => [c.criterionId, { score: null, comments: "" }]),
+            (data.criteria ?? []).map((c) => {
+              const d = draft?.answers?.[c.criterionId];
+              return [c.criterionId, { score: typeof d?.score === "number" ? d.score : null, comments: typeof d?.comments === "string" ? d.comments : "" }];
+            }),
           ),
         );
+        if (draft?.cenoAnswers) setCenoAnswers((prev) => ({ ...prev, ...draft.cenoAnswers }));
+        if (draft && draft.ferramentasAnswer !== undefined) setFerramentasAnswer(draft.ferramentasAnswer);
+        if (typeof draft?.ferramentasComment === "string") setFerramentasComment(draft.ferramentasComment);
+        setDraftRestored(!!draft);
       })
-      .catch((e: unknown) => { if (!catchNextCycle(e)) setLoadError(serverErrorMessage(e, (status) => `Erro ${status}`)); });
-  }, [token]);
+      .catch((e: unknown) => {
+        if (catchNextCycle(e)) return;
+        setLoadErrorStatus(e instanceof ApiError ? e.status : 0);
+        setLoadError(serverErrorMessage(e, (status) => `Erro ${status}`));
+      });
+  }, [token, loadAttempt]);
+
+  // Guarda o que já foi preenchido neste aparelho (até o envio).
+  const draftReady = !!info && !info.isUsed;
+  useEffect(() => {
+    if (!token || !draftReady || done) return;
+    const id = window.setTimeout(() => {
+      try {
+        const payload: LocalDraft = { submitterName, answers, cenoAnswers, ferramentasAnswer, ferramentasComment };
+        if (draftHasContent(payload)) localStorage.setItem(draftKey(token), JSON.stringify(payload));
+        else localStorage.removeItem(draftKey(token));
+      } catch { /* armazenamento indisponível: segue sem rascunho */ }
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [token, draftReady, done, submitterName, answers, cenoAnswers, ferramentasAnswer, ferramentasComment]);
+
+  /** Tenta abrir o link de novo (depois de uma falha de conexão). */
+  const retryLoad = () => setLoadAttempt((n) => n + 1);
 
   const tokenType = info?.tokenType ?? "criteria";
   // Critérios que a área já respondeu ficam visíveis (só leitura) e não são cobrados.
@@ -146,7 +219,9 @@ export function usePublicEval(token: string | undefined) {
       const result = await submitPublicEval(token, body);
       setRejected(result?.rejected ?? []);
       setSavedCount(result?.saved?.length ?? 0);
+      setSavedIds(result?.saved ?? []);
       setConformitySaved(!!result?.conformitySaved);
+      clearDraft(token);
       setDone(true);
     } catch (e: unknown) {
       // Tudo já estava respondido (409 com a lista do que foi recusado): a
@@ -155,13 +230,15 @@ export function usePublicEval(token: string | undefined) {
       if (e instanceof ApiError && e.status === 409 && Array.isArray(data?.rejected) && data.rejected.length > 0) {
         setRejected(data.rejected);
         setSavedCount(0);
+        setSavedIds([]);
         setConformitySaved(false);
         setNothingSaved(true);
+        clearDraft(token);
         setDone(true);
         return;
       }
       if (catchNextCycle(e)) return;
-      setSubmitError(serverErrorMessage(e, () => "Erro ao enviar"));
+      setSubmitError(e instanceof ApiError ? serverErrorMessage(e, () => "Erro ao enviar") : NETWORK_SUBMIT_ERROR);
       // A área respondeu tudo enquanto a pessoa preenchia: recarrega o link
       // para a tela mostrar quem respondeu (o link continua sem uso).
       if (e instanceof ApiError && e.status === 409) {
@@ -199,12 +276,13 @@ export function usePublicEval(token: string | undefined) {
         });
       }
       await submitPublicEvalConformity(token, body);
+      clearDraft(token);
       setDone(true);
     } catch (e: unknown) {
       // 409 (ciclo fechado, matriz já respondida): a mensagem do servidor vai
       // para a tela e o link é recarregado para mostrar o estado real.
       if (catchNextCycle(e)) return;
-      setSubmitError(serverErrorMessage(e, () => "Erro ao enviar"));
+      setSubmitError(e instanceof ApiError ? serverErrorMessage(e, () => "Erro ao enviar") : NETWORK_SUBMIT_ERROR);
       if (e instanceof ApiError && e.status === 409) {
         getPublicEval(token).then(setInfo).catch(() => {});
       }
@@ -251,9 +329,10 @@ export function usePublicEval(token: string | undefined) {
   }
 
   return {
-    info, loadError, nextCycleMessage, done, rejected, savedCount, conformitySaved, nothingSaved, conformityAnswered, needsMatrix, allCriteria, closedCriteria, withoutConduta, submitterName, setSubmitterName, isSubmitting, submitError,
+    info, loadError, loadErrorStatus, retryLoad, draftRestored, nextCycleMessage, done, rejected, savedCount, savedIds, conformitySaved, nothingSaved, conformityAnswered, needsMatrix, allCriteria, closedCriteria, withoutConduta, submitterName, setSubmitterName, isSubmitting, submitError,
     criteria, answers, setScore, setComments,
     cenoAnswers, setCenoAnswers, cenoStandoutMissing, attempted, setAttempted,
+    cenoCanSubmit, ferramentasCanSubmit,
     ferramentasAnswer, setFerramentasAnswer, ferramentasComment, setFerramentasComment,
     isCombined, isConformityCenografia, isConformityFerramentas, isConformity, showCriteria, showCenografiaConformity,
     canSubmit, pending, handleSubmitCriteria, handleSubmitConformity,

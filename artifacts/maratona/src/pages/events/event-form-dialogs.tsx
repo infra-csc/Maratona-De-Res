@@ -1,18 +1,17 @@
 // Diálogos "Novo Evento" (com o botão que o abre) e "Editar Evento".
 // Cada um é dono do próprio formulário e da própria mutação.
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateEvent, useUpdateEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
-import { Plus } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CalendarPlus, Loader2, Pencil, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
-import { FieldError, inputStyle, serverErrorMessage } from "./form-bits";
+import { cn } from "@/lib/utils";
+import { serverErrorMessage } from "./form-bits";
 import { DATE_RE } from "./url-filters";
+import { DialogHeading, FieldErrorText, FieldLabel, btnPrimary, btnSecondary, dialogCls, inputCls } from "./events-ui";
 import type { EditingEvent, EditEventInput } from "./types";
 
 // Regras de validação compartilhadas entre criar e editar. Os dois formulários têm
@@ -20,9 +19,70 @@ import type { EditingEvent, EditEventInput } from "./types";
 const nameRules = { required: "Informe o nome do evento", validate: (v: string) => v.trim().length > 0 || "Informe o nome do evento" };
 const startDateRules = { required: "Informe a data do evento", validate: (v: string) => DATE_RE.test(v) || "Data inválida" };
 
-const dialogStyle = { backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" };
-const labelClass = "font-bold uppercase text-xs tracking-wider";
-const labelStyle = { color: "var(--muted-foreground)" };
+const invalidCls = "aria-[invalid=true]:border-[var(--status-danger)] aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-[var(--status-danger)]/20";
+
+type FormValues = { name: string; clientName?: string; startDate: string; city?: string; state?: string; location?: string };
+
+/**
+ * Campos do evento — os mesmos em criar e editar. `prefix` separa os ids e os
+ * data-testid de cada diálogo ("input-event-*" × "input-edit-event-*").
+ */
+function EventFields({ prefix, register, errors, placeholders }: {
+  prefix: "event" | "edit-event";
+  register: UseFormRegister<FormValues>;
+  errors: FieldErrors<FormValues>;
+  placeholders: boolean;
+}) {
+  const id = (f: string) => `input-${prefix}-${f}`;
+  const err = (f: string) => `${id(f)}-error`;
+  return (
+    <div className="grid grid-cols-6 gap-x-3 gap-y-4">
+      <div className="col-span-6">
+        <FieldLabel htmlFor={id("name")} required>Nome do evento</FieldLabel>
+        <input id={id("name")} data-testid={id("name")} {...register("name", nameRules)} aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? err("name") : undefined} placeholder={placeholders ? "Ex.: Feira XYZ 2026" : undefined}
+          autoComplete="off" className={cn(inputCls, invalidCls)} />
+        <FieldErrorText id={err("name")} message={errors.name?.message} />
+      </div>
+      <div className="col-span-6 sm:col-span-3">
+        <FieldLabel htmlFor={id("client")}>Cliente</FieldLabel>
+        <input id={id("client")} data-testid={id("client")} {...register("clientName")} placeholder={placeholders ? "Nome do cliente" : undefined} autoComplete="off" className={inputCls} />
+      </div>
+      <div className="col-span-6 sm:col-span-3">
+        <FieldLabel htmlFor={id("start")} required>Data do evento</FieldLabel>
+        <input id={id("start")} data-testid={id("start")} type="date" {...register("startDate", startDateRules)} aria-invalid={!!errors.startDate}
+          aria-describedby={errors.startDate ? err("start") : `${id("start")}-hint`} className={cn(inputCls, invalidCls)} />
+        {errors.startDate
+          ? <FieldErrorText id={err("start")} message={errors.startDate.message} />
+          : <p id={`${id("start")}-hint`} className="mt-1.5 text-[12.5px] text-muted-foreground">A avaliação abre sozinha no dia seguinte.</p>}
+      </div>
+      <div className="col-span-4">
+        <FieldLabel htmlFor={id("city")}>Cidade</FieldLabel>
+        <input id={id("city")} data-testid={id("city")} {...register("city")} placeholder={placeholders ? "Ex.: São Paulo" : undefined} autoComplete="off" className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <FieldLabel htmlFor={id("state")}>UF</FieldLabel>
+        <input id={id("state")} data-testid={id("state")} {...register("state")} placeholder={placeholders ? "SP" : undefined} maxLength={2} autoComplete="off" className={cn(inputCls, "uppercase")} />
+      </div>
+      <div className="col-span-6">
+        <FieldLabel htmlFor={id("location")}>Local</FieldLabel>
+        <input id={id("location")} data-testid={id("location")} {...register("location")} placeholder={placeholders ? "Ex.: Pavilhão de Exposições" : undefined} autoComplete="off" className={inputCls} />
+      </div>
+    </div>
+  );
+}
+
+function Footer({ onCancel, pending, submitTestId, label, pendingLabel }: { onCancel: () => void; pending: boolean; submitTestId: string; label: string; pendingLabel: string }) {
+  return (
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+      <button type="button" onClick={onCancel} disabled={pending} className={btnSecondary}>Cancelar</button>
+      <button data-testid={submitTestId} type="submit" disabled={pending} aria-busy={pending || undefined} className={btnPrimary}>
+        {pending && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+        {pending ? pendingLabel : label}
+      </button>
+    </div>
+  );
+}
 
 export function CreateEventDialog() {
   const { toast } = useToast();
@@ -33,71 +93,28 @@ export function CreateEventDialog() {
 
   const createMutation = useCreateEvent({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (ev) => {
         qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-        toast({ title: "Evento criado" });
+        toast({ title: "Evento criado", description: ev?.name ? `${ev.name} já está na lista.` : undefined });
         close();
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: unknown) => toast({ title: "Não foi possível criar o evento", description: serverErrorMessage(e), variant: "destructive" }),
     },
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (o) setOpen(true); else close(); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (o) setOpen(true); else if (!createMutation.isPending) close(); }}>
       <DialogTrigger asChild>
-        <button
-          data-testid="button-create-event"
-          className="h-9 px-4 rounded-lg text-[11px] font-black uppercase tracking-wide flex items-center gap-1.5 transition-opacity hover:opacity-90"
-          style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-        >
-          <Plus size={13} /> Novo Evento
+        <button data-testid="button-create-event" type="button" className={cn(btnPrimary, "min-h-11 lg:min-h-9 px-3.5 sm:px-4 text-[13px]")}>
+          <Plus size={15} aria-hidden /> <span className="sm:hidden">Novo</span><span className="hidden sm:inline">Novo evento</span>
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg rounded-xl" style={dialogStyle}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Evento</DialogTitle>
-        </DialogHeader>
-        <form noValidate onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), endDate: d.startDate } }))} className="space-y-5 pt-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="input-event-name" className={labelClass} style={labelStyle}>Nome do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input id="input-event-name" data-testid="input-event-name" {...register("name", nameRules)} aria-invalid={!!errors.name} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-lg" style={inputStyle} />
-            <FieldError message={errors.name?.message} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className={labelClass} style={labelStyle}>Cliente</Label>
-            <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-lg" style={inputStyle} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="input-event-start" className={labelClass} style={labelStyle}>Data do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input id="input-event-start" data-testid="input-event-start" type="date" {...register("startDate", startDateRules)} aria-invalid={!!errors.startDate} className="h-11 rounded-lg" style={inputStyle} />
-            <FieldError message={errors.startDate?.message} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className={labelClass} style={labelStyle}>Cidade</Label>
-              <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-lg" style={inputStyle} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className={labelClass} style={labelStyle}>UF</Label>
-              <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-lg uppercase" style={inputStyle} />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className={labelClass} style={labelStyle}>Local</Label>
-            <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-lg" style={inputStyle} />
-          </div>
-          <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-            <button type="button" onClick={close} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-            <button
-              data-testid="button-submit-event"
-              type="submit"
-              disabled={createMutation.isPending}
-              className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              {createMutation.isPending ? "Criando..." : "Criar Evento"}
-            </button>
-          </div>
+      <DialogContent className={cn(dialogCls, "max-w-[540px]")}>
+        <DialogHeading icon={CalendarPlus} tone="brand" Title={DialogTitle} Description={DialogDescription} title="Novo evento"
+          description="Entra no ciclo atual com os critérios ativos do catálogo." />
+        <form noValidate onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), endDate: d.startDate } }))} className="space-y-5">
+          <EventFields prefix="event" register={register as unknown as UseFormRegister<FormValues>} errors={errors as FieldErrors<FormValues>} placeholders />
+          <Footer onCancel={close} pending={createMutation.isPending} submitTestId="button-submit-event" label="Criar evento" pendingLabel="Criando…" />
         </form>
       </DialogContent>
     </Dialog>
@@ -113,7 +130,7 @@ type EditEventDialogProps = {
 export function EditEventDialog({ event, onClose }: EditEventDialogProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EditEventInput>();
+  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<EditEventInput>();
   const close = () => { onClose(); reset(); };
 
   useEffect(() => {
@@ -142,52 +159,14 @@ export function EditEventDialog({ event, onClose }: EditEventDialogProps) {
   });
 
   return (
-    <Dialog open={!!event} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="max-w-lg rounded-xl" style={dialogStyle}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Editar Evento</DialogTitle>
-        </DialogHeader>
-        <form noValidate onSubmit={handleSubmit(d => { if (event) editMutation.mutate({ id: event.id, data: { ...d, name: d.name.trim(), endDate: d.startDate } }); })} className="space-y-5 pt-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="input-edit-event-name" className={labelClass} style={labelStyle}>Nome do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input id="input-edit-event-name" data-testid="input-edit-event-name" {...register("name", nameRules)} aria-invalid={!!errors.name} className="h-11 rounded-lg" style={inputStyle} />
-            <FieldError message={errors.name?.message} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className={labelClass} style={labelStyle}>Cliente</Label>
-            <Input data-testid="input-edit-event-client" {...register("clientName")} className="h-11 rounded-lg" style={inputStyle} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="input-edit-event-start" className={labelClass} style={labelStyle}>Data do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input id="input-edit-event-start" data-testid="input-edit-event-start" type="date" {...register("startDate", startDateRules)} aria-invalid={!!errors.startDate} className="h-11 rounded-lg" style={inputStyle} />
-            <FieldError message={errors.startDate?.message} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className={labelClass} style={labelStyle}>Cidade</Label>
-              <Input data-testid="input-edit-event-city" {...register("city")} className="h-11 rounded-lg" style={inputStyle} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className={labelClass} style={labelStyle}>UF</Label>
-              <Input data-testid="input-edit-event-state" {...register("state")} maxLength={2} className="h-11 rounded-lg uppercase" style={inputStyle} />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className={labelClass} style={labelStyle}>Local</Label>
-            <Input data-testid="input-edit-event-location" {...register("location")} className="h-11 rounded-lg" style={inputStyle} />
-          </div>
-          <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-            <button type="button" onClick={close} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
-            <button
-              data-testid="button-submit-edit-event"
-              type="submit"
-              disabled={editMutation.isPending}
-              className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              {editMutation.isPending ? "Salvando..." : "Salvar Alterações"}
-            </button>
-          </div>
+    <Dialog open={!!event} onOpenChange={(o) => { if (!o && !editMutation.isPending) close(); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[540px]")}>
+        <DialogHeading icon={Pencil} Title={DialogTitle} Description={DialogDescription} title="Editar evento"
+          description={event?.name ?? "Altere os dados do evento."} />
+        <form noValidate onSubmit={handleSubmit(d => { if (event) editMutation.mutate({ id: event.id, data: { ...d, name: d.name.trim(), endDate: d.startDate } }); })} className="space-y-5">
+          <EventFields prefix="edit-event" register={register as unknown as UseFormRegister<FormValues>} errors={errors as FieldErrors<FormValues>} placeholders={false} />
+          {isDirty && <p className="text-[12.5px] text-muted-foreground -mt-1" aria-live="polite">Alterações não salvas.</p>}
+          <Footer onCancel={close} pending={editMutation.isPending} submitTestId="button-submit-edit-event" label="Salvar alterações" pendingLabel="Salvando…" />
         </form>
       </DialogContent>
     </Dialog>

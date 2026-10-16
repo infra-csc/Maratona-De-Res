@@ -1,186 +1,135 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { EventConformity, EventDetail } from "@workspace/api-client-react";
-import { Clock, X } from "lucide-react";
-import { CONDENSED, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
-import { fmtDT } from "./helpers";
-import { cenografiaItemCount } from "../evaluations/constants";
-import type { ConformityKey, CritRow } from "./types";
-import { fmtNum } from "@/lib/utils";
+import { MessageSquareText, ShieldCheck, Wrench } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { cn, fmtNum } from "@/lib/utils";
 import { displayCriterionName } from "@/lib/criterion-name";
 import { AudioPlayer } from "@/components/audio-recorder";
+import { fmtDT } from "./helpers";
+import { cenografiaItemCount } from "../evaluations/constants";
+import { Chip, DialogHeading, Eyebrow, btnSecondary, dialogCls } from "./console-ui";
+import type { ConformityKey, CritRow } from "./types";
 
-/** Ver avaliação (modal de leitura) */
+/** Ver resposta enviada (só leitura): quem, quando, nota, comentário e áudio. */
 export function ViewEvaluationDialog({ viewEvalCrit, setViewEvalCrit }: {
   viewEvalCrit: CritRow;
   setViewEvalCrit: Dispatch<SetStateAction<CritRow | null>>;
 }) {
+  const c = viewEvalCrit;
+  const who = c.formSubmitterName ?? c.assignedToName ?? "—";
+  const score = c.score;
+  const rounded = score != null ? Math.round(score) : null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewEvalCrit(null)}>
-      <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>{viewEvalCrit.areaName}</p>
-            <h3 className="font-black uppercase text-[16px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{displayCriterionName(viewEvalCrit.criterionName)}</h3>
-          </div>
-          <button type="button" onClick={() => setViewEvalCrit(null)} aria-label="Fechar avaliação" title="Fechar" className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          {/* Avaliador + data */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              <span className="w-2 h-2 rounded-full inline-block" style={{ background: GOOD }} />
-              {viewEvalCrit.formSubmitterName ?? viewEvalCrit.assignedToName ?? "—"}
-            </span>
-            {viewEvalCrit.submittedAt && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: GOOD_TEXT }}>
-                <Clock size={10} /> {fmtDT(viewEvalCrit.submittedAt)}
-              </span>
-            )}
-          </div>
-          {/* Nota */}
-          {viewEvalCrit.score != null && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Nota atribuída</p>
-              <div className="flex items-center gap-1 flex-wrap">
-                {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                  <div
-                    key={n}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[12px] font-black"
-                    style={{
-                      fontFamily: CONDENSED,
-                      backgroundColor: n === Math.round(viewEvalCrit.score!) ? "var(--primary)" : "var(--secondary)",
-                      color: n === Math.round(viewEvalCrit.score!) ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                      border: n === Math.round(viewEvalCrit.score!) ? "2px solid var(--primary)" : "1px solid var(--border)",
-                      transform: n === Math.round(viewEvalCrit.score!) ? "scale(1.15)" : "scale(1)",
-                    }}
-                  >{n}</div>
+    <Dialog open onOpenChange={o => { if (!o) setViewEvalCrit(null); }}>
+      <DialogContent className={dialogCls} data-testid="dialog-view-evaluation">
+        <DialogHeading
+          icon={MessageSquareText}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={displayCriterionName(c.criterionName)}
+          description={<>{c.areaName} · respondido por <b className="font-semibold text-foreground">{who}</b>{c.submittedAt ? <> em <span className="tabular-nums">{fmtDT(c.submittedAt)}</span></> : null}</>}
+        />
+        <div className="space-y-4">
+          {score != null && (
+            <div className="rounded-xl border border-border px-4 py-3.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <Eyebrow>Nota enviada</Eyebrow>
+                <p className="flex items-baseline gap-1">
+                  <span className="font-condensed text-[34px] font-black leading-none tabular-nums text-foreground">{fmtNum(score, Number.isInteger(score) ? 0 : 1)}</span>
+                  <span className="font-condensed text-[15px] font-bold text-muted-foreground">/10</span>
+                </p>
+              </div>
+              {/* Régua 1–10 só para leitura (a mesma escala do formulário). */}
+              <div className="mt-3 grid grid-cols-10 gap-1" aria-hidden>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                  <span key={n} className={cn(
+                    "font-condensed h-8 rounded-md flex items-center justify-center text-[13px] font-black tabular-nums",
+                    n === rounded ? "bg-primary text-primary-foreground" : rounded != null && n < rounded ? "bg-secondary text-foreground/70" : "bg-secondary/50 text-muted-foreground",
+                  )}>{n}</span>
                 ))}
-                <span className="ml-2 text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary)" }}>{fmtNum(viewEvalCrit.score, 1)}</span>
               </div>
             </div>
           )}
-          {/* Comentário */}
-          {viewEvalCrit.comments ? (
+          <div>
+            <Eyebrow className="mb-2">Comentário</Eyebrow>
+            {c.comments
+              ? <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[14px] leading-relaxed text-foreground whitespace-pre-wrap">{c.comments}</p>
+              : <p className="text-[14px] text-muted-foreground">Sem comentário registrado.</p>}
+          </div>
+          {c.audioUrl && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>Comentário</p>
-              <div className="rounded-lg px-3.5 py-3 text-[12px] leading-relaxed whitespace-pre-wrap" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                {viewEvalCrit.comments}
-              </div>
-            </div>
-          ) : (
-            <p className="text-[11px] italic" style={{ color: "var(--muted-foreground)" }}>Sem comentário registrado.</p>
-          )}
-          {/* Áudio */}
-          {viewEvalCrit.audioUrl && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>Áudio</p>
-              <AudioPlayer objectPath={viewEvalCrit.audioUrl} className="w-full" />
+              <Eyebrow className="mb-2">Áudio</Eyebrow>
+              <AudioPlayer objectPath={c.audioUrl} className="w-full" />
             </div>
           )}
         </div>
-      </div>
-    </div>
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <button type="button" onClick={() => setViewEvalCrit(null)} className={btnSecondary}>Fechar</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/** Ver Matriz de Conformidade (modal de leitura) */
+function Answer({ val }: { val: boolean | null | undefined }) {
+  if (val == null) return <Chip>Pendente</Chip>;
+  return val ? <Chip tone="ok">Sim</Chip> : <Chip tone="danger">Não</Chip>;
+}
+
+function Item({ label, val, comment, children }: { label: string; val?: boolean | null; comment?: string | null; children?: ReactNode }) {
+  return (
+    <li className="px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[14px] font-semibold text-foreground">{label}</span>
+        {children ?? <Answer val={val} />}
+      </div>
+      {comment && <p className="mt-1 text-[13px] leading-snug text-muted-foreground">“{comment}”</p>}
+    </li>
+  );
+}
+
+/** Ver Matriz de Conformidade (só leitura). */
 export function ViewConformityDialog({ viewConformity, setViewConformity, conformity, selectedDetail }: {
   viewConformity: ConformityKey;
   setViewConformity: Dispatch<SetStateAction<ConformityKey | null>>;
   conformity: EventConformity;
   selectedDetail: EventDetail | undefined;
 }) {
+  const ceno = viewConformity === "cenografia";
+  const who = ceno ? selectedDetail?.conformityEvaluatorName : selectedDetail?.conformityEvaluatorFerramentasName;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewConformity(null)}>
-      <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>
-              {viewConformity === "cenografia" ? `Cenografia · ${cenografiaItemCount(selectedDetail?.conformityWithoutConduta)} itens` : "Ferramentas e Case · 1 item"}
-            </p>
-            <h3 className="font-black uppercase text-[16px] leading-tight" style={{ fontFamily: CONDENSED }}>
-              {viewConformity === "cenografia" ? "Matriz de Conformidade" : "Guarda de Ferramentas"}
-            </h3>
-          </div>
-          <button type="button" onClick={() => setViewConformity(null)} aria-label="Fechar matriz de conformidade" title="Fechar" className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
-        </div>
-        <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
-          {/* Avaliador */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-              <span className="w-2 h-2 rounded-full inline-block" style={{ background: GOOD }} />
-              {viewConformity === "cenografia"
-                ? (selectedDetail?.conformityEvaluatorName ?? "—")
-                : (selectedDetail?.conformityEvaluatorFerramentasName ?? "—")}
-            </span>
-          </div>
-
-          {viewConformity === "cenografia" ? (
+    <Dialog open onOpenChange={o => { if (!o) setViewConformity(null); }}>
+      <DialogContent className={dialogCls} data-testid="dialog-view-conformity">
+        <DialogHeading
+          icon={ceno ? ShieldCheck : Wrench}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={ceno ? "Matriz de Conformidade" : "Guarda de Ferramentas"}
+          description={<>{ceno ? `Cenografia · ${cenografiaItemCount(selectedDetail?.conformityWithoutConduta)} itens` : "Ferramentas e Case · 1 item"} · responsável <b className="font-semibold text-foreground">{who ?? "—"}</b></>}
+        />
+        <ul className="rounded-xl border border-border divide-y divide-border">
+          {ceno ? (
             <>
-              {([
-                { label: "Uso de EPI", val: conformity.epi, comment: conformity.epiComment },
-                { label: "Estaiamentos", val: conformity.estaiamentos, comment: conformity.estaiamentosComment },
-                // Ciclo sem "Conduta" na matriz: a pergunta não existe (nem aparece).
-                ...(selectedDetail?.conformityWithoutConduta ? [] : [{ label: "Conduta", val: conformity.conduta, comment: conformity.condutaComment }]),
-              ] as { label: string; val: boolean | null | undefined; comment: string | null | undefined }[]).map(item => (
-                <div key={item.label} className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase">{item.label}</span>
-                    {item.val == null
-                      ? <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--border)", color: "var(--muted-foreground)" }}>Pendente</span>
-                      : item.val
-                        ? <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD_TEXT }}>Sim</span>
-                        : <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Não</span>
-                    }
-                  </div>
-                  {item.comment && <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{item.comment}</p>}
-                </div>
-              ))}
-              {/* Ausências */}
-              {(() => {
-                const absRep = conformity?.absencesReport;
-                const standout = conformity?.standoutResponse;
-                const standoutJust = conformity?.standoutJustification;
-                return (
-                  <>
-                    <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      <p className="text-[11px] font-bold uppercase mb-1">Ausências / Registro</p>
-                      <p className="text-[11px] leading-snug whitespace-pre-wrap" style={{ color: "var(--muted-foreground)" }}>
-                        {absRep || "Sem registro"}
-                      </p>
-                    </div>
-                    {standout != null && (
-                      <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold uppercase">Destaque</span>
-                          {standout
-                            ? <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD_TEXT }}>Sim</span>
-                            : <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Não</span>}
-                        </div>
-                        {standoutJust && <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{standoutJust}</p>}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              <Item label="Uso de EPI" val={conformity.epi} comment={conformity.epiComment} />
+              <Item label="Estaiamentos" val={conformity.estaiamentos} comment={conformity.estaiamentosComment} />
+              {/* Ciclo sem "Conduta" na matriz: a pergunta não existe (nem aparece). */}
+              {!selectedDetail?.conformityWithoutConduta && <Item label="Conduta" val={conformity.conduta} comment={conformity.condutaComment} />}
+              <li className="px-4 py-3">
+                <span className="text-[14px] font-semibold text-foreground">Faltas e atrasos</span>
+                <p className={cn("mt-1 text-[13px] leading-snug whitespace-pre-wrap", conformity.absencesReport ? "text-foreground" : "text-muted-foreground")}>{conformity.absencesReport || "Sem registro."}</p>
+              </li>
+              {conformity.standoutResponse != null && (
+                <Item label="Destaque no evento" val={conformity.standoutResponse} comment={conformity.standoutJustification} />
+              )}
             </>
           ) : (
-            <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold uppercase">Guarda de Equipamentos</span>
-                {conformity.guardaEquipamentos == null
-                  ? <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--border)", color: "var(--muted-foreground)" }}>Pendente</span>
-                  : conformity.guardaEquipamentos
-                    ? <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD_TEXT }}>Sim</span>
-                    : <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Não</span>}
-              </div>
-              {conformity.guardaEquipamentosComment && (
-                <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{conformity.guardaEquipamentosComment}</p>
-              )}
-            </div>
+            <Item label="Guarda de Equipamentos" val={conformity.guardaEquipamentos} comment={conformity.guardaEquipamentosComment} />
           )}
-        </div>
-      </div>
-    </div>
+        </ul>
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <button type="button" onClick={() => setViewConformity(null)} className={btnSecondary}>Fechar</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

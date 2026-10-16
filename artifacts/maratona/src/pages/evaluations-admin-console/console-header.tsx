@@ -1,141 +1,196 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { ArrowRight, ClipboardCheck, SlidersHorizontal, Table2, Users } from "lucide-react";
 import { cn, plural } from "@/lib/utils";
-import { ClipboardCheck, Table2, Users, SlidersHorizontal } from "lucide-react";
-import { CONDENSED, WARNING, AMBER, AMBER_TEXT, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
-import type { ConsoleView, EnrichedEvent, QueueTab } from "./types";
+import { Chip, Eyebrow, FOCUS_RING, Segmented, surfaceCls } from "./console-ui";
+import type { ConsoleView, QueueTab } from "./types";
 
 /**
- * Header: título + switcher de abas. No ciclo por área a Central acompanha
- * (ninguém é designado): subtítulo e aba "Eventos" no lugar de "Atribuição".
+ * Topo da tela (o único h1): título, abas da Central e o ciclo. Fixo no tablet
+ * e no desktop, como nas telas de Avaliações e Calibração. No ciclo por área a
+ * Central acompanha (ninguém é designado): aba "Eventos" no lugar de "Atribuição".
  */
-export function ConsoleHeader({ view, setView, isOperador, areaMode = false }: {
+export function ConsoleHeader({ view, setView, isOperador, areaMode = false, cycleName }: {
   view: ConsoleView;
   setView: Dispatch<SetStateAction<ConsoleView>>;
   isOperador: boolean;
   areaMode?: boolean;
+  cycleName?: string | null;
 }) {
+  const tabs = ([
+    { value: "assign", label: areaMode ? "Eventos" : "Atribuição", Icon: ClipboardCheck },
+    { value: "table", label: "Tabela", Icon: Table2 },
+    { value: "criterios", label: "Critérios", Icon: SlidersHorizontal },
+    { value: "people", label: "Avaliadores", Icon: Users },
+  ] as const)
+    // "operador" só enxerga a aba de Atribuição — as demais expõem edição de
+    // catálogo de critérios ou visões mais amplas fora do escopo dele.
+    .filter(v => !isOperador || v.value === "assign");
   return (
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Central de Avaliações</h1>
-        <p data-testid="console-subtitle" className="text-[11px] font-bold uppercase tracking-wide mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-          {areaMode ? "Acompanhe o progresso das avaliações por área" : "Acompanhe o progresso e atribua avaliadores"}
-        </p>
+    <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <h1 data-testid="text-page-title" className="font-condensed text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground">
+            Central de Avaliações
+          </h1>
+          <p data-testid="console-subtitle" className="sr-only">
+            {areaMode ? "Acompanhe o progresso das avaliações por área" : "Acompanhe o progresso e atribua avaliadores"}
+          </p>
+        </div>
+        {cycleName && <Chip className="lg:hidden max-w-[45vw] truncate">{cycleName}</Chip>}
       </div>
-      {/* No celular as abas dividem a largura (sem ícone) para caber as quatro. */}
-      <div className="flex w-full md:w-auto rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-        {(() => {
-          const tabs = ([
-            { key: "assign", label: areaMode ? "Eventos" : "Atribuição", Icon: ClipboardCheck },
-            { key: "criterios", label: "Critérios", Icon: SlidersHorizontal },
-            { key: "table", label: "Tabela", Icon: Table2 },
-            { key: "people", label: "Avaliadores", Icon: Users },
-          ] as const)
-            // "operador" só enxerga a aba de Atribuição — as demais expõem
-            // edição de catálogo de critérios ou visões mais amplas fora do
-            // escopo dele (confirmar equipe + enviar avaliação).
-            .filter(v => !isOperador || v.key === "assign");
-          return tabs.map((v, idx) => (
-          <button
-            key={v.key}
-            type="button"
-            onClick={() => setView(v.key)}
-            aria-pressed={view === v.key}
-            className={cn(
-              "flex-1 md:flex-none justify-center px-2 md:px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
-              idx < tabs.length - 1 && "border-r",
-            )}
-            style={{
-              fontFamily: CONDENSED,
-              borderColor: "var(--border)",
-              backgroundColor: view === v.key ? "var(--primary)" : "transparent",
-              color: view === v.key ? "var(--primary-foreground)" : "var(--muted-foreground)",
-            }}
-          >
-            <v.Icon size={13} className="hidden sm:inline" aria-hidden="true" /> {v.label}
-          </button>
-          ));
-        })()}
+      {tabs.length > 1 && (
+        <Segmented<ConsoleView>
+          label="Visão da Central"
+          value={view}
+          onChange={setView}
+          className="w-full lg:w-auto"
+          options={tabs.map(t => ({
+            value: t.value,
+            testId: `console-view-${t.value}`,
+            label: <><t.Icon size={14} aria-hidden className="hidden sm:inline" /> {t.label}</>,
+          }))}
+        />
+      )}
+      <div className="hidden lg:flex items-center gap-2 ml-auto min-w-0">
+        {areaMode && <Chip tone="info" title="Neste ciclo, qualquer avaliador da área responde; a primeira resposta da área vale.">Avaliação por área</Chip>}
+        {cycleName && <Chip className="max-w-[220px] truncate">{cycleName}</Chip>}
       </div>
     </div>
   );
 }
 
-/** KPI strip */
-export function KpiStrip({ openCount, selected, currentWeekendDoneCount, pendingEvaluatorsCount, noEvaluatorFilter, setNoEvaluatorFilter, setView, setTab, areaMode = false, toAnswerCount = 0, answeredCount = 0 }: {
+type CellTone = "neutral" | "warn" | "ok" | "danger";
+const VALUE_TONE: Record<CellTone, string> = {
+  neutral: "text-foreground",
+  warn: "text-[var(--status-warn-text)]",
+  ok: "text-[var(--status-ok-text)]",
+  danger: "text-[var(--status-danger-text)]",
+};
+
+/** Uma célula do panorama. Com `onClick` vira atalho (filtro/aba). */
+function Cell({ label, value, unit, sub, tone = "neutral", onClick, pressed, testId, title, action }: {
+  label: ReactNode; value: ReactNode; unit?: ReactNode; sub: ReactNode; tone?: CellTone;
+  onClick?: () => void; pressed?: boolean; testId?: string; title?: string; action?: string;
+}) {
+  const body = (
+    <>
+      <Eyebrow as="span" className={cn("block", pressed && "text-foreground")}>{label}</Eyebrow>
+      <span className="mt-2 flex items-baseline gap-1.5">
+        <span className={cn("font-condensed text-[30px] lg:text-[34px] font-black leading-none tracking-[-0.02em] tabular-nums", VALUE_TONE[tone])}>{value}</span>
+        {unit && <span className="font-condensed text-[14px] font-bold uppercase text-muted-foreground">{unit}</span>}
+      </span>
+      <span className="mt-1.5 block text-[12.5px] leading-snug text-muted-foreground">{sub}</span>
+      {action && (
+        <span className={cn("mt-2 inline-flex items-center gap-1 font-condensed text-[12px] font-bold uppercase tracking-[0.06em]", pressed ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
+          {action} <ArrowRight size={12} aria-hidden className="transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
+        </span>
+      )}
+    </>
+  );
+  const cls = "min-w-0 bg-card px-4 py-3.5 lg:px-5 lg:py-4 text-left";
+  if (!onClick) return <div data-testid={testId} title={title} className={cls}>{body}</div>;
+  return (
+    <button type="button" data-testid={testId} title={title} onClick={onClick} aria-pressed={pressed}
+      className={cn(cls, "group transition-colors duration-150 hover:bg-secondary/50", pressed && "bg-secondary/70 hover:bg-secondary/70", FOCUS_RING, "focus-visible:ring-inset focus-visible:ring-offset-0")}>
+      {body}
+    </button>
+  );
+}
+
+export type WeekendPulse = { label: string; isNow: boolean; done: number; total: number; active: boolean } | null;
+
+/**
+ * Panorama do ciclo: responde "o que falta e quem já avaliou" num relance —
+ * eventos abertos, critérios a responder × respondidos e o fim de semana atual.
+ */
+export function KpiStrip({ openCount, weekend, onWeekend, pendingEvaluatorsCount, selectedUnassigned, noEvaluatorFilter, setNoEvaluatorFilter, setView, setTab, areaMode = false, toAnswerCount = 0, answeredCount = 0 }: {
   /** Eventos abertos pela regra única do app (isOpenEvent): o mesmo número de Eventos e de Ciclos. */
   openCount: number;
-  selected: EnrichedEvent | null;
-  currentWeekendDoneCount: number | null;
+  /** Fim de semana atual (ou o último): eventos concluídos × total. */
+  weekend: WeekendPulse;
+  /** Filtra a fila pelo fim de semana do panorama. */
+  onWeekend: () => void;
   pendingEvaluatorsCount: number;
+  /** Critérios sem avaliador no evento selecionado (fluxo antigo). */
+  selectedUnassigned: number;
   noEvaluatorFilter: boolean;
   setNoEvaluatorFilter: Dispatch<SetStateAction<boolean>>;
   setView: Dispatch<SetStateAction<ConsoleView>>;
   setTab: (t: QueueTab) => void;
-  /** Ciclo por área: "Critérios a responder" e "Respondidos" no lugar de avaliadores/critérios sem avaliador. */
   areaMode?: boolean;
   /** Critérios ainda sem resposta nos eventos abertos. */
   toAnswerCount?: number;
   /** Critérios já respondidos nos eventos abertos. */
   answeredCount?: number;
 }) {
+  const weekendCell = (
+    <Cell
+      testId="kpi-weekend"
+      label={weekend ? `${weekend.isNow ? "Este fim de semana" : "Último fim de semana"} · ${weekend.label}` : "Fim de semana"}
+      value={weekend ? `${weekend.done}/${weekend.total}` : "—"}
+      unit={weekend ? "concluídos" : undefined}
+      sub={weekend ? (weekend.total === 0 ? "Nenhum evento neste fim de semana." : `${plural(weekend.total - weekend.done, "evento ainda aberto", "eventos ainda abertos")}.`) : "Sem fins de semana no ciclo."}
+      tone={weekend && weekend.total > 0 && weekend.done === weekend.total ? "ok" : "neutral"}
+      onClick={weekend ? onWeekend : undefined}
+      pressed={weekend?.active}
+      action={weekend ? (weekend.active ? "Filtro ativo · limpar" : "Ver na fila") : undefined}
+    />
+  );
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-3.5">
-      <div className="rounded-xl p-3 md:p-3.5" data-testid="kpi-open-events" title="Ainda não fechados, do período do ciclo e com a avaliação já aberta (a partir do dia seguinte ao fim do evento)" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED }}>{openCount}</div>
-        <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Eventos abertos</div>
-      </div>
-      <div className="rounded-xl p-3 md:p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{selected ? `${selected.pct}%` : "—"}</div>
-        <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Concluído no evento</div>
-        {currentWeekendDoneCount != null && (
-          <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{plural(currentWeekendDoneCount, "evento concluído", "eventos concluídos")} no fim de semana atual</div>
-        )}
-      </div>
+    <section aria-label="Panorama do ciclo" className={cn(surfaceCls, "overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px bg-border")}>
+      {weekendCell}
       {areaMode ? (
         <>
-          <button
-            type="button"
-            data-testid="kpi-to-answer"
-            onClick={() => { setView("assign"); setTab("todo"); }}
+          <Cell
+            testId="kpi-to-answer"
             title="Critérios dos eventos abertos que ainda não têm resposta enviada — qualquer avaliador da área responde"
-            className="rounded-xl p-3 md:p-3.5 text-left transition-opacity hover:opacity-80"
-            style={{ backgroundColor: toAnswerCount > 0 ? "rgba(232,162,61,0.10)" : "var(--card)", border: toAnswerCount > 0 ? `1px solid ${AMBER}44` : "1px solid var(--border)" }}
-          >
-            <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: toAnswerCount > 0 ? AMBER_TEXT : "var(--foreground)" }}>{toAnswerCount}</div>
-            <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Critérios a responder</div>
-            <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.8 }}>Nos eventos abertos · ver A fazer →</div>
-          </button>
-          <div data-testid="kpi-answered" className="rounded-xl p-3 md:p-3.5" title="Critérios dos eventos abertos com resposta enviada pela área" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-            <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: answeredCount > 0 ? GOOD_TEXT : "var(--foreground)" }}>{answeredCount}</div>
-            <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Respondidos</div>
-            <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.8 }}>Nos eventos abertos</div>
-          </div>
+            label="Critérios a responder"
+            value={toAnswerCount}
+            tone={toAnswerCount > 0 ? "warn" : "ok"}
+            sub="Nos eventos abertos, sem resposta da área."
+            onClick={() => { setView("assign"); setTab("todo"); }}
+            action="Ver A fazer"
+          />
+          <Cell
+            testId="kpi-answered"
+            title="Critérios dos eventos abertos com resposta enviada pela área"
+            label="Respondidos"
+            value={answeredCount}
+            tone={answeredCount > 0 ? "ok" : "neutral"}
+            sub="Nos eventos abertos, com resposta enviada."
+          />
         </>
       ) : (
-      <>
-      <button
-        type="button"
-        onClick={() => { setNoEvaluatorFilter(v => !v); setView("assign"); setTab("todo"); }}
-        className="rounded-xl p-3 md:p-3.5 text-left transition-opacity hover:opacity-80"
-        style={{ backgroundColor: noEvaluatorFilter ? `rgba(232,162,61,0.14)` : pendingEvaluatorsCount > 0 ? `rgba(232,162,61,0.10)` : "var(--card)", border: noEvaluatorFilter ? `1px solid ${AMBER}` : pendingEvaluatorsCount > 0 ? `1px solid ${AMBER}44` : "1px solid var(--border)" }}
-      >
-        <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: AMBER_TEXT }}>{pendingEvaluatorsCount}</div>
-        <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Avaliadores pendentes</div>
-        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? AMBER_TEXT : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
-      </button>
-      <button
-        type="button"
-        onClick={() => { setNoEvaluatorFilter(v => !v); setTab("todo"); }}
-        className="rounded-xl p-3 md:p-3.5 text-left transition-opacity hover:opacity-80"
-        style={{ backgroundColor: noEvaluatorFilter ? `rgba(229,72,77,0.12)` : (selected?.unassigned ?? 0) > 0 ? `rgba(229,72,77,0.06)` : "var(--card)", border: noEvaluatorFilter ? `1px solid ${WARNING}` : (selected?.unassigned ?? 0) > 0 ? `1px solid ${WARNING}44` : "1px solid var(--border)" }}
-      >
-        <div className="text-2xl md:text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: (selected?.unassigned ?? 0) > 0 ? DANGER_TEXT : "var(--foreground)" }}>{selected?.unassigned ?? 0}</div>
-        <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Critérios sem avaliador</div>
-        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? DANGER_TEXT : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
-      </button>
-      </>
+        <>
+          <Cell
+            testId="kpi-pending-evaluators"
+            label="Avaliadores pendentes"
+            value={pendingEvaluatorsCount}
+            tone={pendingEvaluatorsCount > 0 ? "warn" : "neutral"}
+            sub="Com critério ou Matriz ainda sem envio."
+            onClick={() => { setNoEvaluatorFilter(v => !v); setView("assign"); setTab("todo"); }}
+            pressed={noEvaluatorFilter}
+            action={noEvaluatorFilter ? "Filtro ativo · limpar" : "Filtrar eventos"}
+          />
+          <Cell
+            testId="kpi-unassigned"
+            label="Critérios sem avaliador"
+            value={selectedUnassigned}
+            tone={selectedUnassigned > 0 ? "danger" : "neutral"}
+            sub="No evento selecionado."
+            onClick={() => { setNoEvaluatorFilter(v => !v); setTab("todo"); }}
+            pressed={noEvaluatorFilter}
+            action={noEvaluatorFilter ? "Filtro ativo · limpar" : "Filtrar eventos"}
+          />
+        </>
       )}
-    </div>
+      <Cell
+        testId="kpi-open-events"
+        title="Ainda não fechados, do período do ciclo e com a avaliação já aberta (a partir do dia seguinte ao fim do evento)"
+        label="Eventos abertos"
+        value={openCount}
+        sub="Avaliação aberta e evento ainda não fechado."
+      />
+    </section>
   );
 }

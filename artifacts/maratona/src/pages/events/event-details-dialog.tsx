@@ -3,20 +3,22 @@
 // área dos critérios multiárea ficam sob o critério de origem), a situação da
 // calibração de cada critério e os itens da Matriz de Conformidade. Os dados
 // carregam só ao abrir (GET /events/:id, /evaluations, /calibrations e os links).
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
+import { Link } from "wouter";
 import {
   useGetEvent, getGetEventQueryKey, useGetEvaluations, getGetEvaluationsQueryKey,
   useGetCalibrations, getGetCalibrationsQueryKey,
   type Calibration, type EventCriterion, type EventDetail, type Evaluation,
 } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowUpRight, ClipboardList, Link2, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useAllPublicTokens, type AdminPublicToken } from "@/lib/routing-api";
 import { displayCriterionName } from "@/lib/criterion-name";
-import { plural, fmtNum } from "@/lib/utils";
-import { CONDENSED, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
+import { cn, plural, fmtNum } from "@/lib/utils";
 import { fmtDT } from "../evaluations-admin-console/helpers";
 import type { EventItem } from "./types";
 import { areaResponseCounts } from "./criteria-rules";
+import { Bone, Chip, DialogHeading, ErrorBlock, Eyebrow, StackBar, btnSmall, dialogCls, type Tone } from "./events-ui";
 
 export type EventDetailsKind = "evaluations" | "calibrations" | "matrix";
 
@@ -25,6 +27,7 @@ const TITLES: Record<EventDetailsKind, string> = {
   calibrations: "Calibrações publicadas",
   matrix: "Matriz de conformidade",
 };
+const ICONS = { evaluations: ClipboardList, calibrations: SlidersHorizontal, matrix: ShieldCheck } as const;
 
 /** Critérios ativos do evento agrupados pelo critério de origem (cópias por área juntas). */
 function groupByOrigin(criteria: EventCriterion[]) {
@@ -41,15 +44,36 @@ function groupByOrigin(criteria: EventCriterion[]) {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
-const muted = { color: "var(--muted-foreground)" } as const;
-
-function Line({ area, children, right }: { area: string | null | undefined; children: React.ReactNode; right?: React.ReactNode }) {
+/** Uma linha: área (ou item) à esquerda, situação no meio, nota à direita. */
+function Line({ area, children, right }: { area: string | null | undefined; children: ReactNode; right?: ReactNode }) {
   return (
-    <li className="flex items-start gap-3 py-2 text-[12.5px]" style={{ borderTop: "1px solid var(--border)" }}>
-      <span className="w-[34%] max-w-[180px] shrink-0 font-bold uppercase text-[11px] pt-[1px] break-words" style={{ ...muted, fontFamily: CONDENSED, letterSpacing: "0.03em" }}>{area || "Sem área"}</span>
-      <span className="min-w-0 flex-1 leading-snug">{children}</span>
-      {right != null && <span className="shrink-0 font-black tabular-nums text-[14px]" style={{ fontFamily: CONDENSED }}>{right}</span>}
+    <li className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)_auto] sm:grid-cols-[180px_minmax(0,1fr)_auto] items-start gap-x-3 py-2.5 border-t border-border first:border-t-0">
+      <span className="font-condensed pt-0.5 text-[12.5px] font-bold uppercase tracking-[0.05em] leading-tight text-muted-foreground break-words">{area === "" ? "" : area || "Sem área"}</span>
+      <span className="min-w-0 text-[13.5px] leading-snug text-foreground">{children}</span>
+      {right != null ? <span className="font-condensed text-[18px] font-black leading-none tabular-nums text-foreground pt-0.5">{right}</span> : <span />}
     </li>
+  );
+}
+
+/** Situação + texto da linha (selo colorido e frase). */
+function State({ tone, label, children }: { tone: Tone; label: string; children?: ReactNode }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <Chip tone={tone}>{label}</Chip>
+      {children && <span className="text-muted-foreground">{children}</span>}
+    </span>
+  );
+}
+
+function GroupBlock({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="rounded-xl border border-border">
+      <header className="px-4 py-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border bg-secondary/40 rounded-t-xl">
+        <h3 className="font-condensed text-[16px] font-black uppercase leading-tight tracking-[-0.005em] text-foreground">{title}</h3>
+        {aside && <span className="text-[12.5px] text-muted-foreground">{aside}</span>}
+      </header>
+      <ul className="px-4">{children}</ul>
+    </section>
   );
 }
 
@@ -58,52 +82,51 @@ function EvaluationsBody({ detail, evals, tokens, areaMode }: { detail: EventDet
   const byCrit = new Map<number, Evaluation[]>();
   for (const e of evals) byCrit.set(e.criterionId, [...(byCrit.get(e.criterionId) ?? []), e]);
   const viaLink = (e: Evaluation) => tokens.find(t => t.usedAt != null && t.createdByUserId === e.evaluatorUserId && (t.criterionIds ?? []).includes(e.criterionId));
-  if (groups.length === 0) return <p className="text-sm" style={muted}>Nenhum critério ativo neste evento.</p>;
+  if (groups.length === 0) return <p className="text-[14px] text-muted-foreground">Nenhum critério ativo neste evento.</p>;
   const counts = areaResponseCounts(detail.criteria ?? [], evals);
   return (
-    <div className="space-y-4">
-      <p className="text-[12.5px] font-bold" data-testid="event-details-count">
-        {counts.done} de {areaMode ? plural(counts.total, "resposta das áreas", "respostas das áreas") : plural(counts.total, "critério completo", "critérios completos")}
-      </p>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <p className="font-condensed text-[15px] font-bold uppercase tracking-[0.03em] tabular-nums text-foreground shrink-0" data-testid="event-details-count">
+          {counts.done} de {areaMode ? plural(counts.total, "resposta das áreas", "respostas das áreas") : plural(counts.total, "critério completo", "critérios completos")}
+        </p>
+        <StackBar className="flex-1" parts={[{ value: counts.done, cls: "bg-[var(--status-ok)]" }, { value: Math.max(0, counts.total - counts.done), cls: "bg-transparent" }]} />
+      </div>
       {groups.map(g => (
-        <section key={g.name} aria-label={g.name}>
-          <h3 className="font-black uppercase text-[14px] tracking-tight" style={{ fontFamily: CONDENSED }}>
-            {g.name}
-            {g.rows.length > 1 && <span className="ml-2 text-[11px] font-bold normal-case" style={muted}>{plural(g.rows.length, "área", "áreas")} · a nota é a média das áreas</span>}
-          </h3>
-          <ul className="mt-1">
-            {g.rows.map(c => {
-              const list = (byCrit.get(c.criterionId) ?? []).sort((a, b) => (a.status === "submitted" ? 0 : 1) - (b.status === "submitted" ? 0 : 1));
-              const published = c.finalPublishedAt != null || c.partialPublishedAt != null;
-              if (list.length === 0) {
-                return (
-                  <Line key={c.criterionId} area={c.responsibleAreaName}>
-                    {published
-                      ? <span style={{ color: GOOD_TEXT }} className="font-bold">Publicado na calibração (sem resposta de avaliador)</span>
-                      : <span style={muted}>Pendente{areaMode ? " · qualquer avaliador da área" : ""}</span>}
-                  </Line>
-                );
-              }
-              return list.map((e, i) => {
-                const link = e.status === "submitted" ? viaLink(e) : undefined;
-                return (
-                  <Line key={`${c.criterionId}-${e.id}`} area={i === 0 ? c.responsibleAreaName : ""} right={e.score != null ? fmtNum(Number(e.score), 0) : undefined}>
-                    {e.status === "submitted" ? (
-                      <span className="font-bold" style={{ color: GOOD_TEXT }}>
-                        Respondido {link ? `via link por ${e.evaluatorName ?? link.submitterName ?? "freela"}${link.createdByName ? ` (em nome de ${link.createdByName})` : ""}` : `por ${e.evaluatorName ?? "avaliador"}`}
-                        {e.submittedAt ? ` em ${fmtDT(e.submittedAt)}` : ""}
-                      </span>
-                    ) : (
-                      <span className="font-bold" style={{ color: AMBER_TEXT }}>Rascunho de {e.evaluatorName ?? "avaliador"} (não enviado)</span>
-                    )}
-                  </Line>
-                );
-              });
-            })}
-          </ul>
-        </section>
+        <GroupBlock key={g.name} title={g.name} aside={g.rows.length > 1 ? `${plural(g.rows.length, "área", "áreas")} · a nota é a média das áreas` : undefined}>
+          {g.rows.map(c => {
+            const list = (byCrit.get(c.criterionId) ?? []).sort((a, b) => (a.status === "submitted" ? 0 : 1) - (b.status === "submitted" ? 0 : 1));
+            const published = c.finalPublishedAt != null || c.partialPublishedAt != null;
+            if (list.length === 0) {
+              return (
+                <Line key={c.criterionId} area={c.responsibleAreaName}>
+                  {published
+                    ? <State tone="ok" label="Publicado">na calibração, sem resposta de avaliador</State>
+                    : <State tone="neutral" label="Pendente">{areaMode ? "qualquer avaliador da área responde" : undefined}</State>}
+                </Line>
+              );
+            }
+            return list.map((e, i) => {
+              const link = e.status === "submitted" ? viaLink(e) : undefined;
+              return (
+                <Line key={`${c.criterionId}-${e.id}`} area={i === 0 ? c.responsibleAreaName : ""} right={e.score != null ? fmtNum(Number(e.score), 0) : undefined}>
+                  {e.status === "submitted" ? (
+                    <State tone="ok" label="Respondido">
+                      {link
+                        ? <><Link2 size={12} aria-hidden className="inline -mt-0.5 mr-1" />via link por <b className="font-semibold text-foreground">{e.evaluatorName ?? link.submitterName ?? "freela"}</b>{link.createdByName ? ` (em nome de ${link.createdByName})` : ""}</>
+                        : <>por <b className="font-semibold text-foreground">{e.evaluatorName ?? "avaliador"}</b></>}
+                      {e.submittedAt ? ` · ${fmtDT(e.submittedAt)}` : ""}
+                    </State>
+                  ) : (
+                    <State tone="warn" label="Rascunho">de {e.evaluatorName ?? "avaliador"}, não enviado</State>
+                  )}
+                </Line>
+              );
+            });
+          })}
+        </GroupBlock>
       ))}
-      <p className="text-[11.5px]" style={muted}>Notas de 0 a 10, como o avaliador enviou.</p>
+      <p className="text-[12.5px] text-muted-foreground">Notas de 0 a 10, como o avaliador enviou.</p>
     </div>
   );
 }
@@ -111,46 +134,49 @@ function EvaluationsBody({ detail, evals, tokens, areaMode }: { detail: EventDet
 function CalibrationsBody({ detail, cals }: { detail: EventDetail; cals: Calibration[] }) {
   const groups = groupByOrigin((detail.criteria ?? []).filter(c => c.active || cals.some(k => k.criterionId === c.criterionId)));
   const calOf = new Map(cals.map(k => [k.criterionId, k]));
-  if (groups.length === 0) return <p className="text-sm" style={muted}>Nenhum critério ativo neste evento.</p>;
+  if (groups.length === 0) return <p className="text-[14px] text-muted-foreground">Nenhum critério ativo neste evento.</p>;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {groups.map(g => (
-        <section key={g.name} aria-label={g.name}>
-          <h3 className="font-black uppercase text-[14px] tracking-tight" style={{ fontFamily: CONDENSED }}>{g.name}</h3>
-          <ul className="mt-1">
-            {g.rows.map(c => {
-              const cal = calOf.get(c.criterionId);
-              const final = c.finalPublishedAt != null;
-              const partial = !final && c.partialPublishedAt != null;
-              const publishedScore = c.publishedScore ?? (cal && !cal.pendingPublish ? cal.calibratedScore : null);
-              let body: React.ReactNode;
-              let right: string | undefined;
-              if (final || partial) {
-                const by = final ? c.finalPublishedByUserName : c.partialPublishedByUserName;
-                const at = final ? c.finalPublishedAt : c.partialPublishedAt;
-                body = (
-                  <>
-                    <span className="font-bold" style={{ color: final ? GOOD_TEXT : AMBER_TEXT }}>Publicado {final ? "final" : "parcial"}{by ? ` por ${by}` : ""}{at ? ` em ${fmtDT(at)}` : ""}</span>
-                    {cal?.pendingPublish && <span className="block text-[11.5px]" style={{ color: AMBER_TEXT }}>Falta publicar a calibração salva depois: {fmtNum(cal.calibratedScore, 1)}{cal.calibratedAt ? ` em ${fmtDT(cal.calibratedAt)}` : ""}</span>}
-                  </>
-                );
-                right = publishedScore != null ? fmtNum(publishedScore, 1) : "sem calibração";
-              } else if (cal) {
-                body = <span className="font-bold" style={{ color: AMBER_TEXT }}>Falta publicar · salva {fmtNum(cal.calibratedScore, 1)}{cal.calibratedByName ? ` por ${cal.calibratedByName}` : ""}{cal.calibratedAt ? ` em ${fmtDT(cal.calibratedAt)}` : ""}</span>;
-              } else {
-                body = <span style={muted}>Sem calibração</span>;
-              }
-              return (
-                <Line key={c.criterionId} area={c.responsibleAreaName} right={right}>
-                  {body}
-                  {cal?.calibrationReason && <span className="block text-[11.5px] mt-0.5 whitespace-pre-line" style={muted}>Motivo: {cal.calibrationReason}</span>}
-                </Line>
+        <GroupBlock key={g.name} title={g.name}>
+          {g.rows.map(c => {
+            const cal = calOf.get(c.criterionId);
+            const final = c.finalPublishedAt != null;
+            const partial = !final && c.partialPublishedAt != null;
+            const publishedScore = c.publishedScore ?? (cal && !cal.pendingPublish ? cal.calibratedScore : null);
+            let body: ReactNode;
+            let right: string | undefined;
+            if (final || partial) {
+              const by = final ? c.finalPublishedByUserName : c.partialPublishedByUserName;
+              const at = final ? c.finalPublishedAt : c.partialPublishedAt;
+              body = (
+                <>
+                  <State tone={final ? "ok" : "warn"} label={final ? "Final" : "Parcial"}>
+                    {by ? <>por <b className="font-semibold text-foreground">{by}</b></> : "publicado"}{at ? ` · ${fmtDT(at)}` : ""}
+                  </State>
+                  {cal?.pendingPublish && <span className="mt-1 block text-[12.5px] text-[var(--status-warn-text)]">Falta publicar a calibração salva depois: {fmtNum(cal.calibratedScore, 1)}{cal.calibratedAt ? ` em ${fmtDT(cal.calibratedAt)}` : ""}</span>}
+                </>
               );
-            })}
-          </ul>
-        </section>
+              right = publishedScore != null ? fmtNum(publishedScore, 1) : "sem calibração";
+            } else if (cal) {
+              body = (
+                <State tone="warn" label="Falta publicar">
+                  salva {fmtNum(cal.calibratedScore, 1)}{cal.calibratedByName ? <> por <b className="font-semibold text-foreground">{cal.calibratedByName}</b></> : ""}{cal.calibratedAt ? ` · ${fmtDT(cal.calibratedAt)}` : ""}
+                </State>
+              );
+            } else {
+              body = <State tone="neutral" label="Sem calibração" />;
+            }
+            return (
+              <Line key={c.criterionId} area={c.responsibleAreaName} right={right}>
+                {body}
+                {cal?.calibrationReason && <span className="mt-1 block text-[12.5px] text-muted-foreground whitespace-pre-line">Motivo: {cal.calibrationReason}</span>}
+              </Line>
+            );
+          })}
+        </GroupBlock>
       ))}
-      <p className="text-[11.5px]" style={muted}>Nota publicada na escala do critério (0 a 10). Calibração salva só vale na nota depois de publicar.</p>
+      <p className="text-[12.5px] text-muted-foreground">Nota publicada na escala do critério (0 a 10). Calibração salva só vale na nota depois de publicar.</p>
     </div>
   );
 }
@@ -158,8 +184,8 @@ function CalibrationsBody({ detail, cals }: { detail: EventDetail; cals: Calibra
 function MatrixBody({ detail }: { detail: EventDetail }) {
   const cf = detail.conformity ?? null;
   const yesNo = (v: boolean | null | undefined) => v == null
-    ? <span style={muted}>Pendente</span>
-    : <span className="font-bold" style={{ color: v ? GOOD_TEXT : DANGER_TEXT }}>{v ? "Sim" : "Não"}</span>;
+    ? <Chip>Pendente</Chip>
+    : <Chip tone={v ? "ok" : "danger"}>{v ? "Sim" : "Não"}</Chip>;
   const sides = [
     {
       key: "cenografia", title: "Cenografia", responsible: detail.conformityEvaluatorName, answeredBy: cf?.cenografiaSubmittedByName,
@@ -175,63 +201,68 @@ function MatrixBody({ detail }: { detail: EventDetail }) {
     },
   ];
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {sides.map(s => (
-        <section key={s.key} aria-label={s.title}>
-          <h3 className="font-black uppercase text-[14px] tracking-tight" style={{ fontFamily: CONDENSED }}>{s.title}</h3>
-          <p className="text-[12px] mt-0.5" style={muted}>
-            Responsável: <strong style={{ color: "var(--foreground)" }}>{s.responsible ?? "sem responsável"}</strong>
-            {" · "}{s.answeredBy ? <>respondida por <strong style={{ color: "var(--foreground)" }}>{s.answeredBy}</strong>{cf?.updatedAt ? ` (última alteração em ${fmtDT(cf.updatedAt)})` : ""}</> : "ainda não respondida"}
-          </p>
-          <ul className="mt-1">
-            {s.items.map(it => (
-              <Line key={it.label} area={it.label}>
-                {yesNo(it.v)}
-                {it.note && <span className="block text-[11.5px] mt-0.5 whitespace-pre-line" style={muted}>{it.note}</span>}
-              </Line>
-            ))}
-          </ul>
-        </section>
+        <GroupBlock key={s.key} title={s.title} aside={
+          <>Responsável: <b className="font-semibold text-foreground">{s.responsible ?? "sem responsável"}</b>
+            {" · "}{s.answeredBy ? <>respondida por <b className="font-semibold text-foreground">{s.answeredBy}</b>{cf?.updatedAt ? ` (última alteração em ${fmtDT(cf.updatedAt)})` : ""}</> : "ainda não respondida"}</>
+        }>
+          {s.items.map(it => (
+            <Line key={it.label} area={it.label}>
+              {yesNo(it.v)}
+              {it.note && <span className="mt-1 block text-[12.5px] text-muted-foreground whitespace-pre-line">{it.note}</span>}
+            </Line>
+          ))}
+        </GroupBlock>
       ))}
-      {detail.conformityWithoutConduta && <p className="text-[11.5px]" style={muted}>Neste ciclo a Conduta saiu da Matriz (é avaliada no critério Proatividade/Conduta).</p>}
+      {detail.conformityWithoutConduta && <p className="text-[12.5px] text-muted-foreground">Neste ciclo a Conduta saiu da Matriz (é avaliada no critério Proatividade/Conduta).</p>}
     </div>
   );
 }
 
 export function EventDetailsDialog({ ev, kind, areaMode, onClose }: { ev: EventItem; kind: EventDetailsKind; areaMode: boolean; onClose: () => void }) {
-  const { data: detail, isLoading, isError } = useGetEvent(ev.id, { query: { queryKey: getGetEventQueryKey(ev.id) } });
+  const { data: detail, isLoading, isError, refetch } = useGetEvent(ev.id, { query: { queryKey: getGetEventQueryKey(ev.id) } });
   const evalParams = { eventId: ev.id };
   const evals = useGetEvaluations(evalParams, { query: { enabled: kind === "evaluations", queryKey: getGetEvaluationsQueryKey(evalParams) } });
   const cals = useGetCalibrations(evalParams, { query: { enabled: kind === "calibrations", queryKey: getGetCalibrationsQueryKey(evalParams) } });
   const tokens = useAllPublicTokens(kind === "evaluations" ? ev.id : null);
   const loading = isLoading || (kind === "evaluations" && evals.isLoading) || (kind === "calibrations" && cals.isLoading);
   const failed = isError || (kind === "evaluations" && evals.isError) || (kind === "calibrations" && cals.isError);
-  const subtitle = useMemo(() => [ev.clientName, ev.city].filter(Boolean).join(" · "), [ev]);
+  const subtitle = useMemo(() => [ev.name, ev.clientName, ev.city].filter(Boolean).join(" · "), [ev]);
+  const retry = () => { void refetch(); if (kind === "evaluations") void evals.refetch(); if (kind === "calibrations") void cals.refetch(); };
   return (
     <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent
         data-testid={`event-details-${kind}`}
-        className="max-w-2xl max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:max-w-none max-sm:rounded-none max-sm:p-4 content-start"
-        style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+        className={cn(dialogCls, "max-w-[720px] p-0 gap-0 flex flex-col overflow-hidden max-h-[88dvh]",
+          "max-sm:w-full max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0")}
       >
-        <DialogHeader className="pr-6 text-left">
-          <DialogTitle className="text-xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED }}>{TITLES[kind]} · {ev.name}</DialogTitle>
-          <DialogDescription className="text-[12px]" style={muted}>{subtitle || "Detalhe do evento"}</DialogDescription>
-        </DialogHeader>
-        {loading ? (
-          <div role="status" aria-live="polite" className="space-y-2">
-            <span className="sr-only">Carregando…</span>
-            {[0, 1, 2].map(i => <div key={i} className="h-10 rounded-lg animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />)}
-          </div>
-        ) : failed || !detail ? (
-          <p role="alert" className="text-sm font-bold" style={{ color: DANGER_TEXT }}>Não foi possível carregar o detalhe deste evento.</p>
-        ) : kind === "evaluations" ? (
-          <EvaluationsBody detail={detail} evals={evals.data ?? []} tokens={tokens.data ?? []} areaMode={areaMode} />
-        ) : kind === "calibrations" ? (
-          <CalibrationsBody detail={detail} cals={cals.data ?? []} />
-        ) : (
-          <MatrixBody detail={detail} />
-        )}
+        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-border shrink-0">
+          <DialogHeading icon={ICONS[kind]} Title={DialogTitle} Description={DialogDescription} title={TITLES[kind]} description={subtitle} />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6 py-5">
+          {loading ? (
+            <div role="status" aria-live="polite" className="space-y-3">
+              <span className="sr-only">Carregando…</span>
+              <Bone className="h-4 w-48" />
+              {[0, 1, 2].map(i => <Bone key={i} className="h-[92px] w-full rounded-xl" />)}
+            </div>
+          ) : failed || !detail ? (
+            <ErrorBlock title="Não foi possível carregar o detalhe" onRetry={retry} />
+          ) : kind === "evaluations" ? (
+            <EvaluationsBody detail={detail} evals={evals.data ?? []} tokens={tokens.data ?? []} areaMode={areaMode} />
+          ) : kind === "calibrations" ? (
+            <CalibrationsBody detail={detail} cals={cals.data ?? []} />
+          ) : (
+            <MatrixBody detail={detail} />
+          )}
+        </div>
+        <div className="px-5 sm:px-6 py-3.5 border-t border-border shrink-0 flex flex-wrap items-center justify-between gap-2">
+          <Eyebrow as="span" className="hidden sm:block">Detalhe só de leitura</Eyebrow>
+          <Link href={kind === "calibrations" ? `/calibrations?eventId=${ev.id}` : `/events/${ev.id}`} className={cn(btnSmall, "ml-auto")} onClick={onClose}>
+            {kind === "calibrations" ? "Abrir a calibração" : "Abrir o evento"} <ArrowUpRight size={14} aria-hidden />
+          </Link>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,69 +1,77 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CONDENSED, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
+// "Migrar e-mails (Office 365)" em dois passos: prévia (dryRun) → aplicar.
+// Nada muda até "Aplicar"; a prévia mostra o antes → depois de cada pessoa.
+import { ArrowRight, CheckCircle2, Loader2, Mail, SearchX } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn, plural } from "@/lib/utils";
+import { Chip, DialogHeading, Notice, btnPrimary, btnSecondary, dialogCls, dialogFooterCls, surfaceCls, useReturnFocus } from "./users-ui";
 import type { EmailMigrationState } from "./use-email-migration";
 
-/** Diálogo "Migrar Emails Office 365": prévia do que muda → confirmar e aplicar. */
 export function EmailMigrationDialog({ state }: { state: EmailMigrationState }) {
-  const { emailMigOpen, emailMigPreview, emailMigLoading, runEmailMigration, closeMigration, onMigrationOpenChange } = state;
+  const { emailMigOpen, emailMigPreview: preview, emailMigLoading: loading, runEmailMigration, closeMigration, onMigrationOpenChange } = state;
+  const onCloseAutoFocus = useReturnFocus(emailMigOpen);
+  const toUpdate = (preview ?? []).filter(p => p.status === "will_update");
+  const same = (preview ?? []).filter(p => p.status === "no_change");
+  const notFound = (preview ?? []).filter(p => p.status === "not_found");
+
   return (
-    <Dialog open={emailMigOpen} onOpenChange={onMigrationOpenChange}>
-      <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Migrar Emails Office 365</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Atualiza os emails dos avaliadores identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
-          {!emailMigPreview && (
-            <button
-              onClick={() => runEmailMigration(true)}
-              disabled={emailMigLoading}
-              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-colors hover:opacity-80"
-              style={{ border: "1px solid var(--border)" }}
-            >
-              {emailMigLoading ? "Carregando..." : "Ver Prévia"}
+    <Dialog open={emailMigOpen} onOpenChange={o => { if (!loading) onMigrationOpenChange(o); }}>
+      <DialogContent className={cn(dialogCls, "max-w-[640px] max-h-[92dvh] flex flex-col overflow-hidden outline-none")} data-testid="email-migration-dialog" onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeading icon={Mail} Title={DialogTitle} Description={DialogDescription} title="Migrar e-mails (Office 365)"
+          description="Troca o e-mail dos avaliadores encontrados no Office 365. Veja a prévia antes: nada muda até você aplicar." />
+
+        {!preview ? (
+          <div className={cn(surfaceCls, "px-5 py-8 text-center")}>
+            <span className="mx-auto w-11 h-11 rounded-full bg-secondary text-muted-foreground flex items-center justify-center"><Mail size={20} aria-hidden /></span>
+            <p className="mt-3 text-[14px] text-muted-foreground max-w-sm mx-auto">A prévia lista quem muda de e-mail, quem já está certo e quem não foi encontrado.</p>
+            <button type="button" data-testid="button-email-preview" onClick={() => runEmailMigration(true)} disabled={loading} aria-busy={loading || undefined} className={cn(btnPrimary, "mt-4")}>
+              {loading && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+              {loading ? "Buscando…" : "Ver prévia"}
             </button>
-          )}
-          {emailMigPreview && (
-            <div className="space-y-3">
-              <div className="flex gap-4 text-xs font-bold uppercase tracking-wide">
-                <span style={{ color: GOOD_TEXT }}>{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
-                <span style={{ color: "var(--muted-foreground)" }}>{emailMigPreview.filter(p => p.status === "no_change").length} sem mudança</span>
-                {emailMigPreview.filter(p => p.status === "not_found").length > 0 && (
-                  <span style={{ color: DANGER_TEXT }}>{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
-                )}
-              </div>
-              <div className="max-h-72 overflow-y-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>
-                {emailMigPreview.filter(p => p.status === "will_update").map((p, i) => (
-                  <div key={p.id} className="px-3 py-2 text-xs" style={{ backgroundColor: "rgba(154,176,0,0.08)", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                    <span className="font-bold">{p.name}</span>
-                    <div className="line-through" style={{ color: "var(--muted-foreground)" }}>{p.emailFrom ?? <em>sem email</em>}</div>
-                    <div className="font-mono" style={{ color: GOOD_TEXT }}>{p.emailTo}</div>
-                  </div>
-                ))}
-                {emailMigPreview.filter(p => p.status === "no_change").map((p, i) => (
-                  <div key={p.id} className="px-3 py-2 text-xs" style={{ color: "var(--muted-foreground)", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                    <span className="font-bold">{p.name}</span> — já atualizado
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => runEmailMigration(false)}
-                  disabled={emailMigLoading || emailMigPreview.filter(p => p.status === "will_update").length === 0}
-                  className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                >
-                  {emailMigLoading ? "Aplicando..." : "Confirmar e Aplicar"}
-                </button>
-                <button
-                  onClick={closeMigration}
-                  className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide transition-colors hover:opacity-80"
-                  style={{ border: "1px solid var(--border)" }}
-                >
-                  Cancelar
-                </button>
-              </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2" data-testid="email-preview-summary">
+              <Chip tone={toUpdate.length > 0 ? "ok" : "neutral"}>{plural(toUpdate.length, "para atualizar", "para atualizar")}</Chip>
+              <Chip>{plural(same.length, "já certo", "já certos")}</Chip>
+              {notFound.length > 0 && <Chip tone="warn">{plural(notFound.length, "não encontrado", "não encontrados")}</Chip>}
             </div>
+            {toUpdate.length === 0 && (
+              <Notice icon={CheckCircle2} tone="ok">Nenhum e-mail para trocar. Todos os encontrados já estão atualizados.</Notice>
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-border divide-y divide-border max-h-[46dvh]">
+              {toUpdate.map(p => (
+                <div key={`u-${p.id}`} className="px-3.5 py-2.5">
+                  <p className="text-[14px] font-semibold text-foreground">{p.name}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12.5px]">
+                    <span className="text-muted-foreground line-through break-all">{p.emailFrom ?? "sem e-mail"}</span>
+                    <ArrowRight size={12} aria-hidden className="text-muted-foreground shrink-0" />
+                    <span className="font-semibold text-[var(--status-ok-text)] break-all">{p.emailTo}</span>
+                  </p>
+                </div>
+              ))}
+              {notFound.map(p => (
+                <div key={`n-${p.id}`} className="px-3.5 py-2.5 flex items-center gap-2 text-[13px]">
+                  <SearchX size={14} aria-hidden className="text-[var(--status-warn-text)] shrink-0" />
+                  <span className="text-muted-foreground break-all">{p.email ?? "—"}</span>
+                  <span className="text-muted-foreground">· sem usuário com este e-mail</span>
+                </div>
+              ))}
+              {same.map(p => (
+                <div key={`s-${p.id}`} className="px-3.5 py-2 text-[13px] text-muted-foreground">
+                  <span className="font-semibold">{p.name}</span> · já atualizado
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className={dialogFooterCls}>
+          <button type="button" onClick={closeMigration} disabled={loading} className={btnSecondary}>Cancelar</button>
+          {preview && (
+            <button type="button" data-testid="button-email-apply" onClick={() => runEmailMigration(false)} disabled={loading || toUpdate.length === 0} aria-busy={loading || undefined} className={btnPrimary}>
+              {loading && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
+              {loading ? "Aplicando…" : toUpdate.length > 0 ? `Aplicar ${plural(toUpdate.length, "troca", "trocas")}` : "Nada a aplicar"}
+            </button>
           )}
         </div>
       </DialogContent>

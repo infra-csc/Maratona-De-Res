@@ -1,12 +1,10 @@
 import type { QuarterlyResult } from "@workspace/api-client-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
-import { BarChart3 } from "lucide-react";
-import { fmtNum, plural } from "@/lib/utils";
-import { CONDENSED } from "@/lib/premium-theme";
+import { cn, faixaEdge, fmtNum, plural } from "@/lib/utils";
 import { fmtBRLShort } from "./helpers";
 import { FaixaBadge } from "./badges";
+import { Eyebrow, surfaceCls } from "./results-ui";
 
-type PlatoonGroup = {
+export type PlatoonGroup = {
   platoon: string;
   color: string | null;
   minScore: number | null;
@@ -16,7 +14,7 @@ type PlatoonGroup = {
   totalBonus: number;
 };
 
-function buildPlatoonGroups(rows: QuarterlyResult[]): PlatoonGroup[] {
+export function buildPlatoonGroups(rows: QuarterlyResult[]): PlatoonGroup[] {
   const grouped = new Map<string, { items: QuarterlyResult[]; color: string | null; min: number | null; max: number | null }>();
   for (const r of rows) {
     const key = r.platoon ?? "Sem faixa";
@@ -38,87 +36,50 @@ function buildPlatoonGroups(rows: QuarterlyResult[]): PlatoonGroup[] {
     .sort((a, b) => (b.minScore ?? -1) - (a.minScore ?? -1));
 }
 
+/**
+ * Distribuição por faixa: uma linha por faixa (da mais alta para a mais baixa)
+ * com a barra de pessoas, a média e o bônus somado. A média define a faixa.
+ */
 export function PlatoonDistributionPanel({ rows, cycleClosed = false }: { rows: QuarterlyResult[]; /** Ciclo fechado: bônus OFICIAL; aberto, PROJETADO. */ cycleClosed?: boolean }) {
   const bonusHead = cycleClosed ? "Bônus oficial" : "Bônus projetado";
   const groups = buildPlatoonGroups(rows);
   if (groups.length === 0) return null;
-
-  const chartData = groups.map(g => ({ name: g.platoon, count: g.count, color: g.color }));
-  const chartHeight = Math.max(groups.length * 48, 100);
+  const max = Math.max(...groups.map(g => g.count));
+  const cols = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(150px,1.1fr)_minmax(0,2fr)_64px_72px_120px]";
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BarChart3 size={16} style={{ color: "var(--accent-text)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
-          Distribuição por Faixa
-        </span>
-        <span className="ml-auto text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-          {plural(rows.length, "colaborador", "colaboradores")}
-        </span>
+    <section aria-labelledby="faixas-title" className={cn(surfaceCls, "overflow-hidden")} data-testid="platoon-distribution">
+      <div className="px-4 lg:px-5 pt-3.5 pb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <Eyebrow as="h2" id="faixas-title">Distribuição por faixa</Eyebrow>
+        <span className="text-[12.5px] text-muted-foreground">{plural(rows.length, "colaborador", "colaboradores")} · a média define a faixa</span>
       </div>
-
-      <div className="p-5 grid md:grid-cols-2 gap-6 items-start">
-        {/* Horizontal bar chart */}
-        <div style={{ height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 4 }}>
-              <XAxis type="number" hide />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={128}
-                tick={{ fontSize: 11, fontWeight: 700, fill: "var(--foreground)", fontFamily: CONDENSED }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <RechartsTooltip
-                cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                content={({ payload }) => {
-                  if (!payload?.length) return null;
-                  const item = payload[0];
-                  return (
-                    <div className="rounded-lg px-3 py-2 text-xs font-bold shadow-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                      <span style={{ color: "var(--muted-foreground)" }}>{item.payload.name}: </span>
-                      <span style={{ fontFamily: CONDENSED, fontWeight: 900 }}>{plural(item.value as number, "colaborador", "colaboradores")}</span>
-                    </div>
-                  );
-                }}
-              />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, fontWeight: 900, fontFamily: CONDENSED, fill: "var(--foreground)" }}>
-                {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color ?? "var(--primary)"} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+      <div role="table" aria-labelledby="faixas-title">
+        <div role="row" className={cn("hidden lg:grid items-center gap-4 px-4 lg:px-5 py-2 border-y border-border bg-secondary/60 font-condensed text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground", cols)}>
+          <span role="columnheader">Faixa</span>
+          <span role="columnheader">Pessoas</span>
+          <span role="columnheader" className="text-right">Qtd.</span>
+          <span role="columnheader" className="text-right">Média</span>
+          <span role="columnheader" className="text-right" data-testid="platoon-bonus-head"
+            title={cycleClosed ? "Soma do bônus oficial, apurado no fechamento do ciclo" : "Soma do bônus projetado: o ciclo está aberto e o valor muda até o fechamento"}>{bonusHead}</span>
         </div>
-
-        {/* Summary table */}
-        <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-          <div className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
-            {(["Faixa", "Qtd", "Média", bonusHead] as const).map(h => (
-              <div key={h} data-testid={h === bonusHead ? "platoon-bonus-head" : undefined} title={h === bonusHead ? (cycleClosed ? "Soma do bônus oficial, apurado no fechamento do ciclo" : "Soma do bônus projetado: o ciclo está aberto e o valor muda até o fechamento") : undefined} className="px-3 py-2.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
-            ))}
+        {groups.map(g => (
+          <div role="row" key={g.platoon} className={cn("grid items-center gap-x-4 gap-y-2 px-4 lg:px-5 py-3 border-t border-border first:border-t-0 lg:first:border-t-0", cols)}>
+            <span role="cell" className="min-w-0"><FaixaBadge name={g.platoon} minScore={g.minScore} maxScore={g.maxScore} color={g.color} /></span>
+            <span role="cell" className="col-span-2 lg:col-span-1 row-start-2 lg:row-start-auto flex items-center gap-2.5 min-w-0">
+              <span className="flex-1 h-2.5 rounded-full bg-secondary overflow-hidden" aria-hidden>
+                <span className="block h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
+                  style={{ width: `${Math.max(4, (g.count / max) * 100)}%`, backgroundColor: g.color ?? "var(--muted-foreground)", ...faixaEdge(g.color) }} />
+              </span>
+              <span className="lg:hidden text-[12.5px] text-muted-foreground whitespace-nowrap">média {fmtNum(g.avgScore, 1)} · {fmtBRLShort(g.totalBonus)}</span>
+            </span>
+            <span role="cell" className="text-right font-condensed text-[20px] font-black tabular-nums leading-none">
+              {g.count}<span className="lg:hidden font-body text-[12px] font-normal text-muted-foreground"> {g.count === 1 ? "pessoa" : "pessoas"}</span>
+            </span>
+            <span role="cell" className="hidden lg:block text-right font-condensed text-[17px] font-bold tabular-nums">{fmtNum(g.avgScore, 1)}</span>
+            <span role="cell" className={cn("hidden lg:block text-right font-condensed text-[17px] font-bold tabular-nums whitespace-nowrap", g.totalBonus <= 0 && "text-muted-foreground")}>{fmtBRLShort(g.totalBonus)}</span>
           </div>
-          {groups.map((g, i) => (
-            <div key={g.platoon} className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr] items-center" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-              <div className="px-3 py-2.5">
-                <FaixaBadge name={g.platoon} minScore={g.minScore} maxScore={g.maxScore} color={g.color} compact />
-              </div>
-              <div className="px-3 py-2.5 text-center">
-                <span className="font-black text-sm" style={{ fontFamily: CONDENSED }}>{g.count}</span>
-              </div>
-              <div className="px-3 py-2.5 text-center">
-                <span className="font-black text-sm" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(g.avgScore, 1)}</span>
-              </div>
-              <div className="px-3 py-2.5 text-center">
-                <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>{fmtBRLShort(g.totalBonus)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }

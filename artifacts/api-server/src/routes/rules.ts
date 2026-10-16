@@ -47,7 +47,7 @@ const SCORE_STEP = 0.01;
 function validatePlatoonRanges(ranges: RangeRow[]): string | null {
   const active = [...ranges].sort((a, b) => a.minScore - b.minScore);
   if (active.length === 0) {
-    return "É necessário pelo menos um intervalo de pelotão.";
+    return "É necessário pelo menos uma faixa.";
   }
   const first = active[0];
   const last = active[active.length - 1];

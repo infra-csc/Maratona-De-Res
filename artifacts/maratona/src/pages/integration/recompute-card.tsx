@@ -1,66 +1,67 @@
-import { plural } from "@/lib/utils";
+// Recalcular o ciclo (admin e RH): refaz ranking, elegibilidade e bônus do
+// ciclo atual. Agora com confirmação do que acontece e o resultado no mesmo
+// diálogo. Mesma chamada de antes.
+import { useState } from "react";
 import { recomputeQuarter } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
-import { useState } from "react";
-import { CONDENSED } from "@/lib/premium-theme";
+import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { serverErrorMessage } from "./shared";
+import { ActionDialog, ConsequenceList, DoneBox, ErrorBox, MessageList, NumberStrip, ToolRow, btnPrimary, btnSecondary, btnSmall, dialogFooterCls } from "./integration-ui";
 
-/** Card "Recalcular Ciclo" (admin e RH): refaz o snapshot de ranking/elegibilidade/bônus. */
 export function RecomputeCard() {
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [recomputePending, setRecomputePending] = useState(false);
-  const [recomputeResult, setRecomputeResult] = useState<{ totalProcessed: number; warnings: string[] } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<{ totalProcessed: number; warnings: string[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleRecompute() {
-    setRecomputePending(true);
-    setRecomputeResult(null);
+  async function run() {
+    setPending(true); setError(null);
     try {
       const data = await recomputeQuarter();
-      const warnings = data.warnings ?? [];
-      setRecomputeResult({ totalProcessed: data.totalProcessed, warnings });
+      setResult({ totalProcessed: data.totalProcessed, warnings: data.warnings ?? [] });
       await qc.resetQueries();
-      toast({ title: `Ciclo recalculado — ${plural(data.totalProcessed, "colaborador processado", "colaboradores processados")}${warnings.length > 0 ? ` · ${plural(warnings.length, "aviso")}` : ""}` });
     } catch (err: unknown) {
-      toast({ title: "Falha ao recalcular", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
-    } finally {
-      setRecomputePending(false);
-    }
+      setError(serverErrorMessage(err, "Erro desconhecido"));
+    } finally { setPending(false); }
   }
+  const close = () => { if (!pending) { setOpen(false); setResult(null); setError(null); } };
 
   return (
-    <Card className="bg-card border border-border shadow-none overflow-hidden">
-      <CardHeader className="bg-secondary border-b border-border pb-4">
-        <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-          <RefreshCw size={18} className="text-primary" /> Recalcular Ciclo
-        </CardTitle>
-        <CardDescription>Refaz o snapshot de ranking, elegibilidade e bônus para o ciclo atual. Use após ajustes de critérios, exclusão de participantes Sup Ceno ou outras correções manuais.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-6 space-y-3">
-        <Button
-          disabled={recomputePending}
-          onClick={handleRecompute}
-          className="w-full"
-        >
-          <RefreshCw size={16} className={`mr-2 ${recomputePending ? "animate-spin" : ""}`} />
-          {recomputePending ? "Recalculando…" : "Recalcular Resultados do Ciclo"}
-        </Button>
-        {recomputeResult && (
-          <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
-            {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
-            <div>
-              <p>{plural(recomputeResult.totalProcessed, "colaborador processado", "colaboradores processados")}.</p>
-              {recomputeResult.warnings.map((w, i) => (
-                <p key={i} className="text-xs mt-1 opacity-80">{w}</p>
-              ))}
-            </div>
-          </div>
+    <>
+      <ToolRow icon={RefreshCw} title="Recalcular o ciclo atual" testId="tool-recompute" traits={[{ label: "Pode repetir sem risco", tone: "ok" }]}
+        action={<button type="button" data-testid="button-recompute" onClick={() => setOpen(true)} className={btnSmall}><RefreshCw size={14} aria-hidden /> Recalcular…</button>}>
+        Refaz ranking, elegibilidade e bônus do ciclo atual. Use depois de mudar faixas, critérios ou tirar participantes Sup Ceno.
+      </ToolRow>
+      <ActionDialog open={open} onOpenChange={o => { if (!o) close(); }} busy={pending} icon={result ? CheckCircle2 : RefreshCw} tone={result ? "brand" : "neutral"}
+        testId="dialog-recompute" title={result ? "Ciclo recalculado" : "Recalcular o ciclo atual?"}
+        description={result ? undefined : "Leva alguns segundos. As telas abertas recarregam no fim."}>
+        {!result && (
+          <ConsequenceList items={[
+            <>Refaz a nota final, a faixa, a elegibilidade e o bônus de <span className="font-semibold text-foreground">cada colaborador do ciclo atual</span>.</>,
+            <>Usa as regras e as faixas de agora. Pode rodar de novo sem risco.</>,
+          ]} />
         )}
-      </CardContent>
-    </Card>
+        {result && (
+          <>
+            <NumberStrip items={[{ label: "Colaboradores processados", value: result.totalProcessed, tone: "ok" }, { label: "Avisos", value: result.warnings.length, tone: result.warnings.length ? "warn" : undefined }]} />
+            {result.warnings.length > 0 ? <MessageList tone="warn" title="Avisos" items={result.warnings} /> : <DoneBox>Resultados atualizados em todas as telas.</DoneBox>}
+          </>
+        )}
+        <ErrorBox message={error} title="Falha ao recalcular" />
+        <div className={dialogFooterCls}>
+          {result ? <button type="button" onClick={close} className={btnPrimary}>Fechar</button> : (
+            <>
+              <button type="button" onClick={close} disabled={pending} className={btnSecondary}>Cancelar</button>
+              <button type="button" data-testid="button-confirm-recompute" onClick={() => { void run(); }} disabled={pending} aria-busy={pending || undefined} className={btnPrimary}>
+                {pending ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <RefreshCw size={15} aria-hidden />}
+                {pending ? "Recalculando…" : "Recalcular"}
+              </button>
+            </>
+          )}
+        </div>
+      </ActionDialog>
+    </>
   );
 }
+

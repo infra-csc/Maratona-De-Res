@@ -14,12 +14,17 @@ export type EmployeeWithCycle = Employee & {
   cycleExcludedReason: string | null;
   linkedUserId: number | null;
   hasAccess: boolean;
+  /** Estava no ciclo anterior (fechado) — aparece em "No ciclo" mesmo sem nota no ciclo novo. */
+  inPreviousCycle?: boolean;
 };
 
 /** Situação no ciclo atual: com nota, fora do ciclo (admin) ou sem nota (só aparece pela busca). */
 export type CycleStatus = "in" | "out" | "none";
 
-export type EligibilityStatus = "eligible" | "not_eligible" | "freela" | "pending";
+/** Atalho do painel que recorta a lista: elegíveis, casa sem acesso ou nome repetido. */
+export type AttentionFilter = "eligible" | "noAccess" | "dup" | null;
+
+export type EligibilityStatus ="eligible" | "not_eligible" | "freela" | "pending";
 
 /** Filtro de tipo do diálogo "Gerar Acessos em Massa". */
 export type BulkTypeFilter = "casa" | "freela" | "all";

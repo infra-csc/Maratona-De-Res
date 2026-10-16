@@ -1,229 +1,162 @@
-import { plural } from "@/lib/utils";
+// Prévia (dryRun) da importação de resultados históricos, evento por evento,
+// com o vínculo opcional a um evento que já existe na mesma data; depois de
+// confirmar, o resultado aparece no mesmo diálogo.
 import type { HistoricalImportResult } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, CheckCircle2, History, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Calendar, Users, AlertTriangle, History } from "lucide-react";
-import { CONDENSED } from "@/lib/premium-theme";
-import { DIALOG_STYLE } from "./shared";
+import { cn, plural } from "@/lib/utils";
+import { ActionDialog, Chip, DoneBox, ErrorBox, Eyebrow, MessageList, NumberStrip, btnPrimary, btnSecondary, dialogFooterCls, type Tone } from "./integration-ui";
 
-type HistoricalPreviewDialogProps = {
+type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fileName: string;
   preview: HistoricalImportResult | null;
+  committed: HistoricalImportResult | null;
+  commitError: string | null;
   /** groupKey do evento da planilha → id do evento existente ao qual vincular. */
   linkOverrides: Record<string, number>;
   setLinkOverrides: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   isCommitting: boolean;
-  onCancel: () => void;
   onConfirm: () => void;
 };
 
-/** Pré-visualização (dryRun) da importação de resultados históricos, evento por evento. */
-export function HistoricalPreviewDialog({
-  open,
-  onOpenChange,
-  preview: historicalPreview,
-  linkOverrides,
-  setLinkOverrides,
-  isCommitting,
-  onCancel,
-  onConfirm,
-}: HistoricalPreviewDialogProps) {
+const ACTION: Record<string, { label: string; tone: Tone; hint: string }> = {
+  create: { label: "Criar", tone: "ok", hint: "evento novo, ainda não existe no sistema." },
+  link: { label: "Vincular", tone: "info", hint: "você escolheu ligar a um evento que já existe, em vez de criar outro." },
+  update: { label: "Atualizar", tone: "warn", hint: "já existe um evento histórico com este nome e data: a nota é substituída pela da planilha." },
+  conflict: { label: "Conflito", tone: "danger", hint: "não será importado (veja o motivo nos erros)." },
+};
+
+export function HistoricalPreviewDialog({ open, onOpenChange, fileName, preview, committed, commitError, linkOverrides, setLinkOverrides, isCommitting, onConfirm }: Props) {
+  const p = preview;
+  const blocked = !p?.success || (p?.errors.length ?? 0) > 0;
+  const create = p?.events.filter(ev => ev.action === "create").length ?? 0;
+  const update = p?.events.filter(ev => ev.action === "update").length ?? 0;
+  const conflict = p?.events.filter(ev => ev.action === "conflict").length ?? 0;
+  const toLink = p?.events.reduce((s, ev) => s + ev.matchedCount, 0) ?? 0;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-historical-preview">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History size={20} className="text-[var(--amber)]" />
-            Pré-visualização da importação
-          </DialogTitle>
-          <DialogDescription>
-            Nada foi gravado no banco ainda. Confira com atenção tudo o que vai acontecer — evento por evento — antes de confirmar. Depois de confirmar, os eventos entram como resultados históricos (nota já fechada, sem avaliação por critério).
-          </DialogDescription>
-        </DialogHeader>
+    <ActionDialog open={open} onOpenChange={onOpenChange} busy={isCommitting} wide="xl" testId="dialog-historical-preview"
+      icon={committed ? CheckCircle2 : History} tone={committed ? "brand" : "neutral"}
+      title={committed ? "Resultados históricos importados" : "Prévia da importação"}
+      description={committed ? fileName : <>Nada foi gravado ainda. Confira evento por evento antes de confirmar. <span className="text-foreground font-semibold break-all">{fileName}</span></>}>
+      {committed ? (
+        <>
+          <NumberStrip items={[
+            { label: "Eventos criados", value: committed.eventsCreated ?? 0, tone: "ok" },
+            { label: "Eventos atualizados", value: committed.eventsUpdated ?? 0 },
+            { label: "Participações", value: committed.participantsLinked ?? 0 },
+            { label: "Colaboradores novos", value: committed.employeesCreated ?? 0, tone: (committed.employeesCreated ?? 0) > 0 ? "info" : undefined },
+          ]} />
+          {(committed.warnings?.length ?? 0) > 0
+            ? <MessageList tone="warn" title="Avisos" items={committed.warnings ?? []} />
+            : <DoneBox>Os eventos entraram como resultados históricos, com a nota já fechada.</DoneBox>}
+        </>
+      ) : p && (
+        <div className="space-y-4">
+          <NumberStrip items={[
+            { label: "Linhas", value: p.totalRows, testId: "text-preview-total-rows" },
+            { label: "Já cadastrados", value: p.matched, testId: "text-preview-matched" },
+            { label: "Colaboradores novos", value: p.employeesToCreate?.length ?? 0, tone: (p.employeesToCreate?.length ?? 0) > 0 ? "info" : undefined },
+            { label: "Eventos a criar", value: create, tone: "ok" },
+            { label: "Eventos a atualizar", value: update, tone: update > 0 ? "warn" : undefined },
+            { label: "Participações", value: toLink },
+          ]} />
 
-        {historicalPreview && (() => {
-          const eventsToCreate = historicalPreview.events.filter(ev => ev.action === "create").length;
-          const eventsToUpdate = historicalPreview.events.filter(ev => ev.action === "update").length;
-          const eventsBlocked = historicalPreview.events.filter(ev => ev.action === "conflict").length;
-          const participantsToLink = historicalPreview.events.reduce((sum, ev) => sum + ev.matchedCount, 0);
-          return (
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-3 bg-secondary rounded-xl border border-border">
-                <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
-              </div>
-              <div className="text-center p-3 bg-secondary rounded-xl border border-border">
-                <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-matched">{historicalPreview.matched}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores já cadastrados</p>
-              </div>
-              <div className="text-center p-3 bg-secondary rounded-xl border border-border">
-                <p className="text-xl font-black text-[var(--info)]" style={{ fontFamily: CONDENSED }}>{historicalPreview.employeesToCreate?.length ?? 0}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores novos</p>
-              </div>
-              <div className="text-center p-3 bg-accent/10 rounded-xl border border-accent/40">
-                <p className="text-xl font-black text-accent-text" style={{ fontFamily: CONDENSED }}>{eventsToCreate}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos a criar</p>
-              </div>
-              <div className="text-center p-3 bg-[var(--amber)]/10 rounded-xl border border-[var(--amber)]/30">
-                <p className="text-xl font-black text-[var(--amber)]" style={{ fontFamily: CONDENSED }}>{eventsToUpdate}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos a atualizar</p>
-              </div>
-              <div className="text-center p-3 bg-secondary rounded-xl border border-border">
-                <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{participantsToLink}</p>
-                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações a vincular</p>
-              </div>
-            </div>
+          {conflict > 0 && (
+            <p className="text-[13px] font-semibold text-[var(--status-danger-text)]">
+              {conflict === 1 ? "1 evento não será importado" : `${conflict} eventos não serão importados`} por causa dos erros abaixo: corrija a planilha e envie de novo.
+            </p>
+          )}
+          <MessageList tone="danger" title="Erros — bloqueiam a importação" items={p.errors}
+            note="Enquanto houver erro, não dá para confirmar. Corrija a planilha (ou os cadastros) e envie de novo." />
+          <MessageList tone="info" title={p.employeesToCreate?.length === 1 ? "1 colaborador novo será cadastrado" : `${p.employeesToCreate?.length ?? 0} colaboradores novos serão cadastrados`}
+            items={p.employeesToCreate ?? []} count={false}
+            note="Esses nomes não bateram com ninguém já cadastrado. Ao confirmar, viram um cadastro básico (sem área/função) já no evento. Se algum estiver digitado errado, cancele e corrija a planilha." />
+          <MessageList tone="info" title={`${plural(p.cycleFallback?.length ?? 0, "evento", "eventos")} fora do período de qualquer ciclo`}
+            items={p.cycleFallback ?? []} count={false} note="Em vez de bloquear, entram no ciclo atual (indicado na tabela) e aparecem normalmente nos relatórios." />
 
-            {eventsBlocked > 0 && (
-              <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
-                <strong>{eventsBlocked === 1 ? "1 evento não será importado" : `${eventsBlocked} eventos não serão importados`}</strong> por causa dos erros listados abaixo — corrija a planilha e reenvie.
-              </p>
-            )}
-
-            {historicalPreview.errors.length > 0 && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                <p className="text-xs font-bold text-destructive uppercase mb-1 flex items-center gap-1.5">
-                  <AlertTriangle size={14} /> Erros ({historicalPreview.errors.length}) — bloqueiam a importação
-                </p>
-                <p className="text-[11px] text-destructive mb-2">Enquanto houver erros abaixo, o botão de confirmar fica desabilitado. Corrija a planilha (ou os cadastros) e envie novamente.</p>
-                <ul className="text-xs text-destructive space-y-1 max-h-40 overflow-y-auto">
-                  {historicalPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
-                </ul>
-              </div>
-            )}
-
-            {historicalPreview.employeesToCreate && historicalPreview.employeesToCreate.length > 0 && (
-              <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
-                <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
-                  <Users size={14} /> {historicalPreview.employeesToCreate.length === 1 ? "1 colaborador novo será cadastrado" : `${historicalPreview.employeesToCreate.length} colaboradores novos serão cadastrados`}
-                </p>
-                <p className="text-[11px] text-[var(--info)] mb-2">Esses nomes não bateram com nenhum colaborador já cadastrado. Ao confirmar, eles serão criados automaticamente (cadastro básico, sem área/função definida) e já entram participando do evento correspondente na tabela abaixo. Se algum nome estiver digitado errado, cancele e corrija a planilha antes de confirmar.</p>
-                <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
-                  {historicalPreview.employeesToCreate.map((name, i) => <li key={i}>• {name}</li>)}
-                </ul>
-              </div>
-            )}
-
-            {historicalPreview.cycleFallback && historicalPreview.cycleFallback.length > 0 && (
-              <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
-                <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
-                  <Calendar size={14} /> {plural(historicalPreview.cycleFallback.length, "evento")} fora do período do ciclo cadastrado
-                </p>
-                <p className="text-[11px] text-[var(--info)] mb-2">A data desses eventos não cai dentro do período de nenhum ciclo configurado. Em vez de bloquear, eles serão vinculados ao ciclo atual (indicado na tabela abaixo) para que os resultados entrem normalmente nos relatórios.</p>
-                <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
-                  {historicalPreview.cycleFallback.map((msg, i) => <li key={i}>• {msg}</li>)}
-                </ul>
-              </div>
-            )}
-
-            {historicalPreview.events.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Detalhe evento por evento</p>
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
-                      <tr>
-                        <th className="text-left p-2">Evento</th>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-left p-2">Nota</th>
-                        <th className="text-left p-2">Participantes</th>
-                        <th className="text-left p-2">Ciclo</th>
-                        <th className="text-left p-2">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historicalPreview.events.map((ev, i) => (
+          {p.events.length > 0 && (
+            <div className="space-y-2">
+              <Eyebrow as="p">Evento por evento</Eyebrow>
+              <div className="rounded-xl border border-border overflow-x-auto">
+                <table className="w-full min-w-[680px] border-collapse text-[13px]" aria-label="Eventos da planilha">
+                  <thead>
+                    <tr className="bg-secondary/50">
+                      {["Evento", "Data", "Nota", "Participantes", "Ciclo", "Ação"].map(h => (
+                        <th key={h} className="font-condensed px-3 py-2 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {p.events.map((ev, i) => {
+                      const linked = ev.action === "create" && !!linkOverrides[ev.groupKey];
+                      const a = ACTION[linked ? "link" : ev.action] ?? ACTION.create;
+                      return (
                         <tr key={i} className="border-t border-border align-top" data-testid={`row-preview-event-${i}`}>
-                          <td className="p-2 font-medium text-foreground">{ev.eventName}</td>
-                          <td className="p-2 text-muted-foreground">{ev.date}</td>
-                          <td className="p-2 text-muted-foreground">{ev.score ?? "—"}</td>
-                          <td className="p-2 text-muted-foreground">
-                            {ev.matchedCount}/{ev.participantsCount}
+                          <td className="px-3 py-2 font-semibold text-foreground">{ev.eventName}</td>
+                          <td className="px-3 py-2 tabular-nums text-muted-foreground whitespace-nowrap">{ev.date}</td>
+                          <td className="px-3 py-2 tabular-nums text-foreground">{ev.score ?? "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            <span className="tabular-nums">{ev.matchedCount}/{ev.participantsCount}</span>
                             {ev.newEmployeeNames && ev.newEmployeeNames.length > 0 && (
-                              <div className="text-[11px] text-[var(--info)] mt-0.5">
-                                {plural(ev.newEmployeeNames.length, "novo", "novos")}: {ev.newEmployeeNames.join(", ")}
-                              </div>
+                              <span className="block mt-0.5 text-[12px] text-[var(--status-info-text)]">{plural(ev.newEmployeeNames.length, "novo", "novos")}: {ev.newEmployeeNames.join(", ")}</span>
                             )}
                           </td>
-                          <td className="p-2 text-muted-foreground">
+                          <td className="px-3 py-2 text-muted-foreground">
                             {ev.cycleName ?? "—"}
-                            {ev.cycleFallback && (
-                              <div className="text-[11px] text-[var(--info)] mt-0.5">fora do período (ciclo atual)</div>
-                            )}
+                            {ev.cycleFallback && <span className="block mt-0.5 text-[12px] text-[var(--status-info-text)]">fora do período (ciclo atual)</span>}
                           </td>
-                          <td className="p-2">
-                            {ev.action === "create" && !linkOverrides[ev.groupKey] && <Badge className="bg-accent/15 text-accent-text hover:bg-accent/15">Criar</Badge>}
-                            {ev.action === "create" && linkOverrides[ev.groupKey] && <Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15">Vincular</Badge>}
-                            {ev.action === "update" && <Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15">Atualizar</Badge>}
-                            {ev.action === "conflict" && <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10">Conflito</Badge>}
+                          <td className="px-3 py-2">
+                            <Chip tone={a.tone}>{a.label}</Chip>
                             {ev.action === "create" && ev.overlapCandidates && ev.overlapCandidates.length > 0 && (
-                              <div className="mt-1.5 min-w-[220px]" data-testid={`select-link-override-${i}`}>
-                                <p className="text-[11px] text-[var(--amber)] bg-[var(--amber)]/10 border border-[var(--amber)]/30 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
-                                  <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-                                  Já existe {ev.overlapCandidates.length === 1 ? "1 evento" : `${ev.overlapCandidates.length} eventos`} nessa data — pode ser a mesma corrida com nome diferente.
+                              <div className="mt-2 min-w-[230px]" data-testid={`select-link-override-${i}`}>
+                                <p className="mb-1.5 flex items-start gap-1.5 text-[12px] leading-snug text-[var(--status-warn-text)]">
+                                  <AlertTriangle size={12} aria-hidden className="mt-[2px] shrink-0" />
+                                  Já existe {ev.overlapCandidates.length === 1 ? "1 evento" : `${ev.overlapCandidates.length} eventos`} nessa data — pode ser a mesma corrida com outro nome.
                                 </p>
-                                <Select
-                                  value={linkOverrides[ev.groupKey] ? String(linkOverrides[ev.groupKey]) : "none"}
-                                  onValueChange={(val) => {
-                                    setLinkOverrides(prev => {
-                                      const next = { ...prev };
-                                      if (val === "none") delete next[ev.groupKey];
-                                      else next[ev.groupKey] = Number(val);
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="h-7 text-[11px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
+                                <Select value={linkOverrides[ev.groupKey] ? String(linkOverrides[ev.groupKey]) : "none"}
+                                  onValueChange={val => setLinkOverrides(prev => { const n = { ...prev }; if (val === "none") delete n[ev.groupKey]; else n[ev.groupKey] = Number(val); return n; })}>
+                                  <SelectTrigger aria-label={`O que fazer com ${ev.eventName}`} className="h-9 text-[12.5px] rounded-lg border-border bg-card"><SelectValue /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">Criar evento novo</SelectItem>
-                                    {ev.overlapCandidates.map(c => (
-                                      <SelectItem key={c.id} value={String(c.id)}>
-                                        Vincular a "{c.name}" ({c.isHistorical ? "histórico" : "manual"})
-                                      </SelectItem>
-                                    ))}
+                                    {ev.overlapCandidates.map(c => <SelectItem key={c.id} value={String(c.id)}>Vincular a “{c.name}” ({c.isHistorical ? "histórico" : "manual"})</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
                             )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
-                  <span className="block"><Badge className="bg-accent/15 text-accent-text hover:bg-accent/15 mr-1">Criar</Badge>evento novo, ainda não existe no sistema.</span>
-                  <span className="block"><Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15 mr-1">Atualizar</Badge>já existe um evento histórico com este nome/data — a nota será substituída pela da planilha.</span>
-                  <span className="block"><Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15 mr-1">Vincular</Badge>você escolheu ligar esse evento a um já existente (veja o alerta laranja e o seletor na linha) em vez de criar um novo.</span>
-                  <span className="block"><Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10 mr-1">Conflito</Badge>não será importado (veja o motivo nos erros acima).</span>
-                </p>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-          );
-        })()}
-
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onCancel} disabled={isCommitting}>
-            Cancelar
-          </Button>
-          <Button
-            data-testid="button-confirm-historical-import"
-            className="bg-primary hover:opacity-90 text-primary-foreground"
-            disabled={!historicalPreview?.success || historicalPreview.errors.length > 0 || isCommitting}
-            onClick={onConfirm}
-          >
-            <CheckCircle2 size={16} className="mr-2" />
-            {isCommitting ? "Importando..." : "Confirmar e importar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[12.5px] text-muted-foreground">
+                {Object.values(ACTION).map(a => (
+                  <div key={a.label} className="flex items-start gap-2"><dt className="shrink-0"><Chip tone={a.tone} className="h-5 text-[11px]">{a.label}</Chip></dt><dd className="leading-snug">{a.hint}</dd></div>
+                ))}
+              </dl>
+            </div>
+          )}
+        </div>
+      )}
+      <ErrorBox message={commitError} title="Falha ao importar" />
+      <div className={dialogFooterCls}>
+        {committed ? (
+          <button type="button" onClick={() => onOpenChange(false)} className={btnPrimary}>Fechar</button>
+        ) : (
+          <>
+            <button type="button" onClick={() => onOpenChange(false)} disabled={isCommitting} className={btnSecondary}>Cancelar</button>
+            <button type="button" data-testid="button-confirm-historical-import" disabled={blocked || isCommitting} aria-busy={isCommitting || undefined} onClick={onConfirm}
+              title={blocked ? "Corrija os erros da planilha para confirmar" : undefined} className={cn(btnPrimary)}>
+              {isCommitting ? <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" /> : <CheckCircle2 size={15} aria-hidden />}
+              {isCommitting ? "Importando…" : "Confirmar e importar"}
+            </button>
+          </>
+        )}
+      </div>
+    </ActionDialog>
   );
 }

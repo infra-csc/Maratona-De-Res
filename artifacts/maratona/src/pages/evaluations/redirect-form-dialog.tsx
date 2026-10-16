@@ -1,6 +1,7 @@
-import { CornerDownRight } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { CONDENSED } from "@/lib/premium-theme";
+import { CornerDownRight, Loader2, Check } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { cn, plural } from "@/lib/utils";
+import { DialogHeading, Eyebrow, btnPrimary, btnSecondary, dialogCls } from "./ui";
 import type { RedirectDialogArea, RedirectOption } from "./types";
 
 interface RedirectFormDialogProps {
@@ -13,72 +14,57 @@ interface RedirectFormDialogProps {
   onConfirm: () => void;
 }
 
-// Redirect dialog — avaliador redireciona o formulário inteiro (todos os critérios da área)
+// Avaliador redireciona o formulário inteiro (todos os critérios da área).
 export function RedirectFormDialog({ area, targetId, onTargetChange, options, isPending, onClose, onConfirm }: RedirectFormDialogProps) {
+  const target = options.find(o => o.id === targetId);
   return (
-    <Dialog open={area !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <CornerDownRight size={18} /> Redirecionar Formulário
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          {area != null && (
-            <div className="bg-secondary border border-border rounded-lg px-4 py-3">
-              <p className="text-[11px] font-black uppercase text-muted-foreground mb-0.5">Formulário</p>
-              <p className="text-sm font-black uppercase">{area.areaName}</p>
-              {area.criteriaIds.length > 1 && (
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {area.criteriaIds.length} critérios serão transferidos juntos.
-                </p>
-              )}
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">
-            Selecione quem assumirá a responsabilidade por este formulário. Após a confirmação, todos os critérios saem da sua lista e passam para o usuário escolhido.
+    <Dialog open={area !== null} onOpenChange={(v) => { if (!v && !isPending) onClose(); }}>
+      <DialogContent className={dialogCls}>
+        <DialogHeading
+          icon={CornerDownRight}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title="Redirecionar formulário"
+          description={<>
+            Escolha quem assume o formulário <b className="font-semibold text-foreground">{area?.areaName}</b>
+            {area && area.criteriaIds.length > 1 ? <> — os {plural(area.criteriaIds.length, "critério", "critérios")} vão juntos</> : null}.
+            Depois de confirmar, ele sai da sua lista.
+          </>}
+        />
+
+        {options.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[14px] text-muted-foreground">
+            Nenhuma opção de redirecionamento disponível para este critério.
           </p>
-          {options.length === 0 ? (
-            <div className="text-center py-6 border border-dashed border-border rounded-lg font-bold text-muted-foreground text-xs uppercase">
-              Nenhuma opção de redirecionamento disponível para este critério.
+        ) : (
+          <fieldset>
+            <legend className="sr-only">Quem assume o formulário</legend>
+            <Eyebrow className="mb-2">Quem assume</Eyebrow>
+            <div className="rounded-xl border border-border divide-y divide-border max-h-60 overflow-y-auto">
+              {options.map((opt) => {
+                const on = targetId === opt.id;
+                return (
+                  <label key={opt.id} className={cn("flex items-center gap-3 px-4 min-h-12 cursor-pointer transition-colors duration-150", on ? "bg-secondary" : "hover:bg-secondary/50")}>
+                    <input
+                      type="radio"
+                      name="redirect-target"
+                      checked={on}
+                      onChange={() => onTargetChange(opt.id)}
+                      className="h-[18px] w-[18px] accent-[var(--primary)]"
+                    />
+                    <span className="text-[15px] font-semibold text-foreground flex-1">{opt.name}</span>
+                    {on && <Check size={15} aria-hidden className="text-[var(--status-ok-text)]" />}
+                  </label>
+                );
+              })}
             </div>
-          ) : (
-            <div className="border border-border rounded-lg divide-y divide-border max-h-56 overflow-y-auto">
-              {options.map((opt) => (
-                <label key={opt.id} className="flex items-center gap-3 px-4 py-3 hover:bg-secondary cursor-pointer">
-                  <input
-                    type="radio"
-                    name="redirect-target"
-                    checked={targetId === opt.id}
-                    onChange={() => onTargetChange(opt.id)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className="text-sm font-bold uppercase">{opt.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-        {targetId != null && (
-          <div className="bg-accent/10 border border-accent rounded-lg px-4 py-3 text-xs font-bold text-accent-text">
-            ↳ Confirmar: transferir para <strong>{options.find(o => o.id === targetId)?.name ?? "?"}</strong>. Esta ação é imediata.
-          </div>
+          </fieldset>
         )}
-        <DialogFooter className="gap-2 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            disabled={targetId === null || isPending}
-            onClick={onConfirm}
-            className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50"
-          >
-            {isPending ? "Redirecionando..." : "Confirmar Transferência"}
+
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <button type="button" onClick={onClose} disabled={isPending} className={btnSecondary}>Cancelar</button>
+          <button type="button" disabled={targetId === null || isPending} onClick={onConfirm} className={btnPrimary}>
+            {isPending ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Redirecionando...</> : target ? `Passar para ${target.name.split(" ")[0]}` : "Confirmar transferência"}
           </button>
         </DialogFooter>
       </DialogContent>

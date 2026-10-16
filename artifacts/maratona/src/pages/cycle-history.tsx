@@ -1,116 +1,87 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetCycleHistory, getGetCycleHistoryQueryKey, type CycleHistory, type CycleHistoryEntry } from "@workspace/api-client-react";
-import { AlertTriangle, ArrowLeft, CalendarRange, Download, Search, Trophy } from "lucide-react";
-import { PageHeader, EmptyState, LoadingState, StatusBadge } from "@/components/shared";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { todayBR } from "@/lib/utils";
-import { fmtEventDate, isNextCycleEvent, isOpenEvent, opensLabelFor, NEXT_CYCLE_BADGE, NEXT_CYCLE_NOTICE } from "./events/rules";
-import { CycleStatus, CycleStatTiles, cyclePeriod, apiErrorMessage, brl, n1 } from "./cycles";
+import { useGetCycleHistory, getGetCycleHistoryQueryKey, useListCycles, getListCyclesQueryKey, type CycleHistory } from "@workspace/api-client-react";
+import { AlertTriangle, ArrowLeft, Eye, Layers, LockKeyhole, RefreshCw } from "lucide-react";
+import { cn, plural } from "@/lib/utils";
+import { Panel } from "./dashboard/dashboard-ui";
+import { Bone, CycleStatusChip, EmptyBlock, ErrorBlock, Eyebrow, FOCUS_RING, PeriodTrack, btnSecondary, brl, surfaceCls } from "./cycles/cycles-ui";
+import { CycleRules, CycleStatBand } from "./cycles/cycle-overview";
+import { HistoryRanking, Swatch } from "./cycles/history-ranking";
+import { HistoryEvents } from "./cycles/history-events";
 
-const BONUS_STATUS: Record<string, { label: string; variant: "ok" | "warn" | "danger" | "info" | "neutral" }> = {
-  projected: { label: "Projetado", variant: "neutral" },
-  approved: { label: "Aprovado", variant: "info" },
-  scheduled: { label: "Agendado", variant: "info" },
-  paid: { label: "Pago", variant: "ok" },
-  blocked: { label: "Bloqueado", variant: "danger" },
-  not_eligible: { label: "Não elegível", variant: "neutral" },
-};
-
-const TH = "py-2 px-3 font-bold uppercase text-[11px] whitespace-nowrap";
-const thStyle = { fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" } as const;
-const tdStyle = { borderBottom: "1px solid var(--border)" } as const;
-
-function Swatch({ color }: { color?: string | null }) {
-  return <span aria-hidden className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: color ?? "var(--muted)", border: "1px solid var(--border)" }} />;
-}
-
-function Section({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: React.ReactNode; children: React.ReactNode }) {
+/** Topo fixo: voltar para a lista, nome do ciclo (o único h1) e a situação. */
+function HistoryHeader({ cycle }: { cycle?: CycleHistory["cycle"] }) {
   return (
-    <section className="rounded-xl min-w-0" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <header className="px-5 pt-4 pb-3 flex flex-wrap items-end justify-between gap-3">
+    <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 py-3 lg:py-0 lg:h-16 flex items-center gap-3">
+      <Link href="/cycles" aria-label="Voltar para todos os ciclos" title="Todos os ciclos"
+        className={cn("inline-flex items-center justify-center shrink-0 w-11 h-11 lg:w-9 lg:h-9 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors duration-150", FOCUS_RING)}>
+        <ArrowLeft size={18} aria-hidden />
+      </Link>
+      <div className="min-w-0 flex-1 flex items-center gap-3">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-black uppercase" style={{ fontFamily: CONDENSED }}>{title}</h2>
-          {subtitle && <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>{subtitle}</p>}
+          <Eyebrow as="span" className="hidden sm:block text-[11px] mb-1">Histórico do ciclo</Eyebrow>
+          <h1 data-testid="text-page-title" className="min-w-0 font-condensed text-[22px] sm:text-[24px] uppercase tracking-[-0.01em] font-black leading-none text-foreground truncate">
+            {cycle ? cycle.name : "Histórico do ciclo"}
+          </h1>
         </div>
-        {actions}
-      </header>
-      {children}
-    </section>
+        {cycle && <CycleStatusChip cycle={cycle} className="shrink-0 hidden sm:inline-flex" />}
+      </div>
+    </div>
   );
 }
 
-function csvCell(v: string | number | null | undefined): string {
-  const text = v == null ? "" : String(v);
-  return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function exportRankingCsv(history: CycleHistory) {
-  const head = ["Posição", "Colaborador", "Situação", "Nota final", "Faixa", "Eventos com nota", "Eventos participados", "Faltas", "Elegível", "Motivo", "Bônus (R$)", "Pagamento"];
-  const lines = history.ranking.map(r => [
-    r.position, r.employeeName, r.employeeActive ? "Ativo" : "Desligado",
-    r.finalResult.toFixed(2).replace(".", ","), r.platoon ?? "", r.eventsCount, r.participatedEventsCount, r.totalAbsences,
-    r.eligible ? "Sim" : "Não", r.eligibilityReason ?? "", r.bonusValue.toFixed(2).replace(".", ","),
-    BONUS_STATUS[r.bonusStatus]?.label ?? r.bonusStatus,
-  ].map(csvCell).join(";"));
-  // BOM para o Excel abrir os acentos corretamente.
-  const blob = new Blob(["﻿" + [head.join(";"), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `ranking-${history.cycle.name.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function HistorySkeleton() {
+  return (
+    <div role="status" aria-label="Carregando histórico do ciclo" className="space-y-4">
+      <div className={cn(surfaceCls, "p-4 lg:p-6 space-y-5")}>
+        <Bone className="h-2 w-full max-w-[720px]" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">{Array.from({ length: 4 }, (_, i) => <div key={i} className="space-y-2"><Bone className="h-3 w-24" /><Bone className="h-4 w-32" /></div>)}</div>
+      </div>
+      <div className={cn(surfaceCls, "grid grid-cols-2 lg:grid-cols-5 gap-px overflow-hidden bg-border")}>
+        {Array.from({ length: 5 }, (_, i) => <div key={i} className={cn("bg-card px-5 py-4 space-y-3", i === 0 && "col-span-2 lg:col-span-1")}><Bone className="h-3 w-24" /><Bone className="h-8 w-20" /></div>)}
+      </div>
+      <div className={cn(surfaceCls, "divide-y divide-border")}>
+        {Array.from({ length: 5 }, (_, i) => <div key={i} className="flex items-center gap-6 px-5 py-3.5"><Bone className="h-4 w-6" /><Bone className="h-4 w-44" /><Bone className="h-5 w-12 ml-auto" /></div>)}
+      </div>
+    </div>
+  );
 }
 
 export default function CycleHistoryPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const valid = Number.isInteger(id) && id > 0;
-  const { data, isLoading, isError, error } = useGetCycleHistory(id, {
+  const { data, isLoading, isError, refetch } = useGetCycleHistory(id, {
     query: { queryKey: getGetCycleHistoryQueryKey(id), enabled: valid, staleTime: 30_000 },
   });
 
-  if (!valid) {
-    return <div className="px-6 py-10"><EmptyState icon={AlertTriangle} title="Ciclo inválido" action={<Button variant="outline" asChild><Link href="/cycles">Ver todos os ciclos</Link></Button>} /></div>;
-  }
-  if (isLoading) return <div className="px-6 py-6"><LoadingState lines={8} withHeader label="Carregando histórico do ciclo" /></div>;
-  if (isError || !data) {
-    return (
-      <div className="px-6 py-10">
-        <EmptyState icon={AlertTriangle} title="Não foi possível carregar o histórico" description={apiErrorMessage(error, "Tente novamente em instantes.")}
-          action={<Button variant="outline" asChild><Link href="/cycles">Ver todos os ciclos</Link></Button>} />
+  const back = <Link href="/cycles" className={btnSecondary}>Ver todos os ciclos</Link>;
+  return (
+    <div className="min-h-full flex flex-col min-w-0 font-body">
+      <HistoryHeader cycle={data?.cycle} />
+      <div className="flex-1 px-4 md:px-6 py-5 space-y-5 max-w-[1680px] w-full mx-auto">
+        {!valid ? (
+          <div className={surfaceCls}><EmptyBlock icon={AlertTriangle} title="Ciclo inválido" action={back}>O endereço não aponta para um ciclo.</EmptyBlock></div>
+        ) : isLoading ? <HistorySkeleton /> : isError || !data ? (
+          <ErrorBlock title="Não foi possível carregar o histórico" onRetry={() => { void refetch(); }} />
+        ) : (
+          <HistoryView history={data} />
+        )}
       </div>
-    );
-  }
-  return <HistoryView history={data} />;
-}
-
-/**
- * Situação do evento na avaliação, com as mesmas regras da lista de Eventos e
- * da Central: "Próximo ciclo", "Abre em DD/MM", "Aberto" ou "Fechado".
- */
-function eventSituation(e: CycleHistory["events"][number], cycle: CycleHistory["cycle"], today: string): { label: string; variant: "ok" | "warn" | "info" | "neutral"; title?: string } {
-  if (!e.isHistorical && isNextCycleEvent(e, cycle)) return { label: NEXT_CYCLE_BADGE, variant: "info", title: NEXT_CYCLE_NOTICE };
-  const opens = e.isHistorical ? null : opensLabelFor(e, cycle, today);
-  if (opens && e.status === "open") return { label: opens, variant: "info", title: "A avaliação abre sozinha no dia seguinte ao fim do evento." };
-  if (isOpenEvent(e, cycle, today)) return { label: "Aberto", variant: "warn", title: "Aberto para avaliação" };
-  return { label: "Fechado", variant: "neutral" };
+    </div>
+  );
 }
 
 function HistoryView({ history }: { history: CycleHistory }) {
-  const { cycle, ranking, events } = history;
-  const today = todayBR();
-  // Ranking só é "final" com o ciclo fechado; aberto, ele muda até o fechamento.
-  const rankingFinal = cycle.status === "closed";
-  const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase("pt-BR");
-    return term ? ranking.filter(r => r.employeeName.toLocaleLowerCase("pt-BR").includes(term)) : ranking;
-  }, [ranking, search]);
+  const { ranking } = history;
+  // O histórico não traz o mínimo que vale de fato (regra geral); a lista de
+  // ciclos traz — usa o mesmo dado (cache compartilhado com a tela Ciclos).
+  const { data: list } = useListCycles({ query: { queryKey: getListCyclesQueryKey(), staleTime: 30_000 } });
+  const fromList = list?.find(c => c.id === history.cycle.id);
+  const cycle = history.cycle.effectiveMinEvents == null && fromList?.effectiveMinEvents != null
+    ? { ...history.cycle, effectiveMinEvents: fromList.effectiveMinEvents } : history.cycle;
+  const final = cycle.status === "closed";
+  const live = cycle.isCurrent && !final;
 
   // Distribuição por faixa (a faixa é gravada no resultado do ciclo, então
   // reflete as regras que valiam quando o ciclo foi calculado).
@@ -129,163 +100,47 @@ function HistoryView({ history }: { history: CycleHistory }) {
   const maxCount = Math.max(1, ...faixas.map(f => f.count));
 
   return (
-    <div className="px-6 py-6 space-y-6" style={{ fontFamily: BODY }}>
-      <Link href="/cycles" className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
-        <ArrowLeft size={14} aria-hidden /> Todos os ciclos
-      </Link>
-      <PageHeader
-        eyebrow={<span className="inline-flex items-center gap-2">Histórico do ciclo <CycleStatus cycle={cycle} /></span>}
-        title={cycle.name}
-        description={
-          cycle.isCurrent && cycle.status !== "closed"
-            ? `${cyclePeriod(cycle)}. Este é o ciclo atual: os números mudam conforme os eventos são confirmados.`
-            : `${cyclePeriod(cycle)}. Resultado guardado como ficou no fechamento; somente consulta.`
-        }
-      />
+    <>
+      <section aria-label="Período e regras do ciclo" className={cn(surfaceCls, "overflow-hidden")}>
+        <div className="px-4 pt-4 pb-5 lg:px-6 lg:pt-5 grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,720px)_minmax(0,1fr)] lg:items-end">
+          <div className="min-w-0">
+            <CycleStatusChip cycle={cycle} className="sm:hidden mb-3" />
+            <PeriodTrack start={cycle.startDate} end={cycle.endDate} closed={final} />
+          </div>
+          <p className={cn("flex items-start gap-2 text-[13.5px] leading-snug", live ? "text-foreground" : "text-muted-foreground")} data-testid="history-mode">
+            {live
+              ? <><RefreshCw size={14} aria-hidden className="mt-0.5 shrink-0 text-[var(--status-info-text)]" /><span><b className="font-semibold">Ciclo atual, ainda aberto:</b> os números mudam conforme os eventos são confirmados.</span></>
+              : final
+                ? <><LockKeyhole size={14} aria-hidden className="mt-0.5 shrink-0" /><span>Resultado guardado como ficou no fechamento. <b className="font-semibold text-foreground">Somente consulta.</b></span></>
+                : <><Eye size={14} aria-hidden className="mt-0.5 shrink-0" /><span>Ciclo aberto que não é o atual: ainda não foi fechado.</span></>}
+          </p>
+        </div>
+        <div className="border-t border-border px-4 py-4 lg:px-6 lg:py-5"><CycleRules cycle={cycle} /></div>
+      </section>
 
-      <CycleStatTiles cycle={cycle} />
+      <CycleStatBand cycle={cycle} />
 
       {faixas.length > 0 && (
-        <Section title="Distribuição por faixa" subtitle={rankingFinal ? "Quantos colaboradores terminaram em cada faixa e o bônus somado dos elegíveis." : "Quantos colaboradores estão em cada faixa agora e o bônus projetado dos elegíveis (muda até o fechamento)."}>
-          <ul className="px-5 pb-4 space-y-2" data-testid="list-faixas">
+        <Panel labelId="history-faixas-title" icon={Layers} title="Distribuição por faixa" testId="history-faixas"
+          sub={final ? "Quantos colaboradores terminaram em cada faixa e o bônus somado dos elegíveis." : "Quantos estão em cada faixa agora e o bônus projetado dos elegíveis (muda até o fechamento)."}>
+          <ul className="px-4 pb-4 lg:px-5 lg:pb-5 space-y-2.5" data-testid="list-faixas">
             {faixas.map(f => (
-              <li key={f.name} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-[13px]">
+              <li key={f.name} className="grid grid-cols-[minmax(0,8rem)_1fr_auto] sm:grid-cols-[minmax(0,12rem)_1fr_auto] items-center gap-3 text-[13.5px]">
                 <span className="flex items-center gap-2 min-w-0"><Swatch color={f.color} /><span className="truncate font-semibold">{f.name}</span></span>
-                <span className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }} aria-hidden>
-                  <span className="block h-full rounded-full" style={{ width: `${(f.count / maxCount) * 100}%`, backgroundColor: "var(--viz-series-1)" }} />
+                <span className="h-2 rounded-full overflow-hidden bg-secondary" aria-hidden>
+                  <span className="block h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${(f.count / maxCount) * 100}%`, backgroundColor: f.color ?? "var(--viz-series-1)" }} />
                 </span>
                 <span className="tabular-nums whitespace-nowrap text-right">
-                  <strong>{f.count}</strong> <span style={{ color: "var(--muted-foreground)" }}>· {brl(f.bonus)}</span>
+                  <b className="font-semibold">{plural(f.count, "pessoa", "pessoas")}</b> <span className="text-muted-foreground">· {brl(f.bonus)}</span>
                 </span>
               </li>
             ))}
           </ul>
-        </Section>
+        </Panel>
       )}
 
-      <Section
-        title={rankingFinal ? "Ranking final" : "Ranking parcial"}
-        subtitle={!rankingFinal
-          ? "Nota, faixa e bônus projetado de cada colaborador — mudam até o fechamento do ciclo. Mesmos colaboradores do Ranking (ativos)."
-          : cycle.isCurrent
-          ? "Nota final, faixa e bônus de cada colaborador. Mesmos colaboradores do Ranking (ativos)."
-          : "Nota final, faixa e bônus de cada colaborador neste ciclo. Quem foi desligado depois continua aqui."}
-        actions={ranking.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <div className="relative">
-              <Search size={14} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar colaborador" aria-label="Buscar colaborador" className="pl-8 h-9 w-56" data-testid="input-search-history" />
-            </div>
-            <Button variant="outline" size="sm" className="h-9" onClick={() => exportRankingCsv(history)} data-testid="button-export-history">
-              <Download size={14} aria-hidden /> Exportar CSV
-            </Button>
-          </div>
-        )}
-      >
-        {ranking.length === 0 ? (
-          <div className="px-5 pb-5"><EmptyState compact icon={Trophy} title="Sem resultados neste ciclo" description="O ranking aparece depois que há eventos com resultados confirmados e o ciclo é calculado." /></div>
-        ) : filtered.length === 0 ? (
-          <div className="px-5 pb-5"><EmptyState compact icon={Search} title="Ninguém encontrado" description="Confira o nome digitado na busca." /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-[13px]" data-testid="table-history-ranking">
-              <thead>
-                <tr>
-                  <th scope="col" className={`${TH} text-right w-12`} style={thStyle}>#</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Colaborador</th>
-                  <th scope="col" className={`${TH} text-right`} style={thStyle}>Nota final</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Faixa</th>
-                  <th scope="col" className={`${TH} text-right`} style={thStyle}>Eventos</th>
-                  <th scope="col" className={`${TH} text-right`} style={thStyle}>Faltas</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Elegível</th>
-                  <th scope="col" className={`${TH} text-right`} style={thStyle}>{rankingFinal ? "Bônus" : "Bônus projetado"}</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Pagamento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r: CycleHistoryEntry) => {
-                  const pay = BONUS_STATUS[r.bonusStatus] ?? { label: r.bonusStatus, variant: "neutral" as const };
-                  return (
-                    <tr key={r.employeeId} data-testid={`row-history-${r.employeeId}`}>
-                      <td className="py-2 px-3 text-right tabular-nums font-bold" style={tdStyle}>{r.position}</td>
-                      <td className="py-2 px-3" style={tdStyle}>
-                        <span className="font-semibold">{r.employeeName}</span>
-                        {!r.employeeActive && <StatusBadge variant="neutral" size="sm" label="Desligado" className="ml-2" />}
-                      </td>
-                      <td className="py-2 px-3 text-right tabular-nums font-bold" style={tdStyle}>{n1(r.finalResult)}</td>
-                      <td className="py-2 px-3" style={tdStyle}>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap"><Swatch color={r.platoonColor} />{r.platoon ?? "—"}</span>
-                      </td>
-                      <td className="py-2 px-3 text-right tabular-nums" style={tdStyle} title="Eventos com nota / eventos participados">{r.eventsCount}/{r.participatedEventsCount}</td>
-                      <td className="py-2 px-3 text-right tabular-nums" style={tdStyle}>{r.totalAbsences}</td>
-                      <td className="py-2 px-3" style={tdStyle}>
-                        {r.eligible
-                          ? <StatusBadge variant="ok" size="sm" label="Sim" />
-                          : <span className="inline-flex flex-col items-start gap-0.5"><StatusBadge variant="warn" size="sm" label="Não" />{r.eligibilityReason && <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{r.eligibilityReason}</span>}</span>}
-                      </td>
-                      <td className="py-2 px-3 text-right tabular-nums whitespace-nowrap" style={tdStyle}>
-                        {brl(r.bonusValue)}
-                        {r.extraBonusValue > 0 && <span className="block text-[11px]" style={{ color: "var(--muted-foreground)" }}>inclui {brl(r.extraBonusValue)} de extras</span>}
-                      </td>
-                      <td className="py-2 px-3" style={tdStyle}><StatusBadge variant={pay.variant} size="sm" label={pay.label} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
-
-      <Section title="Eventos do ciclo" subtitle={`${events.length} ${events.length === 1 ? "evento" : "eventos"}. Só os confirmados entram na nota.`}>
-        {events.length === 0 ? (
-          <div className="px-5 pb-5"><EmptyState compact icon={CalendarRange} title="Nenhum evento neste ciclo" /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-[13px]" data-testid="table-history-events">
-              <thead>
-                <tr>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Data</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Evento</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Cliente</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Local</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Situação</th>
-                  <th scope="col" className={`${TH} text-left`} style={thStyle}>Resultados</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map(e => {
-                  const sit = eventSituation(e, cycle, today);
-                  // Ano aparece quando o período toca outro ano (fmtEventDate, como em Eventos).
-                  const otherYear = [e.startDate, e.endDate].some(d => !!d && d.slice(0, 4) !== today.slice(0, 4));
-                  return (
-                  <tr key={e.id} data-testid={`row-history-event-${e.id}`}>
-                    <td className="py-2 px-3 whitespace-nowrap tabular-nums" style={tdStyle}>
-                      {fmtEventDate(e.startDate, today, otherYear)}{e.endDate && e.endDate !== e.startDate ? ` a ${fmtEventDate(e.endDate, today, otherYear)}` : ""}
-                      {!otherYear && <span className="sr-only"> de {e.startDate.slice(0, 4)}</span>}
-                    </td>
-                    <td className="py-2 px-3" style={tdStyle}>
-                      <Link href={`/events/${e.id}`} className="font-semibold hover:underline underline-offset-2">{e.name}</Link>
-                      {e.isHistorical && <span className="ml-2 text-[11px]" style={{ color: "var(--muted-foreground)" }}>importado</span>}
-                    </td>
-                    <td className="py-2 px-3" style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{e.clientName ?? "—"}</td>
-                    <td className="py-2 px-3 whitespace-nowrap" style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{[e.city, e.state].filter(Boolean).join("/") || "—"}</td>
-                    <td className="py-2 px-3 whitespace-nowrap" style={tdStyle} title={sit.title}>
-                      <StatusBadge variant={sit.variant} size="sm" label={sit.label} />
-                    </td>
-                    <td className="py-2 px-3" style={tdStyle}>
-                      {e.resultsConfirmed
-                        ? <StatusBadge variant="ok" size="sm" label="Confirmados" />
-                        : <StatusBadge variant="neutral" size="sm" label="Não confirmados" />}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
-    </div>
+      <HistoryRanking history={history} />
+      <HistoryEvents history={history} />
+    </>
   );
 }

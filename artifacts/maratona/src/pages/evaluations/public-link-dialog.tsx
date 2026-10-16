@@ -1,25 +1,43 @@
 import type { EventCriterion } from "@workspace/api-client-react";
-import { CheckCircle, Link2, Copy, CheckCheck, Trash2, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Link2, Copy, CheckCheck, Trash2, AlertCircle, Loader2, CalendarDays, Check } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import type { PublicToken } from "@/lib/routing-api";
 import { cn } from "@/lib/utils";
-import { CONDENSED } from "@/lib/premium-theme";
-import { displayCriterionName, fmtDT } from "./helpers";
+import { displayCriterionName } from "./helpers";
 import { cenografiaItemsLabel } from "./constants";
+import { LinkHistoryRow } from "./conformity-link-history";
+import { DialogHeading, Eyebrow, btnPrimary, btnSecondary, dialogCls, inputCls } from "./ui";
 import type { PublicLinkEligibleCriterion, ToastFn } from "./types";
 
 /** Evento do link: o avaliador confere para qual evento está gerando. */
 export type LinkEventInfo = { name: string; detail: string | null } | null;
 
-/** "Evento" no topo dos diálogos de link para freela. */
-export function LinkEventLine({ event }: { event: LinkEventInfo }) {
+/** "Evento" no topo dos diálogos de link para freela (e, opcionalmente, o formulário). */
+export function LinkEventLine({ event, formName }: { event: LinkEventInfo; formName?: string | null }) {
   if (!event) return null;
   return (
-    <div className="border-l-4 border-accent pl-3" data-testid="public-link-event">
-      <p className="text-[11px] font-bold uppercase text-muted-foreground">Evento</p>
-      <p className="text-sm font-black uppercase break-words">{event.name}</p>
-      {event.detail && <p className="text-xs text-muted-foreground">{event.detail}</p>}
+    <div className="rounded-xl border border-border bg-secondary/50 px-4 py-3 flex items-start gap-3" data-testid="public-link-event">
+      <CalendarDays size={16} aria-hidden className="mt-0.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <Eyebrow>Evento</Eyebrow>
+        <p className="font-condensed mt-1 text-[17px] font-black uppercase leading-tight break-words text-foreground">{event.name}</p>
+        {event.detail && <p className="text-[13px] text-muted-foreground mt-0.5">{event.detail}</p>}
+        {formName && <p className="text-[13px] text-foreground mt-1.5">Formulário <b className="font-semibold">{formName}</b></p>}
+      </div>
+    </div>
+  );
+}
+
+/** URL gerada, pronta para copiar (campo só leitura + botão com retorno). */
+export function GeneratedLinkBox({ url, copied, onCopy }: { url: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <div className="flex flex-col sm:flex-row gap-2">
+      <label className="sr-only" htmlFor="generated-link">Link gerado</label>
+      <input id="generated-link" readOnly value={url} onFocus={e => e.currentTarget.select()} className={cn(inputCls, "font-mono text-[13px] bg-secondary/60")} />
+      <button type="button" onClick={onCopy} className={cn(btnPrimary, "sm:shrink-0 min-w-[120px]")} aria-live="polite">
+        {copied ? <><CheckCheck size={15} aria-hidden /> Copiado</> : <><Copy size={15} aria-hidden /> Copiar</>}
+      </button>
     </div>
   );
 }
@@ -54,232 +72,170 @@ interface PublicLinkDialogProps {
   toast: ToastFn;
 }
 
-// Public link dialog — link único por formulário/área para freelas
+// Link único por formulário/área para um freela responder.
 export function PublicLinkDialog({
   criteriaIds, event, areaName, recipientName, setRecipientName, includeConformity, setIncludeConformity, forceConformity,
   canIncludeConformity, withoutConduta, generatedUrl, linkCopied, setLinkCopied, eligibleCriteria, activeCriteria, history, isGenerating, isDeleting,
   onGenerate, onDeleteToken, onClose, toast,
 }: PublicLinkDialogProps) {
+  // Critérios do formulário que o backend aceita num link público
+  // (interseção entre os critérios da área e os elegíveis). Os que
+  // ficaram de fora precisam ser respondidos pelo próprio avaliador.
+  const requestedIds = criteriaIds ?? [];
+  const eligibleById = new Map((eligibleCriteria ?? []).map(c => [c.criterionId, c]));
+  const dialogEligible = requestedIds.flatMap(id => { const c = eligibleById.get(id); return c ? [c] : []; });
+  const excluded = requestedIds
+    .filter(id => !eligibleById.has(id))
+    .map(id => displayCriterionName(activeCriteria.find(c => c.criterionId === id)?.criterionName) || `critério #${id}`);
+  const linkCriterionIds = requestedIds.filter(id => eligibleById.has(id));
+  const noEligible = linkCriterionIds.length === 0;
+  const canGenerate = !!recipientName.trim() && !isGenerating && !noEligible;
+
   return (
-    <Dialog
-      open={criteriaIds !== null}
-      onOpenChange={(v) => {
-        if (!v) {
-          onClose();
-        }
-      }}
-    >
-      <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Link2 size={18} /> Link para freela
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <LinkEventLine event={event} />
-          {areaName && (
-            <div className="border-l-4 border-accent pl-3">
-              <p className="text-[11px] font-bold uppercase text-muted-foreground">Formulário</p>
-              <p className="text-sm font-black uppercase">{areaName}</p>
-            </div>
-          )}
-          {(() => {
-            // Critérios do formulário que o backend aceita num link público
-            // (interseção entre os critérios da área e os elegíveis). Os que
-            // ficaram de fora precisam ser respondidos pelo próprio avaliador.
-            const requestedIds = criteriaIds ?? [];
-            const eligibleById = new Map((eligibleCriteria ?? []).map(c => [c.criterionId, c]));
-            const dialogEligible = requestedIds.flatMap(id => { const c = eligibleById.get(id); return c ? [c] : []; });
-            const excluded = requestedIds
-              .filter(id => !eligibleById.has(id))
-              .map(id => displayCriterionName(activeCriteria.find(c => c.criterionId === id)?.criterionName) || `critério #${id}`);
-            if (eligibleCriteria === undefined) return null;
-            if (dialogEligible.length === 0) {
-              return (
-                <div data-testid="notice-public-link-no-criteria" className="bg-destructive/10 border border-destructive rounded-lg px-4 py-3 flex items-start gap-2.5">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-destructive" />
-                  <div className="space-y-1">
-                    <p className="text-xs font-black uppercase text-destructive">Nenhum critério disponível para link</p>
-                    <p className="text-xs text-destructive leading-snug">
-                      Nenhum dos critérios deste formulário pode ir num link de freela — em geral porque a área já respondeu, o critério não permite link ou está com outra pessoa. Responda os critérios diretamente nesta tela.
-                    </p>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div className="bg-secondary border border-border rounded-lg px-4 py-3 space-y-2">
-                <div>
-                  <p className="text-[11px] font-black uppercase text-muted-foreground mb-1">
-                    Critérios inclusos ({dialogEligible.length})
-                  </p>
-                  <ul className="space-y-0.5">
-                    {dialogEligible.map(c => (
-                      <li key={c.criterionId} className="text-sm font-black uppercase">{displayCriterionName(c.criterionName)}</li>
-                    ))}
-                  </ul>
-                </div>
-                {excluded.length > 0 && (
-                  <div data-testid="notice-public-link-partial" className="border-t border-dashed border-border pt-2">
-                    <p className="text-[11px] font-black uppercase text-destructive mb-1 flex items-center gap-1">
-                      <AlertCircle size={11} /> Fora do link ({excluded.length})
-                    </p>
-                    <ul className="space-y-0.5">
-                      {excluded.map((name, i) => (
-                        <li key={i} className="text-xs text-destructive">{name}</li>
-                      ))}
-                    </ul>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                      Estes critérios não podem ir no link (já respondidos, sem permissão de link ou com outra pessoa) e continuam sendo respondidos nesta tela.
-                    </p>
-                  </div>
-                )}
+    <Dialog open={criteriaIds !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className={dialogCls}>
+        <DialogHeading
+          icon={generatedUrl ? Check : Link2}
+          tone={generatedUrl ? "brand" : "neutral"}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={generatedUrl ? "Link pronto" : "Link para freela"}
+          description={generatedUrl
+            ? <>Copie e envie para <b className="font-semibold text-foreground">{recipientName}</b>. O link vale para um único envio.</>
+            : "Um freela responde este formulário por você. A resposta dele vale como a sua e o link expira no primeiro envio."}
+        />
+
+        <div className="space-y-4">
+          <LinkEventLine event={event} formName={areaName} />
+
+          {eligibleCriteria !== undefined && (dialogEligible.length === 0 ? (
+            <div data-testid="notice-public-link-no-criteria" role="alert" className="rounded-xl bg-[var(--status-danger-bg)] px-4 py-3 flex items-start gap-2.5">
+              <AlertCircle size={16} aria-hidden className="shrink-0 mt-0.5 text-[var(--status-danger-text)]" />
+              <div className="space-y-1 text-[var(--status-danger-text)]">
+                <p className="text-[14px] font-semibold">Nenhum critério disponível para link</p>
+                <p className="text-[13px] leading-snug">
+                  Nenhum dos critérios deste formulário pode ir num link de freela — em geral porque a área já respondeu, o critério não permite link ou está com outra pessoa. Responda os critérios diretamente nesta tela.
+                </p>
               </div>
-            );
-          })()}
+            </div>
+          ) : (
+            <div>
+              <Eyebrow className="mb-2">No link · {dialogEligible.length + (canIncludeConformity && includeConformity ? 1 : 0)}</Eyebrow>
+              <ul className="flex flex-wrap gap-1.5">
+                {dialogEligible.map(c => (
+                  <li key={c.criterionId} className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 h-8 text-[13px] font-semibold text-foreground">
+                    <Check size={13} aria-hidden className="text-[var(--status-ok-text)]" /> {displayCriterionName(c.criterionName)}
+                  </li>
+                ))}
+                {canIncludeConformity && includeConformity && (
+                  <li className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 h-8 text-[13px] font-semibold text-foreground">
+                    <Check size={13} aria-hidden className="text-[var(--status-ok-text)]" /> Matriz de Conformidade
+                  </li>
+                )}
+              </ul>
+              {excluded.length > 0 && (
+                <div data-testid="notice-public-link-partial" className="mt-3 rounded-lg bg-[var(--status-warn-bg)] px-3.5 py-2.5">
+                  <p className="text-[13px] font-semibold text-[var(--status-warn-text)] flex items-center gap-1.5">
+                    <AlertCircle size={13} aria-hidden /> Fora do link: {excluded.join(", ")}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
+                    Já respondidos, sem permissão de link ou com outra pessoa — continuam sendo respondidos nesta tela.
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
 
           {!generatedUrl ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Gere um link único para um freela responder este formulário. A resposta dele vale como a sua. O link expira após o primeiro uso.
-              </p>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-black uppercase mb-2">
-                    Nome de quem vai receber o link
-                    <span className="text-destructive text-[11px] ml-2 bg-destructive/10 px-2 py-0.5 border border-border">Obrigatório</span>
-                  </label>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="freela-recipient" className="font-condensed block text-[12px] font-bold uppercase tracking-[0.08em] text-foreground mb-1.5">
+                  Para quem é o link <span className="text-[var(--status-danger-text)]">· obrigatório</span>
+                </label>
+                <input
+                  id="freela-recipient"
+                  type="text"
+                  autoComplete="off"
+                  value={recipientName}
+                  onChange={e => setRecipientName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && canGenerate) onGenerate(linkCriterionIds); }}
+                  placeholder="Nome do freela — ex.: João da Silva"
+                  className={inputCls}
+                />
+              </div>
+              {canIncludeConformity && (
+                <label className={cn("flex items-start gap-3 rounded-xl border border-border px-3.5 py-3 select-none", forceConformity ? "cursor-not-allowed" : "cursor-pointer hover:bg-secondary/50")}>
                   <input
-                    type="text"
-                    value={recipientName}
-                    onChange={e => setRecipientName(e.target.value)}
-                    placeholder="Ex.: João da Silva"
-                    className="w-full border border-border rounded-lg bg-card px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-ring"
+                    type="checkbox"
+                    checked={includeConformity}
+                    disabled={forceConformity}
+                    onChange={e => setIncludeConformity(e.target.checked)}
+                    className="mt-0.5 w-[18px] h-[18px] accent-[var(--primary)] shrink-0 cursor-pointer disabled:cursor-not-allowed"
                   />
-                </div>
-                {canIncludeConformity && (
-                  <label className={cn("flex items-start gap-2.5 select-none", forceConformity ? "cursor-not-allowed opacity-90" : "cursor-pointer")}>
-                    <input
-                      type="checkbox"
-                      checked={includeConformity}
-                      disabled={forceConformity}
-                      onChange={e => setIncludeConformity(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 border border-border rounded-lg accent-primary cursor-pointer shrink-0 disabled:cursor-not-allowed"
-                    />
-                    <span className="text-xs font-bold text-muted-foreground leading-tight">
-                      Incluir matriz de conformidade no questionário<br />
-                      <span className="font-normal text-muted-foreground">{cenografiaItemsLabel(withoutConduta)}</span>
-                      {forceConformity && (
-                        <><br /><span className="font-bold text-accent-text">Você responde pela matriz deste evento: critério e matriz vão no mesmo formulário.</span></>
-                      )}
-                    </span>
-                  </label>
-                )}
-              </div>
-            </>
+                  <span className="text-[14px] leading-snug">
+                    <span className="font-semibold text-foreground">Incluir a Matriz de Conformidade</span>
+                    <span className="block text-[12px] text-muted-foreground mt-0.5">{cenografiaItemsLabel(withoutConduta)}</span>
+                    {forceConformity && (
+                      <span className="block text-[12px] text-foreground mt-1">Você responde pela matriz deste evento: critério e matriz vão no mesmo formulário.</span>
+                    )}
+                  </span>
+                </label>
+              )}
+            </div>
           ) : (
-            <>
-              <p className="text-sm text-accent-text font-bold">
-                Link gerado! Copie e envie para <strong>{recipientName}</strong>.
-              </p>
-              <div className="border border-border rounded-lg bg-secondary p-3 flex items-center gap-2">
-                <span className="text-xs font-bold break-all flex-1 select-all">{generatedUrl}</span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (await copyToClipboard(generatedUrl ?? "")) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); }
-                    else toast(COPY_FAILED_TOAST);
-                  }}
-                  className="shrink-0 bg-primary text-primary-foreground border border-primary rounded-lg px-3 py-2 flex items-center gap-1.5 font-bold text-xs uppercase hover:opacity-90 transition-colors"
-                >
-                  {linkCopied ? <><CheckCheck size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
-                </button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Este link é de uso único e expira depois que o freela envia a avaliação.
-              </p>
-            </>
+            <GeneratedLinkBox
+              url={generatedUrl}
+              copied={linkCopied}
+              onCopy={async () => {
+                if (await copyToClipboard(generatedUrl ?? "")) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); }
+                else toast(COPY_FAILED_TOAST);
+              }}
+            />
           )}
 
-          {/* Token history */}
           {(history ?? []).length > 0 && (
             <div>
-              <p className="text-[11px] font-black uppercase text-muted-foreground mb-2">Histórico de links enviados</p>
-              <div className="border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
+              <Eyebrow className="mb-2">Links já enviados</Eyebrow>
+              <ul className="rounded-xl border border-border divide-y divide-border max-h-44 overflow-y-auto">
                 {(history ?? []).map(t => (
-                  <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold truncate">
-                        {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
-                      </p>
-                      {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
-                        <p className="text-[11px] text-muted-foreground truncate">Para: {t.recipientName}</p>
-                      )}
-                      <p className="text-[11px] text-muted-foreground">
-                        Enviado: {fmtDT(t.createdAt)}
-                      </p>
-                      {t.usedAt && (
-                        <p className="text-[11px] font-bold text-accent-text">
-                          Respondido: {fmtDT(t.usedAt)}
-                        </p>
-                      )}
-                    </div>
-                    {t.usedAt ? (
-                      <span className="shrink-0 text-[11px] font-bold uppercase bg-primary text-primary-foreground border border-primary rounded-lg px-2 py-0.5 flex items-center gap-1 mt-0.5">
-                        <CheckCircle size={10} /> Respondido
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[11px] font-bold uppercase bg-secondary text-muted-foreground border border-border rounded-lg px-2 py-0.5 mt-0.5">
-                          Pendente
-                        </span>
-                        <button
-                          type="button"
-                          title="Excluir link"
-                          aria-label={`Excluir link enviado para ${t.recipientName ?? "destinatário sem nome"}`}
-                          disabled={isDeleting}
-                          onClick={() => onDeleteToken(t.id)}
-                          className="mt-0.5 border border-border rounded-lg p-0.5 hover:bg-destructive/10 hover:border-destructive transition-colors disabled:opacity-40"
-                        >
-                          <Trash2 size={12} className="text-destructive" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <LinkHistoryRow
+                    key={t.id}
+                    t={t}
+                    trailing={!t.usedAt ? (
+                      <button
+                        type="button"
+                        title="Excluir link"
+                        aria-label={`Excluir link enviado para ${t.recipientName ?? "destinatário sem nome"}`}
+                        disabled={isDeleting}
+                        onClick={() => onDeleteToken(t.id)}
+                        className="w-11 h-11 md:w-8 md:h-8 rounded-lg flex items-center justify-center text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {isDeleting ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Trash2 size={14} aria-hidden />}
+                      </button>
+                    ) : undefined}
+                  />
                 ))}
-              </div>
+              </ul>
             </div>
           )}
         </div>
 
-        <DialogFooter className="gap-2 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-          >
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <button type="button" onClick={onClose} className={btnSecondary}>
             {generatedUrl ? "Fechar" : "Cancelar"}
           </button>
-          {!generatedUrl && (() => {
-            const eligibleIds = new Set((eligibleCriteria ?? []).map(c => c.criterionId));
-            const linkCriterionIds = (criteriaIds ?? []).filter(id => eligibleIds.has(id));
-            const noEligible = linkCriterionIds.length === 0;
-            return (
+          {!generatedUrl && (
             <button
               type="button"
               data-testid="button-generate-public-link"
-              disabled={!recipientName.trim() || isGenerating || noEligible}
+              disabled={!canGenerate}
               title={noEligible ? "Nenhum critério disponível para gerar link" : undefined}
-              onClick={() => {
-                if (!recipientName.trim() || noEligible) return;
-                onGenerate(linkCriterionIds);
-              }}
-              className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => { if (canGenerate) onGenerate(linkCriterionIds); }}
+              className={btnPrimary}
             >
-              {isGenerating ? "Gerando..." : "Gerar Link"}
+              {isGenerating ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Gerando...</> : <><Link2 size={15} aria-hidden /> Gerar link</>}
             </button>
-            );
-          })()}
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

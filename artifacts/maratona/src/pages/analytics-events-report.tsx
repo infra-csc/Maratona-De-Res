@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useCycleScope } from "@/components/cycle-select";
 import { useGetAnalyticsEventsReport, getGetAnalyticsEventsReportQueryKey, type EventsReport, type EventReportRow } from "@workspace/api-client-react";
-import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
-import { EmptyState, LoadingState } from "@/components/shared";
-import { Button } from "@/components/ui/button";
+import { CalendarCheck2, Printer } from "lucide-react";
+import { CycleScopeNotice, type CycleScopeState } from "@/components/cycle-select";
+import { AnalyticsScopeFallback, AnalyticsTopBar, analyticsBody } from "./analytics-team/analytics-tabs";
+import { Chip, btnSmall, surfaceCls } from "./dashboard/dashboard-ui";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { fmtNum, plural } from "@/lib/utils";
+import { cn, fmtNum, plural } from "@/lib/utils";
 import { displayCriterionName } from "@/lib/criterion-name";
 
 /*
@@ -41,41 +42,32 @@ const TH = "py-1.5 px-2 font-bold uppercase text-[11px]";
 const thStyle = { fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1.5px solid var(--foreground)" } as const;
 const tdStyle = { borderBottom: "1px solid var(--border)" } as const;
 
-function Chip({ children, tone }: { children: React.ReactNode; tone?: "ok" | "warn" }) {
-  const style = tone === "ok"
-    ? { backgroundColor: "var(--status-ok-bg)", color: "var(--status-ok-text)", fontWeight: 600 }
-    : tone === "warn"
-      ? { backgroundColor: "var(--status-warn-bg)", color: "var(--status-warn-text)", fontWeight: 600 }
-      : { backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" };
-  return <span className="text-[11.5px] rounded-full px-2 py-0.5" style={style}>{children}</span>;
-}
-
 function EventCard({ e }: { e: EventReportRow }) {
   const counts = e.team.filter(t => t.countsForScore);
   const info = e.team.filter(t => !t.countsForScore);
   const place = [e.clientName, [e.city, e.state].filter(Boolean).join("/")].filter(Boolean).join(" · ");
   return (
-    <section id={`ev-${e.id}`} className="print-avoid-break rounded-lg p-3.5 space-y-2" style={{ border: "1px solid var(--border)" }}>
+    <section id={`ev-${e.id}`} className="print-avoid-break scroll-mt-32 rounded-xl p-4 space-y-3 border border-border">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11.5px]" style={{ color: "var(--muted-foreground)" }}>
+          <p className="text-[12.5px] text-muted-foreground tabular-nums">
             {br(e.startDate)}{e.endDate && e.endDate !== e.startDate ? ` a ${br(e.endDate)}` : ""}{place ? ` · ${place}` : ""}
           </p>
-          <h3 className="text-[16px] font-black leading-tight" style={{ fontFamily: CONDENSED }}>{e.name}</h3>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            <Chip tone="ok">Resultados confirmados</Chip>
+          <h3 className="mt-0.5 font-condensed text-[19px] font-black uppercase leading-tight text-foreground">{e.name}</h3>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Chip tone="ok">Confirmado</Chip>
             {e.isHistorical ? <Chip>Importado com nota pronta</Chip> : (
               <>
                 <Chip>Performance {f1(e.performanceScore)}</Chip>
-                <Chip>Matriz {e.conformityPenalty ? `−${f1(e.conformityPenalty)} pts` : "sem desconto"}</Chip>
-                <Chip>{e.calibratedCriteria}/{e.totalCriteria} critérios calibrados</Chip>
+                <Chip tone={e.conformityPenalty ? "warn" : "neutral"}>Matriz {e.conformityPenalty ? `−${f1(e.conformityPenalty)} pts` : "sem desconto"}</Chip>
+                <Chip>{e.calibratedCriteria}/{e.totalCriteria} calibrados</Chip>
               </>
             )}
           </div>
         </div>
         <div className="text-right shrink-0">
-          <span className="block text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Nota final</span>
-          <span className="block text-[32px] font-black leading-none tabular-nums" style={{ fontFamily: CONDENSED, color: scoreColor(e.finalScore) }}>{f1(e.finalScore)}</span>
+          <span className="block font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Nota final</span>
+          <span className="block mt-1 font-condensed text-[36px] font-black leading-none tabular-nums" style={{ color: scoreColor(e.finalScore) }}>{f1(e.finalScore)}</span>
         </div>
       </header>
 
@@ -137,7 +129,7 @@ function EventCard({ e }: { e: EventReportRow }) {
 export default function AnalyticsEventsReportPage() {
   // Mesmo ciclo escolhido nas Análises (?ciclo=): atual, anterior ou Total geral.
   const scope = useCycleScope();
-  const { data, isLoading, isError, error } = useGetAnalyticsEventsReport(scope.params, {
+  const { data, isLoading, isError, error, refetch } = useGetAnalyticsEventsReport(scope.params, {
     query: { queryKey: getGetAnalyticsEventsReportQueryKey(scope.params), staleTime: 60_000 },
   });
   const printed = useRef(false);
@@ -154,19 +146,15 @@ export default function AnalyticsEventsReportPage() {
     return () => window.clearTimeout(t);
   }, [data]);
 
-  if (isLoading) return <div className="px-6 py-6"><LoadingState lines={10} withHeader label="Montando o relatório por evento" /></div>;
+  if (isLoading) return <AnalyticsScopeFallback scope={scope} current="eventos" state="loading" loadingLabel="Montando o relatório por evento" errorTitle="" />;
   if (isError || !data) {
-    return (
-      <div className="px-6 py-10">
-        <EmptyState icon={AlertTriangle} title="Não foi possível montar o relatório" description={(error as { message?: string } | null)?.message ?? "Tente novamente em instantes."}
-          action={<Button variant="outline" asChild><Link href={scope.withCycle("/analytics")}>Voltar para Análises</Link></Button>} />
-      </div>
-    );
+    return <AnalyticsScopeFallback scope={scope} current="eventos" state="error" loadingLabel="" errorTitle="Não foi possível montar o relatório"
+      onRetry={() => void refetch()} errorDetail={(error as { message?: string } | null)?.message} />;
   }
-  return <Report report={data} backHref={scope.withCycle("/analytics")} />;
+  return <Report report={data} scope={scope} />;
 }
 
-function Report({ report, backHref }: { report: EventsReport; backHref: string }) {
+function Report({ report, scope }: { report: EventsReport; scope: CycleScopeState }) {
   const { user } = useAuth();
   const events = useMemo(() => report.events
     .filter(e => e.resultsConfirmed && e.finalScore != null)
@@ -203,22 +191,25 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
   const generatedAt = new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="px-4 md:px-6 py-6" style={{ fontFamily: BODY }}>
-      <div className="no-print max-w-[900px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href={backHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline underline-offset-2" style={{ color: "var(--muted-foreground)" }}>
-          <ArrowLeft size={14} aria-hidden /> Voltar para Análises
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>Na janela de impressão, escolha "Salvar como PDF".</span>
-          <Button onClick={() => window.print()} data-testid="button-print-events-report"><Printer size={15} aria-hidden /> Imprimir / salvar PDF</Button>
-        </div>
-      </div>
+    <div className="min-h-full flex flex-col min-w-0" style={{ fontFamily: BODY }}>
+      <AnalyticsTopBar
+        scope={scope}
+        current="eventos"
+        actions={
+          <button type="button" onClick={() => window.print()} data-testid="button-print-events-report"
+            title='Abre a impressão; para PDF, escolha "Salvar como PDF"' className={cn(btnSmall, "px-2.5 lg:px-3")}>
+            <Printer size={15} aria-hidden /><span className="hidden sm:inline">Imprimir / PDF</span><span className="sr-only sm:hidden">Imprimir ou salvar em PDF</span>
+          </button>
+        }
+      />
 
-      <article className="max-w-[900px] mx-auto rounded-xl px-5 md:px-8 py-7 space-y-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} data-testid="events-report">
-        <header className="space-y-1.5">
-          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.12em", color: "var(--accent-text)" }}>Maratona de Resultados · Relatório por evento</p>
-          <h1 className="text-[34px] font-black uppercase leading-none" style={{ fontFamily: CONDENSED }}>{report.cycle.name}</h1>
-          <p className="text-[13px]" style={{ color: "var(--muted-foreground)" }}>
+      <div className={cn(analyticsBody, "print:p-0 print:max-w-none")}>
+      <CycleScopeNotice scope={scope} className="no-print max-w-[960px] mx-auto" />
+      <article className={cn(surfaceCls, "max-w-[960px] mx-auto px-5 md:px-9 py-7 md:py-9 space-y-6 print:border-0 print:p-0")} data-testid="events-report">
+        <header className="space-y-2 pb-5 border-b-2 border-foreground">
+          <p className="font-condensed text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--accent-text)]">Maratona de Resultados · Relatório por evento</p>
+          <h2 className="font-condensed text-[30px] md:text-[38px] font-black uppercase leading-none tracking-[-0.01em] text-foreground">{report.cycle.name}</h2>
+          <p className="text-[13.5px] leading-relaxed text-muted-foreground max-w-[75ch]">
             Nota final de cada evento já calibrada, com os critérios, a calibração e a equipe que trabalhou. {events.length === 1 ? "1 evento com resultado confirmado" : `${events.length} eventos com resultado confirmado`}
             {events.length ? `, de ${br(events[0].startDate)} a ${br(events[events.length - 1].startDate)}` : ""}
             {pendingCount ? `; ${pendingCount === 1 ? "1 evento ainda sem confirmação ficou" : `${pendingCount} eventos ainda sem confirmação ficaram`} de fora` : ""}
@@ -227,35 +218,51 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
         </header>
 
         {events.length === 0 ? (
-          <EmptyState compact title="Nenhum evento confirmado neste ciclo" description="O relatório mostra os eventos depois que o RH confirma os resultados." />
+          <div data-testid="events-report-empty" className="px-6 py-10 text-center">
+            <span className="mx-auto w-11 h-11 rounded-full bg-secondary text-muted-foreground flex items-center justify-center"><CalendarCheck2 size={20} aria-hidden /></span>
+            <p className="font-condensed mt-3 text-[20px] font-black uppercase leading-tight text-foreground">
+              {scope.isCurrent ? "Nenhum evento confirmado ainda" : "Nenhum evento confirmado neste ciclo"}
+            </p>
+            <p className="text-[14px] leading-relaxed text-muted-foreground mt-1 max-w-md mx-auto">
+              O relatório mostra cada evento depois que o RH confirma os resultados — com a nota final, os critérios, a calibração e a equipe.
+            </p>
+            {scope.isCurrent && (
+              <Link href="/events?status=unconfirmed" className={cn(btnSmall, "no-print mt-4")}>Ver eventos sem confirmação</Link>
+            )}
+          </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            <div className="print-avoid-break rounded-xl border border-border overflow-hidden grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
               {[
-                { k: "Nota média dos eventos", v: f1(avgFinal), d: "média das notas finais oficiais", hero: true },
+                { k: "Nota média dos eventos", v: f1(avgFinal), d: "Média das notas finais oficiais" },
                 { k: "Eventos confirmados", v: String(events.length), d: `de ${report.events.length} no ciclo` },
-                { k: "Critérios calibrados", v: `${calibrated}/${totalCrit}`, d: "em eventos avaliados no app" },
-                { k: "Com desconto da matriz", v: String(withPenalty.length), d: 'eventos com algum "Não"' },
+                { k: "Critérios calibrados", v: `${calibrated}/${totalCrit}`, d: "Em eventos avaliados no app" },
+                { k: "Com desconto da matriz", v: String(withPenalty.length), d: 'Eventos com algum "Não"' },
               ].map(t => (
-                <div key={t.k} className="print-avoid-break rounded-lg px-3 py-2.5"
-                  style={{ border: `1px solid ${t.hero ? "var(--primary)" : "var(--border)"}`, backgroundColor: t.hero ? "var(--primary)" : undefined, color: t.hero ? "var(--primary-foreground)" : undefined }}>
-                  <div className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.06em", opacity: t.hero ? 0.85 : 1, color: t.hero ? undefined : "var(--muted-foreground)" }}>{t.k}</div>
-                  <div className="text-[26px] font-black leading-none mt-1 tabular-nums" style={{ fontFamily: CONDENSED }}>{t.v}</div>
-                  <div className="text-[11.5px] mt-1" style={{ opacity: t.hero ? 0.85 : 1, color: t.hero ? undefined : "var(--muted-foreground)" }}>{t.d}</div>
+                <div key={t.k} className="bg-card px-4 py-3.5">
+                  <div className="font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{t.k}</div>
+                  <div className="mt-2 font-condensed text-[30px] font-black leading-none tabular-nums text-foreground">{t.v}</div>
+                  <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground">{t.d}</div>
                 </div>
               ))}
             </div>
 
             <H2>Destaques</H2>
             <ul className="list-disc pl-5 space-y-1 text-[13px]">
-              <li>Maior nota: <strong>{byScore[0].name}</strong> ({br(byScore[0].startDate)}), <strong>{f1(byScore[0].finalScore)}</strong>.</li>
-              {byScore.length > 1 && <li>Menor nota: <strong>{byScore[byScore.length - 1].name}</strong> ({br(byScore[byScore.length - 1].startDate)}), <strong>{f1(byScore[byScore.length - 1].finalScore)}</strong>.</li>}
-              {criteriaSummary[0] && <li>Critério mais fraco no ciclo: <strong>{criteriaSummary[0].name}</strong>{criteriaSummary[0].area ? ` (${criteriaSummary[0].area})` : ""}, média <strong>{f1(criteriaSummary[0].avg)}</strong> em {plural(criteriaSummary[0].n, "evento")}.</li>}
+              {byScore.length > 1 && Math.abs((byScore[0].finalScore ?? 0) - (byScore[byScore.length - 1].finalScore ?? 0)) < 0.05 ? (
+                <li>Todos os {byScore.length} eventos com a mesma nota final: <strong>{f1(byScore[0].finalScore)}</strong>.</li>
+              ) : (
+                <>
+                  <li>Maior nota: <strong>{byScore[0].name}</strong> ({br(byScore[0].startDate)}), <strong>{f1(byScore[0].finalScore)}</strong>.</li>
+                  {byScore.length > 1 && <li>Menor nota: <strong>{byScore[byScore.length - 1].name}</strong> ({br(byScore[byScore.length - 1].startDate)}), <strong>{f1(byScore[byScore.length - 1].finalScore)}</strong>.</li>}
+                </>
+              )}
+              {criteriaSummary.length > 1 && criteriaSummary[criteriaSummary.length - 1].avg - criteriaSummary[0].avg >= 0.05 && <li>Critério mais fraco no ciclo: <strong>{displayCriterionName(criteriaSummary[0].name)}</strong>{criteriaSummary[0].area ? ` (${criteriaSummary[0].area})` : ""}, média <strong>{f1(criteriaSummary[0].avg)}</strong> em {plural(criteriaSummary[0].n, "evento")}.</li>}
               {withPenalty.length > 0 && <li>{withPenalty.length === 1 ? "1 evento perdeu" : `${withPenalty.length} eventos perderam`} pontos na matriz de conformidade; o maior desconto foi de {f1(Math.max(...withPenalty.map(e => e.conformityPenalty)))} pontos.</li>}
             </ul>
 
             <H2>Critérios no ciclo</H2>
-            <p className="text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>Média da nota usada (calibrada quando existe) nos eventos confirmados, escala 0 a 100 (como a nota final). Critério avaliado por duas áreas aparece uma vez por área; na nota do evento as duas entram pela média. Critério com peso 0 não entra — exceto a cópia por área de um critério multiárea, que entra pela média das áreas.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--muted-foreground)" }}>Média da nota usada (calibrada quando existe) nos eventos confirmados, escala 0 a 100 (como a nota final). Critério avaliado por várias áreas aparece aqui uma vez por área (no Painel de gestão, numa linha só, com a média das áreas); na nota do evento as áreas entram pela média. Critério com peso 0 não entra — exceto a cópia por área de um critério multiárea, que entra pela média das áreas.</p>
             <table className="w-full text-[12.5px] border-collapse">
               <thead><tr>
                 <th className={`${TH} text-left`} style={thStyle}>Critério</th>
@@ -326,6 +333,7 @@ function Report({ report, backHref }: { report: EventsReport; backHref: string }
           Maratona de Resultados · {report.cycle.name} · uso interno de RH e diretoria.
         </footer>
       </article>
+      </div>
     </div>
   );
 }

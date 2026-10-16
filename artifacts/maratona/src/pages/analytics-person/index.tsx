@@ -9,21 +9,20 @@ import {
   useGetRankingTotal, getGetRankingTotalQueryKey,
   ApiError,
 } from "@workspace/api-client-react";
-import { AlertTriangle, ChevronLeft, ChevronRight, History, UserMinus, UserX, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PageHeader, EmptyState, LoadingState } from "@/components/shared";
-import { BODY, CONDENSED } from "@/lib/premium-theme";
-import { fmtDate } from "@/lib/utils";
+import { AlertTriangle, ChevronLeft, ChevronRight, History, RotateCw, Trophy, UserMinus, UserX, Users } from "lucide-react";
+import { EmptyBlock, iconBtn } from "../results/results-ui";
+import { Chip, btnSecondary, btnSmall, surfaceCls } from "../dashboard/dashboard-ui";
+import { BODY } from "@/lib/premium-theme";
+import { cn } from "@/lib/utils";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { AnalyticsTabs } from "../analytics-team/analytics-tabs";
+import { AnalyticsError, AnalyticsSkeleton, AnalyticsTopBar, analyticsBody } from "../analytics-team/analytics-tabs";
 import { activeFaixas, n1, rankOf } from "./derive";
 import { SearchPicker } from "./ui";
 import { TeamView } from "./team-view";
 import { PersonView } from "./person-view";
 import { TotalTeamView, TotalPersonView } from "./total-view";
-import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
+import { CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
 
-const fmtDay = (iso: string) => fmtDate(iso, { day: "2-digit", month: "2-digit", year: "numeric" });
 
 /**
  * Análises → Por colaborador. Sem colaborador: a equipe inteira, uma linha por
@@ -86,8 +85,6 @@ export default function AnalyticsPersonPage() {
   const minEvents = isAll ? null
     : scope.cycle?.effectiveMinEvents ?? scope.cycle?.minEvents
       ?? (overview.data ? (overview.data.ruleSet?.minEvents ?? overview.data.kpis?.minEvents ?? null) : null);
-  const cycle = overview.data?.cycle;
-  const period = cycle?.startDate && cycle?.endDate ? `${fmtDay(cycle.startDate)} a ${fmtDay(cycle.endDate)}` : null;
 
   // Anterior/próximo seguem a ordem da lista; a POSIÇÃO exibida é a do ranking (empate divide).
   const idx = employeeId != null ? ordered.findIndex(r => r.employeeId === employeeId) : -1;
@@ -103,109 +100,97 @@ export default function AnalyticsPersonPage() {
     ? totalRows.map(r => ({ id: r.employeeId, label: r.employeeName, hint: n1(r.avgFinalResult), color: r.latest.platoonColor ?? null }))
     : ordered.map(r => ({ id: r.employeeId, label: r.employeeName, hint: n1(r.finalResult), color: r.platoonColor ?? null }));
 
-  return (
-    <div className="px-4 md:px-6 py-6 space-y-5 max-w-[1440px] mx-auto" style={{ fontFamily: BODY }}>
-      <PageHeader
-        eyebrow={isAll ? "Total geral · todos os ciclos" : cycle ? `${cycle.name}${period ? ` · ${period}` : ""}` : scope.label}
-        title="Análises"
-        description={isAll
-          ? "Todos os ciclos somados, por pessoa: ciclos com nota, média final ponderada pelos eventos, eventos e bônus (oficial e projetado). A análise completa de cada ciclo abre a partir do histórico da pessoa."
-          : employeeId
-            ? "Análise do ciclo de um colaborador: a conta da nota, o que as penalidades custaram na nota, na faixa e no bônus, a nota de cada evento, os critérios e a comparação com a equipe."
-            : "Uma análise por participante: escolha um colaborador ou clique numa linha para ver o ciclo dele em detalhe. Não mostra quem avaliou."}
-        actions={<CycleSelect scope={scope} />}
-      />
-      <AnalyticsTabs current="colaborador" />
-      <CycleScopeNotice scope={scope} allHelp={<>Uma linha por pessoa somando <strong>todos os ciclos</strong>: média final ponderada pelos eventos com nota, eventos com nota e bônus — o oficial (ciclos fechados) separado do projetado (ciclo aberto). Não existe faixa do total (aparece a do ciclo mais recente) nem conta de nota do total: ela é sempre de um ciclo.</>} />
+  const teamBtn = (
+    <button type="button" onClick={() => pick(null)} data-testid="button-person-team" className={btnSmall}>
+      <Users size={15} aria-hidden /> Toda a equipe
+    </button>
+  );
 
-      {/* ── Filtro ── */}
-      <section aria-label="Escolher colaborador" className="rounded-xl p-3 sm:p-4 flex flex-wrap items-end gap-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="w-full sm:w-[380px] min-w-0">
-          <label htmlFor="ap-colaborador" className="block mb-1 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>Colaborador</label>
-          <SearchPicker id="ap-colaborador" value={employeeId} onChange={pick}
-            placeholder={loadingBase ? "Carregando…" : outOfRanking ? "Escolha um colaborador do ranking" : "Toda a equipe"} emptyText="Ninguém com esse nome." allLabel="Toda a equipe"
-            options={pickerOptions} />
-        </div>
-        {employeeId != null && isAll && (
-          <Button variant="outline" className="h-10" onClick={() => pick(null)} data-testid="button-person-team">
-            <Users size={15} className="mr-1.5" aria-hidden /> Toda a equipe
-          </Button>
-        )}
-        {employeeId != null && !isAll && !outOfRanking && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1" role="group" aria-label="Navegar pelo ranking">
-              <Button variant="outline" size="icon" className="h-10 w-10" disabled={!prev} onClick={() => prev && pick(prev.employeeId)}
-                aria-label={prev ? `Anterior no ranking: ${prev.employeeName}` : "Sem anterior no ranking"} title={prev ? `Anterior: ${prev.employeeName}` : undefined} data-testid="button-person-prev">
-                <ChevronLeft size={18} aria-hidden />
-              </Button>
-              <Button variant="outline" size="icon" className="h-10 w-10" disabled={!next} onClick={() => next && pick(next.employeeId)}
-                aria-label={next ? `Próximo no ranking: ${next.employeeName}` : "Sem próximo no ranking"} title={next ? `Próximo: ${next.employeeName}` : undefined} data-testid="button-person-next">
-                <ChevronRight size={18} aria-hidden />
-              </Button>
-            </div>
-            <Button variant="outline" className="h-10" onClick={() => pick(null)} data-testid="button-person-team">
-              <Users size={15} className="mr-1.5" aria-hidden /> Toda a equipe
-            </Button>
-            {canTimeline && !scope.readOnly && detail.data && (
-              <Button asChild variant="outline" className="h-10">
-                <Link href={`/linha-do-tempo?colaborador=${employeeId}`} data-testid="button-person-timeline">
-                  <History size={15} className="mr-1.5" aria-hidden /> Ver linha do tempo
+  return (
+    <div className="min-h-full flex flex-col min-w-0" style={{ fontFamily: BODY }}>
+      <AnalyticsTopBar scope={scope} current="colaborador" />
+      <div className={analyticsBody}>
+        <CycleScopeNotice scope={scope} allHelp={<>Uma linha por pessoa somando <strong>todos os ciclos</strong>: média final ponderada pelos eventos com nota, eventos com nota e bônus — o oficial (ciclos fechados) separado do projetado (ciclo aberto). Não existe faixa do total (aparece a do ciclo mais recente) nem conta de nota do total: ela é sempre de um ciclo.</>} />
+
+        {/* ── Escolher colaborador (barra de ferramentas da aba) ── */}
+        <section aria-label="Escolher colaborador" className={cn(surfaceCls, "px-4 py-3 lg:px-5 flex flex-wrap items-end gap-x-3 gap-y-3")}>
+          <div className="w-full sm:w-[360px] min-w-0">
+            <label htmlFor="ap-colaborador" className="block mb-1.5 font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Colaborador</label>
+            <SearchPicker id="ap-colaborador" value={employeeId} onChange={pick}
+              placeholder={loadingBase ? "Carregando…" : outOfRanking ? "Escolha um colaborador do ranking" : "Toda a equipe"} emptyText="Ninguém com esse nome." allLabel="Toda a equipe"
+              options={pickerOptions} />
+          </div>
+          {employeeId != null && isAll && teamBtn}
+          {employeeId != null && !isAll && !outOfRanking && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1" role="group" aria-label="Navegar pelo ranking">
+                <button type="button" className={cn(iconBtn, "disabled:opacity-40 disabled:cursor-not-allowed")} disabled={!prev} onClick={() => prev && pick(prev.employeeId)}
+                  aria-label={prev ? `Anterior no ranking: ${prev.employeeName}` : "Sem anterior no ranking"} title={prev ? `Anterior: ${prev.employeeName}` : undefined} data-testid="button-person-prev">
+                  <ChevronLeft size={18} aria-hidden />
+                </button>
+                <button type="button" className={cn(iconBtn, "disabled:opacity-40 disabled:cursor-not-allowed")} disabled={!next} onClick={() => next && pick(next.employeeId)}
+                  aria-label={next ? `Próximo no ranking: ${next.employeeName}` : "Sem próximo no ranking"} title={next ? `Próximo: ${next.employeeName}` : undefined} data-testid="button-person-next">
+                  <ChevronRight size={18} aria-hidden />
+                </button>
+              </div>
+              {teamBtn}
+              {canTimeline && !scope.readOnly && detail.data && (
+                <Link href={`/linha-do-tempo?colaborador=${employeeId}`} data-testid="button-person-timeline" className={btnSmall}>
+                  <History size={15} aria-hidden /> Linha do tempo
                 </Link>
-              </Button>
-            )}
+              )}
+            </div>
+          )}
+          {rank && !isAll && (
+            <span className="sm:ml-auto self-center" data-testid="text-person-rank">
+              <Chip icon={Trophy}>{rank.position}º de {rank.total} no ranking</Chip>
+            </span>
+          )}
+        </section>
+
+        {!isAll && overview.isError && !loadingBase && !baseError && (
+          <div role="alert" className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] bg-[var(--status-warn-bg)]">
+            <AlertTriangle size={16} aria-hidden className="shrink-0 text-[var(--status-warn-text)]" />
+            <p className="flex-1 min-w-[220px]">Não foi possível carregar as regras do ciclo: o mínimo de eventos do bônus e as médias do ciclo ficam sem valor até carregar.</p>
+            <button type="button" className={btnSmall} onClick={() => void overview.refetch()}><RotateCw size={14} aria-hidden /> Tentar de novo</button>
           </div>
         )}
-        {rank && !isAll && (
-          <p className="text-[12px] tabular-nums sm:ml-auto self-center" style={{ color: "var(--muted-foreground)" }} data-testid="text-person-rank">
-            {rank.position}º de {rank.total} no ranking
-          </p>
+
+        {loadingBase ? (
+          <AnalyticsSkeleton label="Carregando a análise" cells={6} />
+        ) : baseError ? (
+          <AnalyticsError title="Não foi possível carregar a análise" scope={scope}
+            onRetry={() => { if (isAll) void total.refetch(); else { void ranking.refetch(); void rules.refetch(); } }} />
+        ) : isAll ? (
+          employeeId == null
+            ? <TotalTeamView rows={totalRows} onPick={pick} />
+            : <TotalPersonView row={totalRow} onOpenCycle={openCycle} onBack={() => pick(null)} />
+        ) : employeeId == null ? (
+          <TeamView rows={rows} faixas={faixas} minEvents={minEvents} onPick={pick} readOnly={scope.readOnly} />
+        ) : outOfRanking ? (
+          <EmptyBlock icon={UserMinus} title="Fora do ranking deste ciclo" testId="person-out-of-ranking" className={surfaceCls}
+            action={<button type="button" onClick={() => pick(null)} className={btnSecondary}><Users size={15} aria-hidden /> Ver toda a equipe</button>}>
+            {scope.readOnly
+              ? "Este colaborador não tem análise neste ciclo: não teve nota nele ou foi retirado do ciclo pelo administrador. Escolha outra pessoa ou volte para a equipe."
+              : "Este colaborador não tem análise no ciclo atual: ainda não tem nota no ciclo, foi retirado do ciclo pelo administrador ou está com o cadastro inativo. Escolha outra pessoa ou volte para a equipe."}
+          </EmptyBlock>
+        ) : detail.isLoading ? (
+          <AnalyticsSkeleton label="Montando a análise do colaborador" cells={6} />
+        ) : detailNotFound ? (
+          <EmptyBlock icon={UserX} title="Colaborador não encontrado" className={surfaceCls}
+            action={<button type="button" onClick={() => pick(null)} className={btnSecondary}>Ver toda a equipe</button>}>
+            O cadastro dele não foi encontrado. Escolha outra pessoa ou volte para a equipe.
+          </EmptyBlock>
+        ) : detail.isError || !detail.data ? (
+          <AnalyticsError title="Não foi possível carregar a análise do colaborador" detail="Houve uma falha ao buscar os dados dele. Tente de novo em instantes."
+            onRetry={() => void detail.refetch()} />
+        ) : (
+          <PersonView detail={detail.data} rows={rows} faixas={faixas} minEvents={minEvents}
+            teamEventAvg={overview.data?.kpis.avgEventScore ?? null}
+            report={report.data} reportLoading={report.isLoading} reportError={report.isError} onRetryReport={() => void report.refetch()}
+            canTimeline={canTimeline} onPick={pick} cycleId={pastCycleId} />
         )}
-      </section>
-
-      {!isAll && overview.isError && !loadingBase && !baseError && (
-        <div role="alert" className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]" style={{ backgroundColor: "var(--status-warn-bg)", border: "1px solid var(--border)" }}>
-          <AlertTriangle size={16} aria-hidden className="shrink-0" style={{ color: "var(--status-warn-text)" }} />
-          <p className="flex-1 min-w-[220px]">Não foi possível carregar as regras do ciclo: o mínimo de eventos do bônus e as médias do ciclo ficam sem valor até carregar.</p>
-          <Button variant="outline" size="sm" onClick={() => void overview.refetch()}>Tentar de novo</Button>
-        </div>
-      )}
-
-      {loadingBase ? (
-        <LoadingState lines={8} withHeader label="Carregando a análise" />
-      ) : baseError ? (
-        <EmptyState icon={AlertTriangle} title="Não foi possível carregar a análise" description="Tente novamente em instantes."
-          action={<Button variant="outline" onClick={() => { if (isAll) void total.refetch(); else { void ranking.refetch(); void rules.refetch(); } }}>Tentar de novo</Button>} />
-      ) : isAll ? (
-        employeeId == null
-          ? <TotalTeamView rows={totalRows} onPick={pick} />
-          : <TotalPersonView row={totalRow} onOpenCycle={openCycle} onBack={() => pick(null)} />
-      ) : employeeId == null ? (
-        <TeamView rows={rows} faixas={faixas} minEvents={minEvents} onPick={pick} readOnly={scope.readOnly} />
-      ) : outOfRanking ? (
-        <EmptyState icon={UserMinus} title="Fora do ranking deste ciclo" data-testid="person-out-of-ranking"
-          description={scope.readOnly
-            ? "Este colaborador não tem análise neste ciclo: não teve nota nele ou foi retirado do ciclo pelo administrador. Escolha outra pessoa ou volte para a equipe."
-            : "Este colaborador não tem análise no ciclo atual: ainda não tem nota no ciclo, foi retirado do ciclo pelo administrador ou está com o cadastro inativo. Escolha outra pessoa ou volte para a equipe."}
-          action={<Button variant="outline" onClick={() => pick(null)}><Users size={15} className="mr-1.5" aria-hidden /> Ver toda a equipe</Button>} />
-      ) : detail.isLoading ? (
-        <LoadingState lines={10} withHeader label="Montando a análise do colaborador" />
-      ) : detailNotFound ? (
-        <EmptyState icon={UserX} title="Colaborador não encontrado" description="O cadastro dele não foi encontrado. Escolha outra pessoa ou volte para a equipe."
-          action={<Button variant="outline" onClick={() => pick(null)}>Ver toda a equipe</Button>} />
-      ) : detail.isError || !detail.data ? (
-        <EmptyState icon={AlertTriangle} title="Não foi possível carregar a análise do colaborador" description="Houve uma falha ao buscar os dados dele. Tente de novo em instantes."
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button variant="outline" onClick={() => void detail.refetch()}>Tentar de novo</Button>
-              <Button variant="ghost" onClick={() => pick(null)}>Ver toda a equipe</Button>
-            </div>
-          } />
-      ) : (
-        <PersonView detail={detail.data} rows={rows} faixas={faixas} minEvents={minEvents}
-          teamEventAvg={overview.data?.kpis.avgEventScore ?? null}
-          report={report.data} reportLoading={report.isLoading} reportError={report.isError} onRetryReport={() => void report.refetch()}
-          canTimeline={canTimeline} onPick={pick} cycleId={pastCycleId} />
-      )}
+      </div>
     </div>
   );
 }

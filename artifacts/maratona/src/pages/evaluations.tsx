@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ArrowLeft, Rocket, SearchX } from "lucide-react";
+import { ArrowLeft, Rocket, CalendarClock, SearchX, AlertTriangle, RotateCw, Loader2, ArrowDown, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
+import { Chip, DialogHeading, btnPrimary, btnSecondary, dialogCls, scrollToItem } from "./evaluations/ui";
+import { missingLabel } from "./evaluations/evaluation-summary-panel";
+import type { MatrixProgress } from "./evaluations/criteria-column";
 import { useGetEvent, getGetEventQueryKey, useGetEvaluations, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, useDeleteEvaluationDraft, getGetEvaluationsQueryKey, createEvaluation, submitEvaluation, ApiError, type EventConformityInput, type EventCriterion } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { withServerMessage } from "@/lib/calibration-api";
@@ -11,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken } from "@/lib/routing-api";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
-import { CONDENSED, BODY } from "@/lib/premium-theme";
+import { BODY } from "@/lib/premium-theme";
 import { CENOGRAFIA_AREA_ID, FERRAMENTAS_AREA_ID, cenografiaItemCount, cenografiaItemsFor } from "./evaluations/constants";
 import { conformityFormFromData, displayCriterionName, emptyConformityForm, groupCriteriaByArea, publicEvalBaseUrl } from "./evaluations/helpers";
 import type { AreaAssignTarget, AreaGroup, ConformityEvalForm, ConformityLinkType, RedirectDialogArea } from "./evaluations/types";
@@ -387,11 +392,20 @@ export default function EvaluationsPage() {
       onError: (e: { message?: string }) => toast({ title: "Não foi possível descartar o rascunho", description: e?.message, variant: "destructive" }),
     },
   });
+  // Descartar é irreversível: o cartão pede, o diálogo confirma.
+  const [pendingDiscard, setPendingDiscard] = useState<{ evaluationId: number; criterionId: number } | null>(null);
   function handleDiscardDraft(evaluationId: number, criterionId: number) {
-    discardDraft.mutate({ id: evaluationId });
+    setPendingDiscard({ evaluationId, criterionId });
+  }
+  function confirmDiscardDraft() {
+    if (!pendingDiscard) return;
+    const { evaluationId, criterionId } = pendingDiscard;
+    discardDraft.mutate({ id: evaluationId }, { onSettled: () => setPendingDiscard(null) });
     setScores(s => { const n = { ...s }; delete n[criterionId]; return n; });
     setComments(s => { const n = { ...s }; delete n[criterionId]; return n; });
   }
+  // Rascunho sendo salvo agora: só o cartão dele mostra "Salvando…".
+  const savingCriterionId = createMutation.isPending ? (createMutation.variables?.data.criterionId ?? null) : null;
 
   function handleScoreClick(criterionId: number, score: number) {
     setScores(s => ({ ...s, [criterionId]: score }));
@@ -471,7 +485,7 @@ export default function EvaluationsPage() {
       await qc.invalidateQueries({ queryKey: evalsQKey });
       await invalidateMyArea(qc);
       setConfirmLaunchOpen(false);
-      const reason = (e as { message?: string })?.message?.trim();
+      const reason = (e as { message?: string })?.message?.trim().replace(/[.\s]+$/, "");
       const sentMsg = sentCount === 0
         ? "Nenhum critério foi enviado antes da falha."
         : sentCount === 1
@@ -539,6 +553,30 @@ export default function EvaluationsPage() {
           .filter(v => v !== null).length
         + (conformityEvalForm.absencesReport.trim() ? 1 : 0)
       : 0);
+
+  // Guarda de equipamentos respondida por OUTRA pessoa (link, RH…): a tela só
+  // mostra a resposta — mesma regra do nome gravado no envio da Cenografia.
+  const ferramentasAnsweredByOther = (() => {
+    if (!isFerramentasEvaluatorForEvent || myConformityData?.guardaEquipamentos == null) return null;
+    const byName = myConformityData.ferramentasSubmittedByName?.trim() || null;
+    if (!byName) return null;
+    if (byName.localeCompare((user?.name ?? "").trim(), "pt-BR", { sensitivity: "base" }) === 0) return null;
+    return { name: byName, at: myConformityData.updatedAt ?? myConformityData.createdAt ?? null };
+  })();
+  // Índice do formulário: progresso da matriz por área (só apresentação).
+  const matrixProgress = new Map<number, MatrixProgress>();
+  if (isConformityEvaluatorForEvent) {
+    const total = cenografiaItemCount(withoutConduta);
+    const completed = cenografiaAnsweredByOther ? total
+      : [...cenografiaItemsFor(withoutConduta).map(i => conformityEvalForm[i.key]), conformityEvalForm.standoutResponse].filter(v => v !== null).length
+        + (conformityEvalForm.absencesReport.trim() ? 1 : 0);
+    matrixProgress.set(CENOGRAFIA_AREA_ID, { completed, total, readOnly: !!cenografiaAnsweredByOther });
+  }
+  if (isFerramentasEvaluatorForEvent) {
+    matrixProgress.set(FERRAMENTAS_AREA_ID, { completed: conformityEvalForm.guardaEquipamentos !== null ? 1 : 0, total: 1, readOnly: !!ferramentasAnsweredByOther });
+  }
+  // Primeiro critério que ainda falta preencher (atalho do resumo e do rodapé).
+  const firstPendingId = launchCriteria.find(c => !criterionReady(c.criterionId))?.criterionId ?? null;
 
   const totalItems = myCriteria.length + extraConformityItemsTotal;
   const totalCompleted = completedCount + extraConformityItemsCompleted;
@@ -666,24 +704,36 @@ export default function EvaluationsPage() {
     );
   }
 
+  // Painel sem evento: atalho para o primeiro evento a responder da lista.
+  const firstListed = (areaList.data?.events ?? []).find(e => e.pending) ?? null;
+  const nextEvent = firstListed ? {
+    id: firstListed.id,
+    name: firstListed.name,
+    detail: [fmtEventDate(firstListed.startDate), firstListed.clientName, firstListed.city].filter(Boolean).join(" · "),
+    answered: firstListed.answeredCount,
+    total: firstListed.totalCriteria,
+  } : null;
+  const discardName = pendingDiscard ? displayCriterionName(myCriteria.find(c => c.criterionId === pendingDiscard.criterionId)?.criterionName) : "";
+
   return (
     <div className="bg-background min-h-screen flex flex-col text-foreground" style={{ fontFamily: BODY }}>
 
-      {/* ── Top bar ── */}
-      <div className="bg-card px-5 py-3 flex items-center justify-between gap-4 shrink-0 border-b border-border">
-        <div className="flex items-center gap-3">
-          <h1 data-testid="text-page-title" className="text-xl uppercase tracking-tight font-black leading-none text-foreground" style={{ fontFamily: CONDENSED }}>
-            Central de <span className="text-accent-text">Avaliações</span>
+      {/* ── Topo da tela ── */}
+      <div className="bg-card px-5 md:px-6 min-h-16 py-3 flex items-center justify-between gap-4 shrink-0 border-b border-border">
+        <div className="min-w-0">
+          <h1 data-testid="text-page-title" className="font-condensed text-[26px] uppercase tracking-[-0.01em] font-black leading-none text-foreground">
+            Avaliações
           </h1>
-          {cycle && (
-            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded border border-border text-muted-foreground hidden sm:inline-block">
-              {cycle.name}
-            </span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          {areaList.data?.areaName && (
+            <Chip className="hidden sm:inline-flex" title={`Sua área no cadastro: ${areaList.data.areaName}`}>Área {areaList.data.areaName}</Chip>
           )}
+          {cycle && <Chip tone="neutral" className="max-w-[45vw] truncate">{cycle.name}</Chip>}
         </div>
       </div>
 
-      {/* ── Body: lista + avaliação (no celular, uma OU outra) ── */}
+      {/* ── Corpo: lista + avaliação (no celular, uma OU outra) ── */}
       <div className="flex flex-col md:flex-row flex-1 min-h-0">
 
         {/* ── Lista de eventos (recolhível no desktop com um evento aberto) ── */}
@@ -708,15 +758,15 @@ export default function EvaluationsPage() {
 
         {/* ── Avaliação (no celular, só aparece com um evento aberto) ── */}
         <div className={`flex-1 flex-col min-w-0 ${selectedEventId != null ? "flex" : "hidden md:flex"}`}>
-          <div className={`@container flex-1 min-w-0 p-4 md:p-5 space-y-5 ${selectedEventId != null ? "pb-28 md:pb-5" : ""}`}>
+          <div className={`@container flex-1 min-w-0 px-4 py-4 sm:px-5 md:px-6 md:py-6 space-y-5 ${selectedEventId != null ? "pb-32 md:pb-8" : ""}`}>
 
         {selectedEventId != null && (
           <button
             type="button"
             onClick={() => setSelectedEventId(null)}
-            className="md:hidden inline-flex items-center gap-1.5 text-xs font-bold uppercase text-muted-foreground hover:text-foreground -mt-1 min-h-8"
+            className="md:hidden -ml-2 inline-flex items-center gap-1.5 min-h-11 px-2 rounded-lg font-condensed text-[14px] font-bold uppercase tracking-[0.06em] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <ArrowLeft size={14} /> Eventos
+            <ArrowLeft size={16} aria-hidden /> Eventos
           </button>
         )}
 
@@ -729,55 +779,87 @@ export default function EvaluationsPage() {
         />
 
         {!selectedEventId ? (
-          <NoEventSelected pendingCount={areaList.data && !searchTerm && periodFilter === "cycle" ? areaList.data.totals.pending : null} upcoming={areaList.data?.upcoming ?? []} />
+          <NoEventSelected
+            pendingCount={areaList.data && !searchTerm && periodFilter === "cycle" ? areaList.data.totals.pending : null}
+            upcoming={areaList.data?.upcoming ?? []}
+            next={statusFilter !== "done" ? nextEvent : null}
+            onOpen={selectEvaluatorEvent}
+          />
         ) : eventUnavailable ? (
-          <div data-testid="notice-event-unavailable" className="max-w-lg mx-auto mt-10 text-center bg-card border border-border rounded-xl px-6 py-10">
-            <div className="w-14 h-14 border border-border rounded-lg bg-secondary text-muted-foreground flex items-center justify-center mx-auto mb-4">
-              <SearchX size={24} />
-            </div>
-            <h2 className="text-2xl uppercase font-black tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>
+          <div data-testid="notice-event-unavailable" className="mx-auto max-w-lg pt-6 md:pt-16">
+            <span className={cn("w-12 h-12 rounded-full flex items-center justify-center", unavailableOpens ? "bg-[var(--status-info-bg)] text-[var(--status-info-text)]" : "bg-secondary text-muted-foreground")}>
+              {unavailableOpens ? <CalendarClock size={22} aria-hidden /> : <SearchX size={22} aria-hidden />}
+            </span>
+            <h2 className="font-condensed mt-5 text-[34px] uppercase font-black leading-[0.95] tracking-[-0.02em] text-foreground">
               {unavailableOpens ? "Avaliação ainda não abriu" : "Evento indisponível para você"}
             </h2>
+            {unavailableEvent?.name && unavailableOpens && (
+              <p className="font-condensed mt-2 text-[18px] font-bold uppercase text-muted-foreground">{unavailableEvent.name}</p>
+            )}
             {unavailableOpens && (
-              <p data-testid="notice-event-opens" className="inline-block my-2 rounded-full px-3 py-1 text-[12px] font-bold uppercase" style={{ fontFamily: CONDENSED, backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
-                {unavailableOpens}
+              <p data-testid="notice-event-opens" className="mt-3">
+                <Chip tone="info" icon={CalendarClock} className="h-7 text-[13px]">{unavailableOpens}</Chip>
               </p>
             )}
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="mt-3 text-[15px] text-muted-foreground leading-relaxed">
               {unavailableNextCycle
                 ? NEXT_CYCLE_NOTICE
                 : unavailableOpens
                   ? `A avaliação de ${unavailableEvent?.name ?? "este evento"} abre sozinha no dia seguinte ao fim do evento. Volte a partir dessa data.`
                   : "Este evento não tem nada para você avaliar, ou a avaliação dele ainda não abriu — ela abre sozinha no dia seguinte à realização do evento."}
             </p>
-            <button type="button" onClick={() => setSelectedEventId(null)} className="mt-5 border border-border rounded-lg bg-card px-4 py-2 font-bold text-xs uppercase tracking-wider hover:bg-secondary">
-              Ver meus eventos
+            <button type="button" onClick={() => setSelectedEventId(null)} className={cn(btnSecondary, "mt-6")}>
+              <ArrowLeft size={15} aria-hidden /> Ver meus eventos
             </button>
           </div>
         ) : areaEvent.isError ? (
-          <div role="alert" className="max-w-lg mx-auto mt-10 text-center bg-card border border-border rounded-xl px-6 py-10 space-y-3">
-            <p className="text-sm font-bold text-destructive">Não foi possível abrir este evento.</p>
-            <p className="text-xs text-muted-foreground">{areaEvent.error?.message}</p>
-            <button type="button" onClick={() => { void areaEvent.refetch(); }} className="border border-border rounded-lg bg-card px-4 py-2 font-bold text-xs uppercase tracking-wider hover:bg-secondary">
-              Tentar de novo
-            </button>
+          <div role="alert" className="mx-auto max-w-lg pt-6 md:pt-16">
+            <span className="w-12 h-12 rounded-full bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] flex items-center justify-center"><AlertTriangle size={22} aria-hidden /></span>
+            <h2 className="font-condensed mt-5 text-[34px] uppercase font-black leading-[0.95] tracking-[-0.02em] text-foreground">Não foi possível abrir este evento</h2>
+            <p className="mt-3 text-[15px] text-muted-foreground leading-relaxed">
+              Nada do que você já salvou se perdeu. Confira a conexão e tente de novo.
+              {areaEvent.error?.message ? <span className="block mt-1 text-[13px]">Detalhe: {areaEvent.error.message}</span> : null}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button type="button" onClick={() => { void areaEvent.refetch(); }} disabled={areaEvent.isFetching} className={btnPrimary}>
+                {areaEvent.isFetching ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <RotateCw size={15} aria-hidden />} Tentar de novo
+              </button>
+              <button type="button" onClick={() => setSelectedEventId(null)} className={btnSecondary}>Ver meus eventos</button>
+            </div>
           </div>
         ) : !selectedInfo ? (
-          <div className="space-y-4" role="status" aria-live="polite">
+          <div className="space-y-5" role="status" aria-live="polite">
             <span className="sr-only">Carregando evento…</span>
-            <div className="h-16 rounded-xl bg-secondary animate-pulse" />
-            <div className="h-72 rounded-xl bg-secondary animate-pulse" />
+            <div className="rounded-2xl border border-border bg-card px-5 sm:px-7 py-6 space-y-3" aria-hidden>
+              <div className="h-3 w-32 rounded bg-secondary animate-pulse" />
+              <div className="h-8 w-3/4 rounded bg-secondary animate-pulse" />
+              <div className="h-4 w-1/2 rounded bg-secondary animate-pulse" />
+              <div className="h-14 w-full rounded-xl bg-secondary/70 animate-pulse mt-4" />
+            </div>
+            <div className="grid grid-cols-1 @4xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start" aria-hidden>
+              <div className="rounded-2xl border border-border bg-card px-5 sm:px-7 py-6 space-y-4">
+                <div className="h-7 w-48 rounded bg-secondary animate-pulse" />
+                <div className="grid grid-cols-6 @2xl:grid-cols-11 gap-1.5">
+                  {Array.from({ length: 11 }, (_, i) => <div key={i} className="h-12 rounded-lg bg-secondary animate-pulse" />)}
+                </div>
+                <div className="h-24 w-full rounded-lg bg-secondary animate-pulse" />
+              </div>
+              <div className="hidden @4xl:block rounded-2xl border border-border bg-card p-5 space-y-3">
+                <div className="h-10 w-24 rounded bg-secondary animate-pulse" />
+                <div className="h-2 w-full rounded-full bg-secondary animate-pulse" />
+                <div className="h-4 w-2/3 rounded bg-secondary animate-pulse" />
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="space-y-5">
-            {/* Header strip compacto */}
+          <div className="space-y-5 motion-safe:animate-in motion-safe:fade-in-0 duration-200">
             {/* Evento do próximo ciclo (começa depois do fim do ciclo atual): a
                 API recusa a avaliação (409 EVENT_NEXT_CYCLE) até o ciclo novo existir.
                 Um selo só ("Próximo ciclo") na faixa + a frase única abaixo. */}
-            {currentEvent && <EventHeaderStrip currentEvent={currentEvent} nextCycle={selectedIsNextCycle} />}
+            {currentEvent && <EventHeaderStrip currentEvent={currentEvent} nextCycle={selectedIsNextCycle} currentCycleName={cycle?.name ?? null} />}
 
             {selectedIsNextCycle && (
-              <div role="status" data-testid="notice-event-next-cycle" className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-text)" }}>
+              <div role="status" data-testid="notice-event-next-cycle" className="rounded-xl px-4 py-3 text-[14px] bg-[var(--status-info-bg)] text-[var(--status-info-text)]">
                 {NEXT_CYCLE_NOTICE}
               </div>
             )}
@@ -797,10 +879,9 @@ export default function EvaluationsPage() {
 
             {/* Duas colunas (formulário + resumo) só quando a área de conteúdo
                 tem largura para isso; abaixo disso, o resumo vem depois. */}
-            <div className="grid grid-cols-1 @4xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+            <div className="grid grid-cols-1 @4xl:grid-cols-[minmax(0,1fr)_320px] @7xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
 
-              <div className="space-y-8 min-w-0">
-                {/* Critérios */}
+              <div className="min-w-0">
                 {(() => {
                   // Matriz de Conformidade junto com o formulário da área (Cenografia / Ferramentas).
                   const ferramentasNode = isFerramentasEvaluatorForEvent ? (
@@ -818,6 +899,7 @@ export default function EvaluationsPage() {
                       saveConformity={saveConformity}
                       isSaving={conformityEvalMutation.isPending}
                       toast={toast}
+                      answeredByOther={ferramentasAnsweredByOther}
                     />
                   ) : null;
                   const cenografiaNode = isConformityEvaluatorForEvent ? (
@@ -842,12 +924,13 @@ export default function EvaluationsPage() {
                   const groupAreas = new Set(myAreaGroups.map(g => g.areaId));
                   const matrixByArea = new Map<number, React.ReactNode>();
                   const orphans: React.ReactNode[] = [];
-                  if (cenografiaNode) { if (groupAreas.has(CENOGRAFIA_AREA_ID)) matrixByArea.set(CENOGRAFIA_AREA_ID, cenografiaNode); else orphans.push(<div key="ceno">{cenografiaNode}</div>); }
-                  if (ferramentasNode) { if (groupAreas.has(FERRAMENTAS_AREA_ID)) matrixByArea.set(FERRAMENTAS_AREA_ID, ferramentasNode); else orphans.push(<div key="ferr">{ferramentasNode}</div>); }
+                  if (cenografiaNode) { if (groupAreas.has(CENOGRAFIA_AREA_ID)) matrixByArea.set(CENOGRAFIA_AREA_ID, cenografiaNode); else orphans.push(<div key="ceno" id={`matriz-${CENOGRAFIA_AREA_ID}`} className="scroll-mt-24">{cenografiaNode}</div>); }
+                  if (ferramentasNode) { if (groupAreas.has(FERRAMENTAS_AREA_ID)) matrixByArea.set(FERRAMENTAS_AREA_ID, ferramentasNode); else orphans.push(<div key="ferr" id={`matriz-${FERRAMENTAS_AREA_ID}`} className={cn("scroll-mt-24", orphans.length > 0 && "mt-10 pt-8 border-t border-border")}>{ferramentasNode}</div>); }
                   return (
                 <CriteriaColumn
                   matrixByArea={matrixByArea}
                   matrixOrphans={orphans.length > 0 ? <>{orphans}</> : undefined}
+                  matrixProgress={matrixProgress}
                   myCriteria={myCriteria}
                   myAreaGroups={myAreaGroups}
                   areaMode={areaMode}
@@ -858,8 +941,7 @@ export default function EvaluationsPage() {
                   getEval={getEval}
                   currentScore={currentScore}
                   currentAudio={currentAudio}
-                  isSaving={createMutation.isPending}
-                  progressPct={progressPct}
+                  savingCriterionId={savingCriterionId}
                   criterionInfo={criterionInfo}
                   closingEval={closingEval}
                   onRedirectArea={openRedirectDialog}
@@ -905,26 +987,39 @@ export default function EvaluationsPage() {
                 launchCriteria={launchCriteria}
                 withoutConduta={withoutConduta}
                 cenografiaByOther={cenografiaAnsweredByOther ? (cenografiaAnsweredByOther.name ?? "outra pessoa") : null}
+                firstPendingId={firstPendingId}
+                cenografiaAnchor={isConformityEvaluatorForEvent ? `matriz-${CENOGRAFIA_AREA_ID}` : undefined}
+                ferramentasAnchor={isFerramentasEvaluatorForEvent ? `matriz-${FERRAMENTAS_AREA_ID}` : undefined}
               />
             </div>
 
             {/* Celular: o botão de lançar fica fixo no rodapé (o resumo vem
                 depois do formulário). */}
             {isEvaluator && myCriteria.length > 0 && !allEvaled && (
-              <div className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+              <div className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur-sm px-4 pt-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)]">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-[13px] text-muted-foreground"><b className="font-condensed text-[15px] font-black text-foreground tabular-nums">{totalCompleted} de {totalItems}</b> itens concluídos</span>
+                  <span className="flex-1 max-w-[40%] h-1.5 rounded-full bg-secondary overflow-hidden" aria-hidden>
+                    <span className="block h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+                  </span>
+                </div>
                 {allReady ? (
                   <button
                     type="button"
                     data-testid="button-submit-eval-mobile"
                     onClick={() => setConfirmLaunchOpen(true)}
                     disabled={launching}
-                    className="w-full min-h-12 bg-primary text-primary-foreground border border-primary rounded-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
+                    className={cn(btnPrimary, "w-full min-h-12 text-[15px]")}
                   >
-                    <Rocket size={16} /> Lançar Avaliação
+                    {launching ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Rocket size={16} aria-hidden />} Lançar avaliação
                   </button>
                 ) : (
-                  <button type="button" disabled className="w-full min-h-12 bg-secondary border border-border rounded-lg font-bold text-sm uppercase tracking-wider opacity-70 cursor-not-allowed">
-                    {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
+                  <button
+                    type="button"
+                    onClick={() => { if (firstPendingId != null) scrollToItem(`crit-${firstPendingId}`); }}
+                    className={cn(btnSecondary, "w-full min-h-12 text-[15px]")}
+                  >
+                    {missingLabel(pendingToFill)} <span className="text-muted-foreground font-bold">· ir</span> <ArrowDown size={15} aria-hidden />
                   </button>
                 )}
               </div>
@@ -934,6 +1029,29 @@ export default function EvaluationsPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={pendingDiscard != null} onOpenChange={(o) => { if (!o && !discardDraft.isPending) setPendingDiscard(null); }}>
+        <AlertDialogContent className={dialogCls} data-testid="dialog-discard-draft">
+          <DialogHeading
+            icon={Trash2}
+            tone="danger"
+            Title={AlertDialogTitle}
+            Description={AlertDialogDescription}
+            title="Descartar rascunho?"
+            description={<>O seu rascunho de <b className="font-semibold text-foreground">{discardName || "este critério"}</b> não vale mais — a área já respondeu. Descartar apaga o rascunho de vez.</>}
+          />
+          <AlertDialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+            <AlertDialogCancel disabled={discardDraft.isPending} className={cn(btnSecondary, "mt-0")}>Manter</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDiscardDraft(); }}
+              disabled={discardDraft.isPending}
+              className={cn(btnPrimary, "bg-destructive text-destructive-foreground")}
+            >
+              {discardDraft.isPending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Trash2 size={15} aria-hidden />} Descartar rascunho
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RedirectFormDialog
         area={redirectDialogArea}

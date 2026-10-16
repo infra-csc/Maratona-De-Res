@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import type { Evaluation, EventCriterion } from "@workspace/api-client-react";
-import { CheckCircle, Lock, Rocket } from "lucide-react";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
-import { CONDENSED, AMBER_TEXT } from "@/lib/premium-theme";
-import { plural } from "@/lib/utils";
+import { CheckCircle2, Lock, Rocket, Loader2, ArrowDown, ShieldCheck, AlertCircle } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { cn, plural } from "@/lib/utils";
 import { displayCriterionName } from "./helpers";
+import { DialogHeading, Eyebrow, btnPrimary, btnSecondary, btnGhost, dialogCls, scrollToItem } from "./ui";
 import type { ConformityEvalForm } from "./types";
 
 interface CriteriaScoreProps {
@@ -20,68 +21,73 @@ interface ConfirmLaunchDialogProps extends CriteriaScoreProps {
   toSubmitCount: number;
   eventName: string | undefined;
   onLaunch: () => void;
+  /** A Matriz deste evento ainda tem item sem resposta (o lançamento não a envia). */
+  matrixPending?: boolean;
 }
 
-// Modal de confirmação do "Lançar Avaliação" (submete e bloqueia as notas).
+/** "Falta 1 critério" / "Faltam 2 critérios". */
+export function missingLabel(n: number) {
+  return n === 1 ? "Falta 1 critério" : `Faltam ${plural(n, "critério", "critérios")}`;
+}
+
+// Modal de confirmação do "Lançar avaliação" (envia e bloqueia as notas).
 export function ConfirmLaunchDialog({
-  open, onOpenChange, launching, toSubmitCount, eventName, onLaunch, isEvaluator, myCriteria, getEval, currentScore,
+  open, onOpenChange, launching, toSubmitCount, eventName, onLaunch, isEvaluator, myCriteria, getEval, currentScore, matrixPending,
 }: ConfirmLaunchDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(o) => { if (!launching) onOpenChange(o); }}>
-      <AlertDialogContent className="rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }} data-testid="dialog-confirm-launch">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Rocket size={22} className="text-accent-text" /> Confirmar lançamento
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            Você está prestes a lançar {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
-            {" "}<strong>{eventName}</strong>. Após o lançamento, as notas ficam
-            {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+      <AlertDialogContent className={dialogCls} data-testid="dialog-confirm-launch">
+        <DialogHeading
+          icon={Rocket}
+          tone="brand"
+          Title={AlertDialogTitle}
+          Description={AlertDialogDescription}
+          title="Confirmar lançamento"
+          description={<>
+            {toSubmitCount === 1 ? "1 nota" : `${plural(toSubmitCount, "nota", "notas")}`} para <b className="font-semibold text-foreground">{eventName}</b>.
+            Depois de lançadas, as notas ficam <b className="font-semibold text-foreground">bloqueadas para edição</b> e compõem a nota final da equipe.
+          </>}
+        />
         {isEvaluator && myCriteria.length > 0 && (
-          <div className="border border-border rounded-lg bg-secondary p-4 max-h-60 overflow-y-auto">
-            <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Resumo das Notas</p>
-            <div className="space-y-2">
+          <div>
+            <Eyebrow className="mb-2">Notas que serão lançadas</Eyebrow>
+            <ul className="rounded-xl border border-border divide-y divide-border max-h-60 overflow-y-auto">
               {myCriteria.map(c => {
                 const ev = getEval(c.criterionId);
                 const score = currentScore(c.criterionId);
-                const hasScore = score != null;
                 const isSubmitted = ev?.status === "submitted";
-                const isDraft = ev?.status === "draft";
                 return (
-                  <div key={c.criterionId} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
-                      {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
-                      {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
-                    </div>
-                    {hasScore ? (
-                      <span className="shrink-0 text-sm font-black text-accent-text">{score}<span className="text-[11px] text-muted-foreground">/10</span></span>
-                    ) : (
-                      <span className="shrink-0 text-sm font-black text-muted-foreground/50">—</span>
-                    )}
-                  </div>
+                  <li key={c.criterionId} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <span className="text-[14px] font-semibold text-foreground min-w-0 break-words leading-snug flex items-center gap-2">
+                      {displayCriterionName(c.criterionName)}
+                      {isSubmitted && <Lock size={12} aria-label="já lançado" className="shrink-0 text-muted-foreground" />}
+                    </span>
+                    <span className="font-condensed shrink-0 text-[20px] font-black leading-none tabular-nums text-foreground">
+                      {score != null ? <>{score}<span className="text-[13px] text-muted-foreground font-bold">/10</span></> : <span className="text-muted-foreground">—</span>}
+                    </span>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         )}
-        <AlertDialogFooter>
-          <AlertDialogCancel
-            disabled={launching}
-            data-testid="button-cancel-launch"
-            className="border border-border rounded-lg font-bold uppercase text-xs tracking-wider"
-          >
+        {matrixPending && (
+          <p className="rounded-lg bg-[var(--status-warn-bg)] px-3.5 py-2.5 text-[13px] text-[var(--status-warn-text)] font-semibold flex items-start gap-2">
+            <ShieldCheck size={14} aria-hidden className="mt-0.5 shrink-0" />
+            A Matriz de Conformidade ainda tem itens sem resposta. Ela não vai junto: o evento continua aberto até você terminá-la.
+          </p>
+        )}
+        <AlertDialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <AlertDialogCancel disabled={launching} data-testid="button-cancel-launch" className={cn(btnSecondary, "mt-0")}>
             Voltar
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => { e.preventDefault(); onLaunch(); }}
             disabled={launching}
             data-testid="button-confirm-launch"
-            className="border border-border rounded-lg bg-primary text-primary-foreground font-bold uppercase text-xs tracking-wider hover:opacity-90 disabled:opacity-60"
+            className={btnPrimary}
           >
-            {launching ? "Lançando..." : "Lançar agora"}
+            {launching ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Lançando...</> : "Lançar agora"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -113,180 +119,200 @@ interface EvaluationSummaryPanelProps extends Omit<ConfirmLaunchDialogProps, "op
   withoutConduta: boolean;
   /** Matriz de Cenografia respondida por OUTRA pessoa: não é pendência minha; vazio = "não respondida". */
   cenografiaByOther?: string | null;
+  /** Primeiro critério que falta preencher (atalho "Ir para o que falta"). */
+  firstPendingId?: number | null;
+  /** Ids das âncoras da matriz (pular do resumo para a pergunta). */
+  cenografiaAnchor?: string;
+  ferramentasAnchor?: string;
 }
 
-// Painel "Resumo da Avaliação": progresso, resumo das notas (critérios +
-// perguntas da matriz) e o fluxo de lançamento. No celular e em telas médias
-// ele vem DEPOIS do formulário, e o botão de lançar fica fixo no rodapé.
+function Row({ label, value, onClick, muted, testId, sub }: { label: ReactNode; value: ReactNode; onClick?: () => void; muted?: boolean; testId?: string; sub?: ReactNode }) {
+  const body = (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-[14px] leading-snug break-words", muted ? "text-muted-foreground" : "text-foreground font-semibold")}>{label}</span>
+        {sub}
+      </span>
+      <span className="shrink-0 text-right">{value}</span>
+    </>
+  );
+  return (
+    <li data-testid={testId}>
+      {onClick ? (
+        <button type="button" onClick={onClick} className="w-full flex items-start justify-between gap-3 rounded-lg px-2 -mx-2 py-1.5 text-left transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {body}
+        </button>
+      ) : (
+        <div className="flex items-start justify-between gap-3 py-1.5">{body}</div>
+      )}
+    </li>
+  );
+}
+
+const pendingTag = (label = "pendente") => <span className="font-condensed text-[13px] font-bold uppercase tracking-[0.05em] text-[var(--status-warn-text)]">{label}</span>;
+const scoreTag = (n: number) => <span className="font-condensed text-[20px] font-black leading-none tabular-nums text-foreground">{n}<span className="text-[13px] text-muted-foreground font-bold">/10</span></span>;
+
+// Painel "Resumo da avaliação": progresso, o que falta (critérios + matriz),
+// atalhos para cada item e o lançamento. No celular e em telas médias vem
+// DEPOIS do formulário, e o botão de lançar fica fixo no rodapé.
 export function EvaluationSummaryPanel({
   isEvaluator, myCriteria, getEval, currentScore, comments, progressPct, totalItems, totalCompleted, completedCount,
   extraConformityItemsTotal, extraConformityItemsCompleted, isFerramentasEvaluatorForEvent, isConformityEvaluatorForEvent,
   conformityEvalForm, allEvaled, allReady, pendingToFill, launching, confirmLaunchOpen, setConfirmLaunchOpen,
-  toSubmitCount, eventName, onLaunch, closedNames, launchCriteria, withoutConduta, cenografiaByOther,
+  toSubmitCount, eventName, onLaunch, closedNames, launchCriteria, withoutConduta, cenografiaByOther, firstPendingId,
+  cenografiaAnchor, ferramentasAnchor,
 }: EvaluationSummaryPanelProps) {
-  // Item da matriz que ficou vazio: pendência minha (âmbar) ou, se a matriz foi
-  // respondida por outra pessoa, só "não respondida" (neutro).
-  const emptyMark = (label = "pendente") => cenografiaByOther !== undefined && cenografiaByOther !== null
-    ? <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">não respondida</span>
-    : <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>{label}</span>;
+  const byOther = cenografiaByOther !== undefined && cenografiaByOther !== null;
+  // Item da matriz vazio: pendência minha (âmbar) ou, se a matriz foi respondida por outra pessoa, só "não respondida".
+  const emptyMark = () => byOther ? <span className="text-[13px] text-muted-foreground">não respondida</span> : pendingTag();
   // Tudo respondido por OUTRA pessoa da área (e nenhuma matriz minha): não é
   // "sua avaliação" nem "100%" — é "respondido pela área".
   const allByOthers = myCriteria.length > 0 && extraConformityItemsTotal === 0
     && !!closedNames && myCriteria.every(c => closedNames.has(c.criterionId));
-  return (
-    <div className="@4xl:sticky @4xl:top-4 space-y-6">
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="bg-secondary px-5 py-4 border-b border-border">
-          <h3 className="text-lg font-black uppercase tracking-tight text-foreground" style={{ fontFamily: CONDENSED }}>Resumo da Avaliação</h3>
-          <p className="text-[11px] font-bold uppercase text-muted-foreground" data-testid="summary-subtitle">{allByOthers ? "Respondido pela área" : "Sua avaliação para este evento"}</p>
-        </div>
+  const pct = Math.round(progressPct);
+  const matrixPending = extraConformityItemsCompleted < extraConformityItemsTotal;
+  const yesNo = (v: boolean | null, neutral = false) => v === null ? emptyMark()
+    : <span className={cn("font-condensed text-[15px] font-black uppercase", v ? "text-foreground" : neutral ? "text-foreground" : "text-[var(--status-danger-text)]")}>{v ? "Sim" : "Não"}</span>;
 
-        {allByOthers ? (
-          <div className="p-5 border-b-2 border-border" data-testid="summary-answered-by-area">
-            <p className="text-[12px] text-muted-foreground leading-snug">
+  return (
+    <aside aria-label="Resumo da avaliação" className="@4xl:sticky @4xl:top-4">
+      <div className="rounded-2xl border border-border bg-card">
+        <div className="px-5 pt-5 pb-4">
+          <h3 className="font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Resumo da avaliação</h3>
+          <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="summary-subtitle">{allByOthers ? "Respondido pela área" : "Sua avaliação para este evento"}</p>
+
+          {allByOthers ? (
+            <p className="mt-4 text-[14px] text-foreground leading-relaxed" data-testid="summary-answered-by-area">
               {myCriteria.length === 1
                 ? "O critério deste evento já foi respondido por outra pessoa da sua área. Nada a enviar por você."
                 : `Os ${myCriteria.length} critérios deste evento já foram respondidos pela sua área. Nada a enviar por você.`}
             </p>
-          </div>
-        ) : (
-        <div className="p-5 border-b-2 border-border">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
-            <span className="text-sm font-black text-accent-text">{Math.round(progressPct)}%</span>
-          </div>
-          <div className="w-full bg-secondary border border-border h-2.5 mb-2">
-            <div className="bg-accent h-full transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {extraConformityItemsTotal > 0
-              ? `${totalCompleted} de ${plural(totalItems, "item concluído", "itens concluídos")} — ${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")} e ${cenografiaByOther ? `matriz respondida por ${cenografiaByOther}.` : `${extraConformityItemsCompleted} de ${plural(extraConformityItemsTotal, "pergunta da matriz respondida", "perguntas da matriz respondidas")}.`}`
-              : `${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")}${closedNames && closedNames.size > 0 ? ` (${closedNames.size} ${closedNames.size === 1 ? "fechado por quem respondeu primeiro" : "fechados por quem respondeu primeiro"})` : ""}.`}
-          </p>
-        </div>
-        )}
-
-        {/* Grade summary — evaluators only. Includes both scored
-            criteria AND the extra Sim/Não questions from the
-            Matriz de Conformidade (Ferramentas e Case / Cenografia),
-            so nothing an avaliador has to fill out is left off the
-            summary. */}
-        {isEvaluator && (myCriteria.length > 0 || extraConformityItemsTotal > 0) && (
-          <div className="p-5 border-b-2 border-border">
-            <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Resumo das Notas</p>
-            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-              {myCriteria.map(c => {
-                const ev = getEval(c.criterionId);
-                const score = currentScore(c.criterionId);
-                const hasScore = score != null;
-                const isSubmitted = ev?.status === "submitted";
-                const isDraft = ev?.status === "draft";
-                const commentText = comments[c.criterionId] ?? ev?.comments ?? "";
-                const missingComment = !isSubmitted && hasScore && !commentText.trim();
-                const closedBy = closedNames?.get(c.criterionId);
-                if (closedBy != null) {
-                  return (
-                    <div key={c.criterionId} className="flex items-start justify-between gap-3" data-testid={`summary-closed-${c.criterionId}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-bold uppercase text-muted-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
-                        <Lock size={11} className="shrink-0 text-muted-foreground" aria-label="Fechado" />
-                      </div>
-                      <span className="shrink-0 text-right text-[11px] font-bold text-muted-foreground max-w-[55%] leading-snug" title={`Respondido por ${closedBy.name}`}>
-                        {closedBy.score != null && <span className="text-sm font-black text-foreground">{closedBy.score}</span>}
-                        {closedBy.score != null ? " · " : ""}por {closedBy.name}
-                      </span>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={c.criterionId} className="space-y-0.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{displayCriterionName(c.criterionName)}</span>
-                        {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
-                        {isDraft && !isSubmitted && <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>rascunho</span>}
-                      </div>
-                      {hasScore ? (
-                        <span className="shrink-0 text-sm font-black text-accent-text">{score}<span className="text-[11px] text-muted-foreground">/10</span></span>
-                      ) : (
-                        <span className="shrink-0 text-sm font-black text-muted-foreground/50">—</span>
-                      )}
-                    </div>
-                    {missingComment && (
-                      <p className="text-[11px] font-bold uppercase text-destructive">Falta preencher o comentário</p>
-                    )}
-                  </div>
-                );
-              })}
-              {isFerramentasEvaluatorForEvent && (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">Guarda de Equipamentos</span>
-                  {conformityEvalForm.guardaEquipamentos === null ? (
-                    <span className="shrink-0 text-[11px] font-black uppercase tracking-wide" style={{ color: AMBER_TEXT }}>pendente</span>
-                  ) : (
-                    <span className={`shrink-0 text-sm font-black ${conformityEvalForm.guardaEquipamentos ? "text-accent-text" : "text-destructive"}`}>{conformityEvalForm.guardaEquipamentos ? "Sim" : "Não"}</span>
-                  )}
-                </div>
-              )}
-              {isConformityEvaluatorForEvent && [
-                { label: "EPI", val: conformityEvalForm.epi },
-                { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
-                ...(withoutConduta ? [] : [{ label: "Conduta", val: conformityEvalForm.conduta }]),
-                // Destaque não é conformidade: "Não" é a resposta comum, não uma falha.
-                { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse, neutral: true },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">{item.label}</span>
-                  {item.val === null ? (
-                    emptyMark()
-                  ) : (
-                    <span className={`shrink-0 text-sm font-black ${item.val ? "text-accent-text" : "neutral" in item ? "text-foreground" : "text-destructive"}`}>{item.val ? "Sim" : "Não"}</span>
-                  )}
-                </div>
-              ))}
-              {isConformityEvaluatorForEvent && (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase text-foreground min-w-0 break-words leading-snug">Faltas/Atrasos</span>
-                  {conformityEvalForm.absencesReport.trim() ? (
-                    <span className="shrink-0 text-sm font-black text-accent-text">Respondido</span>
-                  ) : emptyMark()}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Link Freelancer — movido para o cabeçalho de cada formulário/área */}
-
-        {/* Submission — evaluators only */}
-        {isEvaluator && myCriteria.length > 0 && (
-          <div className="p-5">
-            {/* No celular o botão de lançar é o fixo do rodapé — aqui só no tablet/computador. */}
-            {allEvaled ? (
-              <div className="flex items-center justify-center gap-2 text-accent-text bg-accent/15 border border-accent rounded-lg p-3 font-bold uppercase text-sm">
-                <CheckCircle size={16} /> {closedNames && closedNames.size === myCriteria.length ? "Sua área já respondeu este evento" : "Você já concluiu sua avaliação"}
+          ) : (
+            <>
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <p className="font-condensed leading-none text-foreground">
+                  <span className="text-[40px] font-black tabular-nums">{totalCompleted}</span>
+                  <span className="text-[20px] font-bold text-muted-foreground"> de {totalItems}</span>
+                  <span className="font-body text-[13px] font-semibold text-muted-foreground"> {totalItems === 1 ? "item concluído" : "itens concluídos"}</span>
+                </p>
+                <span className="font-condensed text-[15px] font-bold tabular-nums text-muted-foreground mb-1">{pct}%</span>
               </div>
-            ) : allReady ? (
-              <button
-                data-testid="button-submit-eval"
-                type="button"
-                onClick={() => setConfirmLaunchOpen(true)}
-                disabled={launching}
-                className="hidden md:flex w-full bg-primary text-primary-foreground border border-primary rounded-lg py-4 font-bold text-sm uppercase tracking-wider items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
-              >
-                <Rocket size={16} /> Lançar Avaliação
-              </button>
+              <div role="progressbar" aria-label="Itens concluídos" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="mt-2.5 h-2 rounded-full bg-secondary overflow-hidden">
+                <div className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${progressPct}%` }} />
+              </div>
+              <p className="mt-2.5 text-[13px] text-muted-foreground leading-snug">
+                {extraConformityItemsTotal > 0
+                  ? `${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")} e ${byOther ? `matriz respondida por ${cenografiaByOther}.` : `${extraConformityItemsCompleted} de ${plural(extraConformityItemsTotal, "pergunta da matriz respondida", "perguntas da matriz respondidas")}.`}`
+                  : `${completedCount} de ${plural(myCriteria.length, "critério respondido", "critérios respondidos")}${closedNames && closedNames.size > 0 ? ` (${closedNames.size} ${closedNames.size === 1 ? "fechado por quem respondeu primeiro" : "fechados por quem respondeu primeiro"})` : ""}.`}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Itens: critérios + perguntas da Matriz (nada do que o avaliador
+            responde fica de fora). Cada linha pula para o item. */}
+        {isEvaluator && (myCriteria.length > 0 || extraConformityItemsTotal > 0) && (
+          <div className="px-5 py-4 border-t border-border space-y-4">
+            {myCriteria.length > 0 && (
+              <div>
+                <Eyebrow className="mb-1.5">Critérios</Eyebrow>
+                <ul>
+                  {myCriteria.map(c => {
+                    const ev = getEval(c.criterionId);
+                    const score = currentScore(c.criterionId);
+                    const isSubmitted = ev?.status === "submitted";
+                    const isDraft = ev?.status === "draft";
+                    const commentText = comments[c.criterionId] ?? ev?.comments ?? "";
+                    const missingComment = !isSubmitted && score != null && !commentText.trim();
+                    const closedBy = closedNames?.get(c.criterionId);
+                    const go = () => scrollToItem(`crit-${c.criterionId}`);
+                    if (closedBy != null) {
+                      return (
+                        <Row key={c.criterionId} testId={`summary-closed-${c.criterionId}`} onClick={go} muted
+                          label={<span className="inline-flex items-center gap-1.5">{displayCriterionName(c.criterionName)} <Lock size={12} aria-label="Fechado" /></span>}
+                          sub={<span className="block text-[12px] text-muted-foreground" title={`Respondido por ${closedBy.name}`}>por {closedBy.name}</span>}
+                          value={closedBy.score != null ? scoreTag(closedBy.score) : <span className="text-[13px] text-muted-foreground">fechado</span>}
+                        />
+                      );
+                    }
+                    return (
+                      <Row key={c.criterionId} onClick={go}
+                        label={<span className="inline-flex items-center gap-1.5">{displayCriterionName(c.criterionName)}{isSubmitted && <Lock size={12} aria-label="Lançado" className="text-muted-foreground" />}</span>}
+                        sub={missingComment
+                          ? <span className="block text-[12px] font-semibold text-[var(--status-danger-text)]">Falta preencher o comentário</span>
+                          : isDraft ? <span className="block text-[12px] text-[var(--status-warn-text)]">rascunho</span>
+                          : isSubmitted ? <span className="block text-[12px] text-muted-foreground">lançado</span> : undefined}
+                        value={score != null ? scoreTag(score) : pendingTag("sem nota")}
+                      />
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {(isFerramentasEvaluatorForEvent || isConformityEvaluatorForEvent) && (
+              <div>
+                <Eyebrow className="mb-1.5">Matriz de Conformidade</Eyebrow>
+                <ul>
+                  {isFerramentasEvaluatorForEvent && (
+                    <Row label="Guarda de Equipamentos" onClick={ferramentasAnchor ? () => scrollToItem(ferramentasAnchor) : undefined}
+                      value={conformityEvalForm.guardaEquipamentos === null ? pendingTag() : yesNo(conformityEvalForm.guardaEquipamentos)} />
+                  )}
+                  {isConformityEvaluatorForEvent && [
+                    { label: "EPI", val: conformityEvalForm.epi },
+                    { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
+                    ...(withoutConduta ? [] : [{ label: "Conduta", val: conformityEvalForm.conduta }]),
+                    // Destaque não é conformidade: "Não" é a resposta comum, não uma falha.
+                    { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse, neutral: true },
+                  ].map(item => (
+                    <Row key={item.label} label={item.label} onClick={cenografiaAnchor ? () => scrollToItem(cenografiaAnchor) : undefined}
+                      value={yesNo(item.val, "neutral" in item)} />
+                  ))}
+                  {isConformityEvaluatorForEvent && (
+                    <Row label="Faltas/Atrasos" onClick={cenografiaAnchor ? () => scrollToItem(cenografiaAnchor) : undefined}
+                      value={conformityEvalForm.absencesReport.trim() ? <span className="font-condensed text-[15px] font-black uppercase text-foreground">Respondido</span> : emptyMark()} />
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lançamento — só avaliador */}
+        {isEvaluator && myCriteria.length > 0 && (
+          <div className="px-5 pb-5 pt-4 border-t border-border">
+            {allEvaled ? (
+              <div role="status" className="flex items-center gap-2.5 rounded-xl bg-[var(--status-ok-bg)] px-4 py-3 text-[var(--status-ok-text)]">
+                <CheckCircle2 size={18} aria-hidden className="shrink-0" />
+                <span className="font-condensed text-[15px] font-bold uppercase tracking-[0.04em] leading-tight">
+                  {closedNames && closedNames.size === myCriteria.length ? "Sua área já respondeu este evento" : "Você já concluiu sua avaliação"}
+                </span>
+              </div>
             ) : (
-              <button type="button" disabled className="hidden md:block w-full bg-secondary border border-border rounded-lg py-4 font-bold text-sm uppercase tracking-wider opacity-60 cursor-not-allowed">
-                {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
-              </button>
+              <div className="hidden md:block">
+                {allReady ? (
+                  <button data-testid="button-submit-eval" type="button" onClick={() => setConfirmLaunchOpen(true)} disabled={launching} className={cn(btnPrimary, "w-full min-h-12 text-[15px]")}>
+                    {launching ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Rocket size={16} aria-hidden />} Lançar avaliação
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" disabled className={cn(btnPrimary, "w-full min-h-12 text-[15px]")}>
+                      <AlertCircle size={16} aria-hidden /> {missingLabel(pendingToFill)}
+                    </button>
+                    {firstPendingId != null && (
+                      <button type="button" onClick={() => scrollToItem(`crit-${firstPendingId}`)} className={cn(btnGhost, "w-full mt-1.5")}>
+                        <ArrowDown size={14} aria-hidden /> Ir para o que falta
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             {!allEvaled && (
-              <p className="text-[11px] text-center text-muted-foreground md:mt-3 leading-relaxed">
+              <p className="text-[13px] text-muted-foreground mt-3 leading-relaxed">
                 {allReady
-                  ? <>Ao lançar, suas notas são <strong>lançadas e bloqueadas</strong>. Salvar rascunho é opcional.</>
-                  : <>Dê nota e preencha o comentário de cada critério (o áudio é opcional). <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
+                  ? <>Ao lançar, as notas são enviadas e <b className="font-semibold text-foreground">bloqueadas</b>.{matrixPending ? " A Matriz é salva a cada resposta, à parte." : ""}</>
+                  : <>Cada critério precisa de nota e justificativa (o áudio é opcional). Rascunho é opcional — dá para lançar direto.</>}
               </p>
             )}
 
@@ -301,10 +327,11 @@ export function EvaluationSummaryPanel({
               myCriteria={launchCriteria}
               getEval={getEval}
               currentScore={currentScore}
+              matrixPending={matrixPending && !byOther}
             />
           </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }

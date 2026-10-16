@@ -1,13 +1,22 @@
-import { plural } from "@/lib/utils";
 import type { Dispatch, SetStateAction } from "react";
-import { ClipboardCheck, CheckCircle2 } from "lucide-react";
-import { CONDENSED, AMBER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
+import { BellRing, CheckCircle2, ClipboardCheck, ListChecks, UsersRound } from "lucide-react";
+import { cn, plural } from "@/lib/utils";
 import { initials } from "./helpers";
 import { EventCombobox } from "./pickers";
+import { Chip, EmptyBlock, Eyebrow, Segmented, btnPrimary, btnSmall, surfaceCls } from "./console-ui";
 import type { ToastFn } from "./use-event-mutations";
 import type { AreaResponderRow, ConsoleView, EnrichedEvent, EvaluatorsScope, EventEvaluatorCard, GlobalEvaluatorCard } from "./types";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
+const small = cn(btnSmall, "min-h-11 lg:min-h-8 px-2.5 text-[12.5px]");
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span aria-hidden className="w-9 h-9 rounded-full bg-secondary text-foreground inline-flex items-center justify-center shrink-0 font-condensed text-[13px] font-black">
+      {initials(name)}
+    </span>
+  );
+}
 
 /**
  * Ciclo por área: quem respondeu, agrupado por área — nome, quantos critérios
@@ -17,40 +26,35 @@ type SetState<T> = Dispatch<SetStateAction<T>>;
 function AreaRespondersList({ rows, scope }: { rows: AreaResponderRow[]; scope: EvaluatorsScope }) {
   if (rows.length === 0) {
     return (
-      <div data-testid="area-responders-empty" className="text-center py-12 px-6 rounded-xl space-y-1.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>
-          {scope === "all" ? "Ninguém respondeu ainda neste ciclo" : "Ninguém respondeu ainda neste evento"}
-        </p>
-        <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>No ciclo por área, qualquer avaliador da área responde. Quem enviar aparece aqui, com a área e os critérios.</p>
+      <div className={surfaceCls}>
+        <EmptyBlock icon={UsersRound} testId="area-responders-empty" title={scope === "all" ? "Ninguém respondeu ainda neste ciclo" : "Ninguém respondeu ainda neste evento"}>
+          No ciclo por área, qualquer avaliador da área responde. Quem enviar aparece aqui, com a área e os critérios.
+        </EmptyBlock>
       </div>
     );
   }
   const areas = [...new Set(rows.map(r => r.area))];
   return (
-    <div className="space-y-4" data-testid="area-responders">
+    <div className="grid gap-4 xl:grid-cols-2 items-start" data-testid="area-responders">
       {areas.map(area => {
         const list = rows.filter(r => r.area === area);
         return (
-          <section key={area} className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-            <h3 className="px-4 py-2.5 text-[11px] font-black uppercase tracking-wide flex items-center justify-between gap-2" style={{ fontFamily: CONDENSED, backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-              <span>{area}</span>
-              <span>{plural(list.reduce((n, r) => n + r.answered, 0), "critério respondido", "critérios respondidos")}</span>
+          <section key={area} className={cn(surfaceCls, "overflow-hidden")} aria-label={`Área ${area}`}>
+            <h3 className="px-4 py-3 flex items-baseline justify-between gap-2 border-b border-border">
+              <span className="font-condensed text-[17px] font-black uppercase leading-tight text-foreground">{area}</span>
+              <span className="text-[12.5px] text-muted-foreground">{plural(list.reduce((n, r) => n + r.answered, 0), "critério respondido", "critérios respondidos")}</span>
             </h3>
-            <ul>
+            <ul className="divide-y divide-border">
               {list.map(r => (
-                <li key={r.key} className="px-4 py-3 flex items-start gap-3" style={{ borderTop: "1px solid var(--border)" }} data-testid="area-responder-row">
-                  <span className="w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-                    <span className="font-black text-[12px]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{initials(r.name)}</span>
-                  </span>
+                <li key={r.key} className="px-4 py-3 flex items-start gap-3" data-testid="area-responder-row">
+                  <Avatar name={r.name} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                      <span className="font-black uppercase text-[14px] leading-tight break-words" style={{ fontFamily: CONDENSED }}>{r.name}</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: GOOD_TEXT }}>
-                        <CheckCircle2 size={11} aria-hidden /> {plural(r.answered, "critério respondido", "critérios respondidos")}
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <span className="text-[14.5px] font-semibold text-foreground break-words">{r.name}</span>
+                      <Chip tone="ok" icon={CheckCircle2}>{plural(r.answered, "critério", "critérios")}</Chip>
                     </div>
                     {scope === "all" && (
-                      <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--muted-foreground)" }}>
+                      <p className="text-[12.5px] mt-1 leading-snug text-muted-foreground break-words">
                         {plural(r.events.length, "evento", "eventos")}: {r.events.map(e => e.name).join(" · ")}
                       </p>
                     )}
@@ -62,6 +66,41 @@ function AreaRespondersList({ rows, scope }: { rows: AreaResponderRow[]; scope: 
         );
       })}
     </div>
+  );
+}
+
+/** Uma linha de avaliador (fluxo antigo): progresso, pendências e ações. */
+function EvaluatorRow({ name, sub, submitted, assigned, pct, label, pendingEvents, onCharge, onSeeCriteria }: {
+  name: string; sub: string; submitted: number; assigned: number; pct: number; label: string;
+  pendingEvents?: { id: number; name: string }[]; onCharge: () => void; onSeeCriteria: () => void;
+}) {
+  const done = submitted >= assigned;
+  return (
+    <li className="px-4 py-3.5 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] md:items-center">
+      <div className="flex items-center gap-3 min-w-0">
+        <Avatar name={name} />
+        <div className="min-w-0">
+          <p className="text-[14.5px] font-semibold text-foreground truncate">{name}</p>
+          <p className="text-[12.5px] text-muted-foreground truncate">{sub}</p>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2.5">
+          <span className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden" aria-hidden>
+            <span className={cn("block h-full rounded-full", done ? "bg-[var(--status-ok)]" : "bg-[var(--status-warn)]")} style={{ width: `${pct}%` }} />
+          </span>
+          <span className="font-condensed text-[13px] font-bold tabular-nums text-muted-foreground shrink-0">{submitted}/{assigned}</span>
+          <Chip tone={done ? "ok" : "warn"}>{label}</Chip>
+        </div>
+        {pendingEvents && pendingEvents.length > 0 && (
+          <p className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground"><b className="font-semibold text-foreground">Falta:</b> {pendingEvents.map(e => e.name).join(" · ")}</p>
+        )}
+      </div>
+      <div className="flex gap-1.5 md:justify-end">
+        <button type="button" onClick={onCharge} className={small}><BellRing size={13} aria-hidden /> Cobrar</button>
+        <button type="button" onClick={onSeeCriteria} className={small}><ListChecks size={13} aria-hidden /> Ver critérios</button>
+      </div>
+    </li>
   );
 }
 
@@ -89,159 +128,63 @@ export function EvaluatorsView(props: {
   } = props;
   const responders = evaluatorsScope === "all" ? globalAreaResponders : eventAreaResponders;
   return (
-    <div>
-      {/* Toggle Todos / Este Evento */}
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-          <button
-            type="button"
-            onClick={() => setEvaluatorsScope("all")}
-            className="px-3 py-1.5 text-[11px] font-bold uppercase transition-colors"
-            style={{ backgroundColor: evaluatorsScope === "all" ? "var(--primary)" : "transparent", color: evaluatorsScope === "all" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
-          >
-            Todos os eventos
-          </button>
-          <button
-            type="button"
-            onClick={() => setEvaluatorsScope("event")}
-            className="px-3 py-1.5 text-[11px] font-bold uppercase transition-colors"
-            style={{ borderLeft: "1px solid var(--border)", backgroundColor: evaluatorsScope === "event" ? "var(--primary)" : "transparent", color: evaluatorsScope === "event" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
-          >
-            Este evento
-          </button>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+        <Segmented<EvaluatorsScope>
+          label="Abrangência"
+          value={evaluatorsScope}
+          onChange={setEvaluatorsScope}
+          options={[{ value: "all", label: "Todos os eventos" }, { value: "event", label: "Este evento" }]}
+        />
         {evaluatorsScope === "event" && (
           <EventCombobox events={enrichedEvents} value={selected?.id ?? null} onChange={setSelectedEventId} />
         )}
-        {evaluatorsScope === "all" && !areaMode && (
-          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-            {plural(globalEvaluatorCards.length, "avaliador", "avaliadores")} · {globalEvaluatorCards.filter(c => c.submitted < c.assigned).length} com pendência
-          </span>
-        )}
-        {areaMode && (
-          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-            {plural(new Set(responders.map(r => r.name)).size, "pessoa respondeu", "pessoas responderam")} · {plural(responders.reduce((n, r) => n + r.answered, 0), "critério", "critérios")}
-          </span>
-        )}
+        <p className="text-[13.5px] text-muted-foreground" aria-live="polite">
+          {areaMode
+            ? <>{plural(new Set(responders.map(r => r.name)).size, "pessoa respondeu", "pessoas responderam")} · {plural(responders.reduce((n, r) => n + r.answered, 0), "critério", "critérios")}</>
+            : evaluatorsScope === "all"
+              ? <>{plural(globalEvaluatorCards.length, "avaliador", "avaliadores")} · {globalEvaluatorCards.filter(c => c.submitted < c.assigned).length} com pendência</>
+              : null}
+        </p>
       </div>
 
       {areaMode ? (
         <AreaRespondersList rows={responders} scope={evaluatorsScope} />
       ) : evaluatorsScope === "all" ? (
         globalEvaluatorCards.length === 0 ? (
-          <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-            <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador atribuído no ciclo.</p>
-          </div>
+          <div className={surfaceCls}><EmptyBlock icon={UsersRound} title="Nenhum avaliador atribuído no ciclo">Atribua avaliadores aos critérios dos eventos para acompanhar o progresso aqui.</EmptyBlock></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {globalEvaluatorCards.map(av => (
-              <div key={av.id} className="rounded-xl p-4 relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: av.accent }} />
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className="w-10 h-10 rounded-lg inline-flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-                    <span className="font-black text-[13px]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{initials(av.name)}</span>
-                  </span>
-                  <div className="min-w-0">
-                    <div className="font-black uppercase text-[14.5px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{av.name}</div>
-                    <div className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>{av.submitted}/{av.assigned} critérios no ciclo</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: av.bg, color: av.color }}>{av.label}</span>
-                  <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: av.color }}>{av.pct}%</span>
-                </div>
-                <div className="h-[6px] rounded-full overflow-hidden mb-3" style={{ backgroundColor: "var(--secondary)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${av.pct}%`, background: av.accent }} />
-                </div>
-                {av.pendingEvents.length > 0 && (
-                  <div className="mb-3">
-                    <p className="text-[11px] font-bold uppercase mb-1.5" style={{ color: "var(--muted-foreground)" }}>Falta responder:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {av.pendingEvents.map(ev => (
-                        <span key={ev.id} className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}>{ev.name}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} no ciclo`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério")}.` })}
-                    className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    Cobrar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setEvaluatorFilter(av.name); setView("assign"); }}
-                    className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    Ver critérios
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <section className={cn(surfaceCls, "overflow-hidden")} aria-label="Avaliadores do ciclo">
+            <Eyebrow as="h2" className="px-4 py-3 border-b border-border">Avaliadores do ciclo</Eyebrow>
+            <ul className="divide-y divide-border">
+              {globalEvaluatorCards.map(av => (
+                <EvaluatorRow key={av.id} name={av.name} sub={`${av.submitted} de ${plural(av.assigned, "critério")} no ciclo`} submitted={av.submitted} assigned={av.assigned} pct={av.pct} label={av.label}
+                  pendingEvents={av.pendingEvents}
+                  onCharge={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} no ciclo`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério")}.` })}
+                  onSeeCriteria={() => { setEvaluatorFilter(av.name); setView("assign"); }} />
+              ))}
+            </ul>
+          </section>
         )
       ) : (
-        /* ── Visão por evento ── */
         evaluatorCards.length === 0 ? (
-          <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-            <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador atribuído neste evento.</p>
-            <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Atribua avaliadores aos critérios do evento para ver o progresso aqui.</p>
-            <button
-              type="button"
-              onClick={() => setView("assign")}
-              className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[11px] font-bold uppercase transition-opacity hover:opacity-80"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              <ClipboardCheck size={13} /> Ir para Atribuição
-            </button>
+          <div className={surfaceCls}>
+            <EmptyBlock icon={UsersRound} title="Nenhum avaliador atribuído neste evento"
+              action={<button type="button" onClick={() => setView("assign")} className={btnPrimary}><ClipboardCheck size={15} aria-hidden /> Ir para Atribuição</button>}>
+              Atribua avaliadores aos critérios do evento para ver o progresso aqui.
+            </EmptyBlock>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {evaluatorCards.map(av => (
-              <div key={av.id} className="rounded-xl p-4 relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: av.accent }} />
-                <div className="flex items-center gap-2.5 mb-3.5">
-                  <span className="w-10 h-10 rounded-lg inline-flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
-                    <span className="font-black text-[13px]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{initials(av.name)}</span>
-                  </span>
-                  <div className="min-w-0">
-                    <div className="font-black uppercase text-[14.5px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{av.name}</div>
-                    <div className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>{av.area}</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: av.bg, color: av.color }}>{av.label}</span>
-                  <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: av.color }}>{av.submitted}/{av.assigned} neste evento</span>
-                </div>
-                <div className="h-[6px] rounded-full overflow-hidden mb-3.5" style={{ backgroundColor: "var(--secondary)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${av.pct}%`, background: av.accent }} />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} neste evento`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério atribuído", "critérios atribuídos")}.` })}
-                    className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    Cobrar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setEvaluatorFilter(av.name); setView("assign"); }}
-                    className="flex-1 rounded-lg py-2 text-[11px] font-bold uppercase transition-colors hover:opacity-80"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    Ver critérios
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <section className={cn(surfaceCls, "overflow-hidden")} aria-label="Avaliadores do evento">
+            <Eyebrow as="h2" className="px-4 py-3 border-b border-border">Avaliadores · {selected?.name}</Eyebrow>
+            <ul className="divide-y divide-border">
+              {evaluatorCards.map(av => (
+                <EvaluatorRow key={av.id} name={av.name} sub={av.area} submitted={av.submitted} assigned={av.assigned} pct={av.pct} label={av.label}
+                  onCharge={() => toast({ title: `${plural(av.assigned - av.submitted, "pendência", "pendências")} neste evento`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${plural(av.assigned, "critério atribuído", "critérios atribuídos")}.` })}
+                  onSeeCriteria={() => { setEvaluatorFilter(av.name); setView("assign"); }} />
+              ))}
+            </ul>
+          </section>
         )
       )}
     </div>

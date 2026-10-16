@@ -66,6 +66,9 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans: var(--app-font-sans);
+  /* Família dos títulos/rótulos premium (mesma de CONDENSED em premium-theme) — gera `font-condensed`. */
+  --font-condensed: 'Barlow Condensed', sans-serif;
+  --font-body: 'Barlow', sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -302,9 +305,27 @@
   }
   html, body { background: #ffffff !important; height: auto !important; overflow: visible !important; }
   .app-shell { display: block !important; height: auto !important; overflow: visible !important; }
+  .app-row { display: block !important; height: auto !important; min-height: 0 !important; }
   .app-main { height: auto !important; overflow: visible !important; display: block !important; }
   .no-print { display: none !important; }
   .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
   .print-page-break { break-before: page; page-break-before: always; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Tela do avaliador: destaque curto do item ao pular para ele (resumo/índice). */
+@keyframes eval-flash {
+  0% { box-shadow: 0 0 0 0 var(--accent); }
+  30% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.eval-flash { animation: eval-flash 1.2s ease-out; border-radius: 0.75rem; }
+@media (prefers-reduced-motion: reduce) { .eval-flash { animation: none; } }
+
+/* Casca: barra de carregamento indeterminada (abrindo o app / trocando de tela). */
+@keyframes shell-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+.shell-indeterminate { animation: shell-indeterminate 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .shell-indeterminate { animation: none; transform: translateX(75%); } }

@@ -1,49 +1,67 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/lib/auth-context";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowRight } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Clock, Link2, Loader2 } from "lucide-react";
 import { login as loginRequest, ApiError } from "@workspace/api-client-react";
-
-const CONDENSED = "'Barlow Condensed', 'Barlow', sans-serif";
-const ACCENT = "#ccff00";
-const ACCENT_HOVER = "#b8e600";
-const ACCENT_FG = "#161e00";
-
-// Login page always uses its own dark palette — independent of system theme
-const PAGE_BG = "#0b1200";
-const CARD_BG = "#0d0d0d";
-const CARD_BORDER = "#ccff00";
-const CARD_BORDER_ACCENT = "#ccff00";
-const INPUT_BG = "#181818";
-const INPUT_BORDER = "rgba(255,255,255,0.12)";
-const LABEL_COLOR = ACCENT;
-const TEXT_COLOR = "rgba(255,255,255,0.9)";
-// Lima opaca e dessaturada: "#ccff0055" (lima a 33%) dava só 2,7:1 sobre #0b1200; este tom passa de 4,5:1.
-const MUTED_COLOR = "#c9d97a";
-const HINT_COLOR = "rgba(255,255,255,0.35)";
+import { useAuth } from "@/lib/auth-context";
+import { cn, plural } from "@/lib/utils";
+import { AuthNotice, AuthShell, authButtonCls, authInputCls, authLabelCls } from "@/components/layout/auth-shell";
 
 /** Traduz a resposta do login para uma frase que o colaborador entende (sem "HTTP 401"). */
 function loginErrorMessage(status: number, serverError: string | undefined): string {
-  if (status === 401 || status === 403 || status === 404) return serverError ?? "CPF não encontrado ou sem acesso à plataforma.";
+  // 401 do servidor é sempre "Credenciais inválidas": diz o que conferir.
+  if (status === 401) return "CPF não encontrado ou sem acesso. Confira os números — se estiverem certos, fale com o RH.";
+  if (status === 403 || status === 404) return serverError ?? "CPF não encontrado ou sem acesso à plataforma.";
   if (status === 429) return "Muitas tentativas seguidas. Aguarde um instante e tente de novo.";
   if (status >= 500) return "O sistema está indisponível no momento. Tente novamente em alguns minutos.";
   return serverError ?? "Não foi possível entrar. Verifique o CPF e tente novamente.";
 }
 
+/** 11144477735 → 111.444.777-35 (só na tela; o estado guarda os dígitos). */
+function maskCpf(d: string): string {
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+}
+
+// Avisos deixados por quem mandou a pessoa para cá (lidos uma vez ao abrir):
+// sessão vencida no meio do uso, link do portal NORTE que não entrou e o
+// evento que ela vai retomar depois de entrar.
+function readArrival() {
+  try {
+    return {
+      expired: sessionStorage.getItem("maratona_sessao_expirou") === "1",
+      ssoFailed: sessionStorage.getItem("maratona_sso_falhou") === "1",
+      resumesEvent: /[?&]evento=/.test(sessionStorage.getItem("maratona_destino") ?? ""),
+    };
+  } catch {
+    return { expired: false, ssoFailed: false, resumesEvent: false };
+  }
+}
+
 export default function LoginPage() {
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [arrival] = useState(readArrival);
   const [, setLocation] = useLocation();
   const { login } = useAuth();
-  const { toast } = useToast();
+
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("maratona_sessao_expirou");
+      sessionStorage.removeItem("maratona_sso_falhou");
+    } catch { /* sem storage */ }
+  }, []);
 
   const isReady = /^\d{11}$/.test(cpf);
+  const missing = 11 - cpf.length;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isReady) return;
+    if (!isReady || loading) return;
     setLoading(true);
+    setError(null);
     try {
       let data: Awaited<ReturnType<typeof loginRequest>>;
       try {
@@ -55,132 +73,91 @@ export default function LoginPage() {
           const body = err.data as { error?: unknown } | null;
           throw new Error(loginErrorMessage(err.status, typeof body?.error === "string" ? body.error : undefined));
         }
-        throw err;
+        throw new Error("Sem conexão com o servidor. Verifique sua internet e tente de novo.");
       }
       if (!data?.token || !data.user) throw new Error("Não foi possível entrar. Tente novamente.");
       login(data.token, data.user);
       setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
     } catch (err: unknown) {
-      toast({
-        title: "Não foi possível entrar",
-        description: err instanceof Error ? err.message : "Sem conexão com o servidor. Verifique sua internet e tente de novo.",
-        variant: "destructive",
-      });
-    } finally {
+      setError(err instanceof Error ? err.message : "Sem conexão com o servidor. Verifique sua internet e tente de novo.");
       setLoading(false);
     }
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ backgroundColor: PAGE_BG }}
-    >
-      {/* Branding */}
-      {/* A marca é o título da tela (único h1) para leitores de tela. */}
-      <h1 className="mb-10 text-center select-none">
-        <span
-          className="block text-6xl font-black uppercase leading-none tracking-tight"
-          style={{ fontFamily: CONDENSED, color: ACCENT }}
-        >
-          Maratona
-        </span>
-        <span
-          className="block text-6xl font-black uppercase leading-none tracking-tight"
-          style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.30)" }}
-        >
-          de Resultados
-        </span>
-      </h1>
+    <AuthShell title="Entrar">
+      <h1 className="font-condensed text-[32px] font-black uppercase leading-none tracking-[-0.01em] sm:text-[36px]">Entrar</h1>
+      <p className="mt-2.5 text-[14px] leading-relaxed text-muted-foreground">
+        Use o CPF cadastrado no RH. Quem chega pelo portal NORTE entra direto, sem digitar nada.
+      </p>
 
-      {/* Card */}
-      <div className="w-full" style={{ maxWidth: 420 }}>
-        <div
-          style={{
-            backgroundColor: CARD_BG,
-            border: `1.5px solid ${CARD_BORDER}`,
-            color: TEXT_COLOR,
-          }}
-        >
-          <form onSubmit={handleSubmit} className="px-6 py-8 space-y-5">
-            <div>
-              <label
-                htmlFor="login-cpf"
-                className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
-              >
-                CPF
-              </label>
-              <input
-                id="login-cpf"
-                name="cpf"
-                type="text"
-                inputMode="numeric"
-                aria-describedby="login-cpf-hint"
-                maxLength={11}
-                value={cpf}
-                onChange={e => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                placeholder="Somente números"
-                required
-                autoFocus
-                autoComplete="off"
-                className="w-full outline-none font-bold transition-all"
-                style={{
-                  fontFamily: CONDENSED,
-                  height: 56,
-                  padding: "0 16px",
-                  fontSize: cpf.length > 0 ? 22 : 16,
-                  letterSpacing: cpf.length > 0 ? "0.18em" : "0.02em",
-                  backgroundColor: INPUT_BG,
-                  border: `1px solid ${INPUT_BORDER}`,
-                  color: TEXT_COLOR,
-                  colorScheme: "dark",
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
-                onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
-              />
-              <p
-                id="login-cpf-hint"
-                className="text-[11px] mt-1.5"
-                style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
-              >
-                {cpf.length === 0
-                  ? "Digite seu CPF (11 dígitos)"
-                  : cpf.length < 11
-                  ? `${11 - cpf.length} dígito${11 - cpf.length !== 1 ? "s" : ""} restante${11 - cpf.length !== 1 ? "s" : ""}`
-                  : "✓ CPF completo"}
-              </p>
-            </div>
+      {(arrival.expired || arrival.ssoFailed || arrival.resumesEvent) && (
+        <div className="mt-6 space-y-2.5">
+          {arrival.expired && (
+            <AuthNotice tone="warn" icon={Clock} title="Sua sessão expirou" role="status" data-testid="login-notice-expired">
+              Entre de novo para continuar de onde parou.
+            </AuthNotice>
+          )}
+          {arrival.ssoFailed && (
+            <AuthNotice tone="danger" icon={Link2} title="O link do portal NORTE não abriu a sua sessão" role="status" data-testid="login-notice-sso">
+              Ele pode ter vencido. Entre com o CPF ou abra o link de novo pelo portal.
+            </AuthNotice>
+          )}
+          {arrival.resumesEvent && (
+            <AuthNotice tone="info" icon={ArrowRight} role="status" data-testid="login-notice-resume">
+              Depois de entrar, você volta direto ao evento que estava abrindo.
+            </AuthNotice>
+          )}
+        </div>
+      )}
 
-            <button
-              type="submit"
-              disabled={loading || !isReady}
-              className="w-full font-black uppercase flex items-center justify-center gap-2 transition-all"
-              style={{
-                fontFamily: CONDENSED,
-                letterSpacing: "0.1em",
-                backgroundColor: !isReady || loading ? `${ACCENT}40` : ACCENT,
-                color: !isReady || loading ? `${ACCENT_FG}80` : ACCENT_FG,
-                height: 52,
-                border: "none",
-                cursor: !isReady || loading ? "not-allowed" : "pointer",
-                fontSize: 15,
-              }}
-              onMouseEnter={e => { if (isReady && !loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
-              onMouseLeave={e => { if (isReady && !loading) e.currentTarget.style.backgroundColor = !isReady || loading ? `${ACCENT}40` : ACCENT; }}
-            >
-              {loading ? "Autenticando…" : <><span>Acessar</span><ArrowRight size={16} /></>}
-            </button>
-          </form>
+      <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-5" aria-busy={loading}>
+        <div>
+          <label htmlFor="login-cpf" className={authLabelCls}>CPF</label>
+          <input
+            id="login-cpf"
+            name="cpf"
+            type="text"
+            inputMode="numeric"
+            aria-describedby="login-cpf-hint"
+            aria-invalid={!!error || undefined}
+            maxLength={14}
+            value={maskCpf(cpf)}
+            onChange={e => { setCpf(e.target.value.replace(/\D/g, "").slice(0, 11)); if (error) setError(null); }}
+            placeholder="000.000.000-00"
+            readOnly={loading}
+            required
+            autoFocus
+            autoComplete="off"
+            className={cn(
+              authInputCls,
+              "mt-2 font-condensed text-[22px] font-bold tracking-[0.08em] placeholder:font-semibold placeholder:tracking-[0.08em] placeholder:text-muted-foreground/45",
+              error && "border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]/25",
+            )}
+          />
+          <p id="login-cpf-hint" aria-live="polite" className={cn("mt-2 flex min-h-5 items-center gap-1.5 text-[13px]", isReady ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}>
+            {cpf.length === 0
+              ? "Só os 11 números — os pontos entram sozinhos."
+              : isReady
+              ? <><Check size={14} aria-hidden /> CPF completo</>
+              : `Faltam ${plural(missing, "dígito")}`}
+          </p>
         </div>
 
-        <p
-          className="text-center text-[11px] font-bold uppercase tracking-widest mt-5"
-          style={{ color: MUTED_COLOR }}
-        >
-          Sistema exclusivo • Uso restrito
-        </p>
-      </div>
-    </div>
+        {error && (
+          <AuthNotice tone="danger" icon={AlertCircle} title="Não foi possível entrar" role="alert" data-testid="login-error">
+            {error}
+          </AuthNotice>
+        )}
+
+        <button type="submit" disabled={loading || !isReady} className={authButtonCls}>
+          {loading ? (
+            <><Loader2 size={17} aria-hidden className="motion-safe:animate-spin" /> Entrando…</>
+          ) : (
+            <>Acessar <ArrowRight size={17} aria-hidden /></>
+          )}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

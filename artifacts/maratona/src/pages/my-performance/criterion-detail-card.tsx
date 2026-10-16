@@ -1,71 +1,62 @@
+// Um critério dentro do evento aberto: nota de 0 a 10, situação (avaliado,
+// parcial ou pendente), o que a equipe escreveu e o motivo de um ajuste. Os
+// nomes de quem avaliou nunca aparecem.
 import type { MyPerformanceCriterion } from "@workspace/api-client-react";
-import { CheckCircle2 } from "lucide-react";
-import { fmtDateTime, fmtNum } from "@/lib/utils";
-import { INFO } from "@/lib/premium-theme";
-import { scoreColor, scoreBarColor } from "./helpers";
-import type { EventSummary } from "./types";
+import { CheckCircle2, Clock, MessageSquareQuote, SlidersHorizontal } from "lucide-react";
+import { cn, fmtDateTime, fmtNum } from "@/lib/utils";
 import { displayCriterionName } from "@/lib/criterion-name";
+import { scoreBarColor } from "./helpers";
+import { Chip, Meter, scoreInk } from "./mp-ui";
+import type { EventSummary } from "./types";
 
-/** Cartão de um quesito no detalhamento aberto do EventCard. */
 export function CriterionDetailCard({ event, c }: { event: EventSummary; c: MyPerformanceCriterion }) {
+  const final = event.feedbackReleased || !!c.finalPublishedAt;
+  const finalAt = c.finalPublishedAt ?? event.feedbackReleasedAt ?? null;
   return (
-    <div className="p-4 rounded-xl relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="flex justify-between items-start gap-4 mb-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-[11px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
-            {event.feedbackReleased || c.finalPublishedAt ? (
-              <span
-                title={c.finalPublishedAt ? `Avaliado em ${fmtDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Avaliado em ${fmtDateTime(event.feedbackReleasedAt)}` : undefined}
-                className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
-              >
-                <CheckCircle2 size={11}/> Avaliado{c.finalPublishedAt ? ` · ${fmtDateTime(c.finalPublishedAt)}` : ""}
-              </span>
+    <div className="rounded-xl border border-border bg-card p-4 min-w-0" data-testid={`my-criterion-${event.eventId}-${c.criterionId}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14.5px] font-semibold leading-snug text-foreground break-words">{displayCriterionName(c.criterionName)}</p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {final ? (
+              <Chip tone="ok" icon={CheckCircle2} title={finalAt ? `Nota final publicada em ${fmtDateTime(finalAt)}` : undefined}>Avaliado</Chip>
             ) : c.partialPublishedAt ? (
-              <span
-                title={`Publicação parcial em ${fmtDateTime(c.partialPublishedAt)}`}
-                className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
-              >
-                Projeção Parcial
-              </span>
+              <Chip tone="info" icon={Clock} title={`Nota parcial publicada em ${fmtDateTime(c.partialPublishedAt)}`}>Nota parcial</Chip>
             ) : null}
-          </div>
-          <p className="font-bold text-[13px] text-foreground leading-tight">{displayCriterionName(c.criterionName)}</p>
+            <Chip title="Quanto este critério pesa na nota do evento">Peso {fmtNum(Number(c.weight), Number.isInteger(Number(c.weight)) ? 0 : 1)}</Chip>
+          </p>
         </div>
-
-        <div className="text-right shrink-0 flex flex-col items-end gap-1">
-          {c.scoreUsed !== null ? (
-            <div className="flex items-end gap-1">
-              <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{fmtNum(c.scoreUsed, 1)}</span>
-              <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
-            </div>
-          ) : (
-            <span className="text-[11px] font-bold uppercase px-2 py-1 rounded text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>Pendente</span>
-          )}
-        </div>
+        {c.scoreUsed !== null ? (
+          <p className="shrink-0 flex items-baseline gap-1">
+            <span className={cn("font-condensed text-[30px] font-black leading-none tabular-nums", scoreInk(c.scoreUsed * 10))}>{fmtNum(c.scoreUsed, 1)}</span>
+            <span className="text-[12px] font-semibold text-muted-foreground">/10</span>
+          </p>
+        ) : (
+          <Chip>Pendente</Chip>
+        )}
       </div>
-      {c.scoreUsed !== null && (
-        <div className="h-[4px] rounded-full overflow-hidden mb-3" style={{ backgroundColor: "var(--muted)" }}>
-          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(c.scoreUsed / 10) * 100}%`, backgroundColor: scoreBarColor(c.scoreUsed * 10) }} />
-        </div>
-      )}
+      {c.scoreUsed !== null && <Meter pct={(c.scoreUsed / 10) * 100} fill={scoreBarColor(c.scoreUsed * 10)} className="mt-3 h-1" />}
 
       {c.publicComments.length > 0 && (
-        <div className="mt-4 space-y-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <p className="text-[11px] font-black uppercase text-muted-foreground">Feedbacks da equipe avaliadora</p>
+        <div className="mt-4 space-y-2">
+          <p className="flex items-center gap-1.5 font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            <MessageSquareQuote size={13} aria-hidden /> O que a equipe avaliadora disse
+          </p>
           {c.publicComments.map((comment, i) => (
-            <div key={i} className="text-xs text-foreground p-3 rounded border-l-2 border-[var(--accent)]" style={{ backgroundColor: "var(--muted)" }}>
-              <span className="italic leading-relaxed">"{comment}"</span>
-            </div>
+            <blockquote key={i} className="rounded-lg border-l-[3px] border-[var(--accent)] bg-secondary/70 px-3 py-2.5 text-[13.5px] leading-relaxed text-foreground break-words">
+              “{comment}”
+            </blockquote>
           ))}
         </div>
       )}
       {c.calibrationReason && (
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <p className="text-[11px] font-black uppercase text-muted-foreground mb-2">Comentário de calibração</p>
-          <div className="text-xs text-foreground p-3 rounded border-l-2" style={{ backgroundColor: "var(--muted)", borderLeftColor: INFO }}>
-            <span className="italic leading-relaxed">"{c.calibrationReason}"</span>
-          </div>
+        <div className="mt-4 space-y-2">
+          <p className="flex items-center gap-1.5 font-condensed text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            <SlidersHorizontal size={13} aria-hidden /> Por que a nota foi ajustada
+          </p>
+          <blockquote className="rounded-lg border-l-[3px] border-[var(--status-info)] bg-[var(--status-info-bg)] px-3 py-2.5 text-[13.5px] leading-relaxed text-foreground break-words">
+            “{c.calibrationReason}”
+          </blockquote>
         </div>
       )}
     </div>

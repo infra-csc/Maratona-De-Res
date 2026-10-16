@@ -1,15 +1,28 @@
-import { CheckCircle2, XCircle, Filter, Pencil, Eye, Wifi, WifiOff, Hash, UserMinus, UserPlus } from "lucide-react";
-import { CONDENSED, GOOD, PremiumCard, GOOD_TEXT } from "@/lib/premium-theme";
-import { cycleStatus, employmentTypeLabel, fromPreviousCycleOnly, getEligibilityStatus, initials, toTitleCase } from "./utils";
-import type { EmployeeWithCycle } from "./types";
+// A lista de colaboradores: TABELA nas telas largas e CARTÕES no celular e no
+// tablet (renderiza um dos dois, nunca os dois escondidos por CSS), a seção
+// "Sem nota no ciclo" (achados pela busca) e os estados vazios.
+import type { ReactNode } from "react";
+import { Search, SearchX, UserMinus, Users } from "lucide-react";
+import { cn, plural } from "@/lib/utils";
+import { useWideScreen } from "../events/use-wide-screen";
+import { EmptyBlock, Eyebrow, btnSecondary, surfaceCls } from "./ui";
+import { AccessCell, CycleCell, EligibilityCell, NameBlock, RowActions, TypeChip } from "./employee-cells";
+import { toTitleCase } from "./utils";
+import type { AttentionFilter, EmployeeWithCycle } from "./types";
 
 type EmployeesTableProps = {
-  isLoading: boolean;
-  /** Lista já filtrada por situação no ciclo e busca. */
+  /** Lista já filtrada por situação no ciclo, busca e atalho do painel. */
   filtered: EmployeeWithCycle[];
   /** Quem bate com a busca e ainda não tem nota no ciclo (só com texto na busca). */
   noScore?: EmployeeWithCycle[];
   total: number;
+  tab: "in" | "out";
+  search: string;
+  attention: AttentionFilter;
+  onClearSearch: () => void;
+  onClearAttention: () => void;
+  /** Ids com nome repetido (selo "Nome repetido"). */
+  duplicateIds: Set<number>;
   mergeMode: boolean;
   selectedIds: Set<number>;
   canonicalId: number | null;
@@ -26,337 +39,179 @@ type EmployeesTableProps = {
   onToggleCycle?: (emp: EmployeeWithCycle) => void;
 };
 
-/** Grid de colaboradores (com coluna de seleção no modo mesclagem, acesso e ações). */
-export function EmployeesTable({
-  isLoading,
-  filtered,
-  noScore = [],
-  total,
-  mergeMode,
-  selectedIds,
-  canonicalId,
-  canBulk,
-  canEdit,
-  isAdmin,
-  previewingId,
-  generatingPinId,
-  onToggleMergeSelection,
-  onPreviewAs,
-  onGeneratePin,
-  onEdit,
-  onToggleCycle,
-}: EmployeesTableProps) {
-  if (isLoading) {
-    return <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando colaboradores...</div>;
-  }
-  const colCount = 6 + (mergeMode ? 1 : 0) + (!mergeMode && canBulk ? 1 : 0) + (!mergeMode && canEdit ? 1 : 0);
+const th = "font-condensed h-11 px-3 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground bg-card border-b border-border md:sticky md:top-16 z-10";
 
-  const renderRow = (emp: EmployeeWithCycle, i: number) => {
-    const isSelected = selectedIds.has(emp.id);
-    const isCanonical = canonicalId === emp.id;
-    const status = cycleStatus(emp);
+/** Lista vazia: o porquê e o próximo passo, conforme a aba, a busca e o filtro. */
+function EmptyList({ tab, search, attention, onClearSearch, onClearAttention }: Pick<EmployeesTableProps, "tab" | "search" | "attention" | "onClearSearch" | "onClearAttention">) {
+  if (search.trim()) {
     return (
-      <tr
-        key={emp.id}
-        data-testid={`row-employee-${emp.id}`}
-        onClick={mergeMode ? () => onToggleMergeSelection(emp.id) : undefined}
-        className="transition-colors group"
-        style={{
-          borderTop: i > 0 ? "1px solid var(--border)" : "none",
-          cursor: mergeMode ? "pointer" : "default",
-          backgroundColor: mergeMode && isSelected ? "rgba(154,176,0,0.10)" : "transparent",
-        }}
-      >
-        {mergeMode && (
-          <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
-            {/* Checkbox real: a linha inteira continua clicável como atalho, mas o teclado e o leitor de tela usam este controle. */}
-            <input
-              type="checkbox"
-              className="w-4 h-4 cursor-pointer align-middle"
-              style={{ accentColor: GOOD }}
-              aria-label={`Selecionar ${toTitleCase(emp.name)} para mesclagem`}
-              checked={isSelected}
-              onChange={() => onToggleMergeSelection(emp.id)}
-            />
-          </td>
-        )}
-        <td className="px-5 py-3.5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isCanonical ? "var(--primary)" : "var(--secondary)" }}>
-              <span className="text-sm font-black" style={{ color: isCanonical ? "var(--primary-foreground)" : "var(--foreground)" }}>{initials(emp.name)}</span>
-            </div>
-            <div>
-              <p className="font-bold">{toTitleCase(emp.name)}</p>
-              {isCanonical && <span className="text-[11px] font-black uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>CANÔNICO</span>}
-              {emp.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{emp.email}</p>}
-            </div>
+      <EmptyBlock icon={SearchX} title="Nada encontrado" testId="employees-no-results"
+        action={<button type="button" onClick={onClearSearch} className={btnSecondary}>Limpar busca</button>}>
+        Ninguém com “{search.trim()}” no nome, no cargo ou no departamento{attention ? " dentro deste filtro" : ""}.
+      </EmptyBlock>
+    );
+  }
+  if (attention) {
+    return (
+      <EmptyBlock icon={Search} title="Ninguém neste filtro" testId="employees-empty-filter"
+        action={<button type="button" onClick={onClearAttention} className={btnSecondary}>Limpar filtro</button>}>
+        {attention === "noAccess" ? "Todo colaborador casa desta aba já entra no app." : attention === "dup" ? "Nenhum nome repetido nesta aba." : "Ninguém elegível ao bônus nesta aba ainda."}
+      </EmptyBlock>
+    );
+  }
+  if (tab === "out") {
+    return (
+      <EmptyBlock icon={UserMinus} title="Ninguém fora do ciclo" testId="employees-empty-out">
+        Quando o admin tirar alguém do ciclo, a pessoa aparece aqui para poder ser devolvida.
+      </EmptyBlock>
+    );
+  }
+  return (
+    <EmptyBlock icon={Users} title="Ninguém com nota neste ciclo ainda" testId="employees-empty-in">
+      Quem tiver nota em algum evento entra aqui sozinho. Para achar qualquer cadastro, use a busca.
+    </EmptyBlock>
+  );
+}
+
+/** Cabeçalho da seção "Sem nota no ciclo" (mesmo texto na tabela e nos cartões). */
+function NoScoreHeading({ count }: { count: number }) {
+  return (
+    <div className="flex flex-col md:flex-row md:items-baseline gap-x-3 gap-y-1">
+      <Eyebrow as="span" className="text-foreground">Sem nota no ciclo <span className="tabular-nums text-muted-foreground">{count}</span></Eyebrow>
+      <span className="text-[13px] text-muted-foreground">Achados pela busca. Entram em “No ciclo” quando tiverem nota em algum evento.</span>
+    </div>
+  );
+}
+
+export function EmployeesTable(props: EmployeesTableProps) {
+  const wide = useWideScreen();
+  const { filtered, noScore = [], total, mergeMode, selectedIds, canonicalId, duplicateIds, canBulk, canEdit } = props;
+  const showAccess = canBulk && !mergeMode;
+  const showActions = canEdit && !mergeMode;
+  const footer = (
+    <p className="text-[13px] text-muted-foreground tabular-nums" data-testid="employees-count">
+      Mostrando {filtered.length} de {plural(total, "colaborador", "colaboradores")}{noScore.length > 0 ? ` · + ${noScore.length} sem nota no ciclo` : ""}
+    </p>
+  );
+  const emptyTop = filtered.length === 0 && (noScore.length > 0
+    ? <p className="px-5 py-6 text-center text-[14px] text-muted-foreground">Ninguém nesta aba com essa busca — veja abaixo quem ainda não tem nota.</p>
+    : <EmptyList {...props} />);
+
+  const cellProps = (emp: EmployeeWithCycle) => ({
+    emp, canBulk, previewingId: props.previewingId, generatingPinId: props.generatingPinId, onGeneratePin: props.onGeneratePin,
+  });
+  const actions = (emp: EmployeeWithCycle, variant: "row" | "card") => (
+    <RowActions {...cellProps(emp)} variant={variant} canEdit={canEdit} isAdmin={props.isAdmin}
+      onEdit={props.onEdit} onPreviewAs={props.onPreviewAs} onToggleCycle={props.onToggleCycle} />
+  );
+  const mergeCheckbox = (emp: EmployeeWithCycle) => (
+    <input
+      type="checkbox"
+      className="w-[18px] h-[18px] cursor-pointer align-middle accent-[var(--foreground)]"
+      aria-label={`Selecionar ${toTitleCase(emp.name)} para mesclagem`}
+      checked={selectedIds.has(emp.id)}
+      onClick={e => e.stopPropagation()}
+      onChange={() => props.onToggleMergeSelection(emp.id)}
+    />
+  );
+
+  // ── Celular e tablet: cartões ────────────────────────────────────────────
+  if (!wide) {
+    const card = (emp: EmployeeWithCycle) => {
+      const selected = mergeMode && selectedIds.has(emp.id);
+      return (
+        <li key={emp.id} data-testid={`row-employee-${emp.id}`}
+          onClick={mergeMode ? () => props.onToggleMergeSelection(emp.id) : undefined}
+          className={cn(surfaceCls, "p-4 flex flex-col gap-3.5 transition-[background-color,box-shadow] duration-150",
+            mergeMode && "cursor-pointer", selected && "bg-secondary/70 shadow-[inset_0_0_0_2px_var(--foreground)]")}>
+          <div className="flex items-start gap-3">
+            {mergeMode && <span className="pt-2.5">{mergeCheckbox(emp)}</span>}
+            <div className="min-w-0 flex-1"><NameBlock emp={emp} canonical={canonicalId === emp.id} duplicate={duplicateIds.has(emp.id)} /></div>
+            <TypeChip type={emp.employmentType} />
           </div>
-        </td>
-        <td className="px-5 py-3.5 font-bold uppercase text-sm">{emp.department}</td>
-        <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)" }}>{emp.functionName}</td>
-        <td className="px-5 py-3.5 text-center">
-          <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: emp.employmentType === "freela" ? "var(--secondary)" : "transparent", border: "1px solid var(--border)" }}>
-            {employmentTypeLabel(emp.employmentType)}
-          </span>
-        </td>
-        <td className="px-5 py-3.5 text-center">
-          <CycleCell emp={emp} />
-        </td>
-        <td className="px-5 py-3.5">
-          <EligibilityCell emp={emp} />
-        </td>
-        {canBulk && !mergeMode && (
-          <td className="px-5 py-3.5 text-center">
-            <AccessCell
-              emp={emp}
-              isAdmin={isAdmin}
-              previewingId={previewingId}
-              generatingPinId={generatingPinId}
-              onPreviewAs={onPreviewAs}
-              onGeneratePin={onGeneratePin}
-            />
-          </td>
+          <p className="text-[13px] text-muted-foreground -mt-1.5">
+            <span className="font-condensed font-bold uppercase tracking-[0.04em] text-foreground">{emp.department}</span> · {emp.functionName}
+          </p>
+          <dl className={cn("grid gap-3 border-t border-border pt-3", showAccess ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
+            <div className="min-w-0"><dt><Eyebrow as="span">No ciclo</Eyebrow></dt><dd className="mt-1.5"><CycleCell emp={emp} /></dd></div>
+            <div className="min-w-0"><dt><Eyebrow as="span">Elegibilidade</Eyebrow></dt><dd className="mt-1.5"><EligibilityCell emp={emp} /></dd></div>
+            {showAccess && <div className="min-w-0"><dt><Eyebrow as="span">Acesso</Eyebrow></dt><dd className="mt-1.5"><AccessCell {...cellProps(emp)} /></dd></div>}
+          </dl>
+          {showActions && <div className="border-t border-border pt-3">{actions(emp, "card")}</div>}
+        </li>
+      );
+    };
+    const grid = "grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))]";
+    return (
+      <div className="space-y-4" data-testid="employees-cards">
+        {filtered.length > 0 ? <ul className={grid} aria-label="Colaboradores">{filtered.map(card)}</ul> : <div className={surfaceCls}>{emptyTop}</div>}
+        {noScore.length > 0 && (
+          <section data-testid="section-no-score" aria-label="Sem nota no ciclo" className="space-y-2.5 pt-1">
+            <NoScoreHeading count={noScore.length} />
+            <ul className={grid} aria-label="Sem nota no ciclo">{noScore.map(card)}</ul>
+          </section>
         )}
-        {canEdit && !mergeMode && (
-          <td className="px-5 py-3.5 text-center">
-            <div className="inline-flex flex-col items-stretch gap-1.5">
-            <button
-              type="button"
-              data-testid={`button-edit-employee-${emp.id}`}
-              aria-label={`Editar ${toTitleCase(emp.name)}`}
-              onClick={() => onEdit(emp)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors hover:opacity-80"
-              style={{ border: "1px solid var(--border)" }}
-            >
-              <Pencil size={13} /> Editar
-            </button>
-            {/* Sem nota no ciclo: não há o que tirar do ciclo (entra sozinho quando tiver nota). */}
-            {onToggleCycle && status !== "none" && (
-              <button
-                type="button"
-                data-testid={`button-cycle-${status === "out" ? "include" : "exclude"}-${emp.id}`}
-                onClick={() => onToggleCycle(emp)}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors hover:opacity-80"
-                style={status === "out"
-                  ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }
-                  : { border: "1px solid var(--border)", color: "var(--status-danger-text)" }}
-              >
-                {status === "out" ? <><UserPlus size={13} aria-hidden /> Devolver ao ciclo</> : <><UserMinus size={13} aria-hidden /> Tirar do ciclo</>}
-              </button>
-            )}
-            </div>
-          </td>
-        )}
+        {footer}
+      </div>
+    );
+  }
+
+  // ── Telas largas: tabela ─────────────────────────────────────────────────
+  const colCount = 5 + (mergeMode ? 1 : 0) + (showAccess ? 1 : 0) + (showActions ? 1 : 0);
+  const row = (emp: EmployeeWithCycle) => {
+    const selected = mergeMode && selectedIds.has(emp.id);
+    return (
+      <tr key={emp.id} data-testid={`row-employee-${emp.id}`}
+        onClick={mergeMode ? () => props.onToggleMergeSelection(emp.id) : undefined}
+        className={cn("border-t border-border first:border-t-0 align-top transition-colors duration-150",
+          mergeMode ? "cursor-pointer hover:bg-secondary/50" : "hover:bg-secondary/35",
+          selected && "bg-secondary/70 hover:bg-secondary/70 shadow-[inset_3px_0_0_var(--foreground)]")}>
+        {mergeMode && <td className="pl-5 pr-1 py-4 w-10">{mergeCheckbox(emp)}</td>}
+        <td className={cn("py-3.5 pr-3", mergeMode ? "pl-2" : "pl-5")}><NameBlock emp={emp} canonical={canonicalId === emp.id} duplicate={duplicateIds.has(emp.id)} /></td>
+        <td className="px-3 py-3.5">
+          <p className="font-condensed text-[14px] font-bold uppercase tracking-[0.04em] leading-tight break-words">{emp.department}</p>
+          <p className="text-[13px] text-muted-foreground mt-1 break-words">{emp.functionName}</p>
+        </td>
+        <td className="px-3 py-3.5"><TypeChip type={emp.employmentType} /></td>
+        <td className="px-3 py-3.5"><CycleCell emp={emp} /></td>
+        <td className="px-3 py-3.5"><EligibilityCell emp={emp} /></td>
+        {showAccess && <td className="px-3 py-3.5"><AccessCell {...cellProps(emp)} /></td>}
+        {showActions && <td className="pl-3 pr-5 py-3">{actions(emp, "row")}</td>}
       </tr>
     );
   };
-
+  const head: ReactNode = (
+    <tr>
+      {mergeMode && <th className={cn(th, "pl-5 pr-1 w-10 rounded-tl-2xl")}><span className="sr-only">Selecionar</span></th>}
+      <th className={cn(th, "w-[28%] min-w-[220px]", mergeMode ? "pl-2" : "pl-5 rounded-tl-2xl")}>Colaborador</th>
+      <th className={cn(th, "w-[17%]")}>Departamento · Cargo</th>
+      <th className={cn(th, "w-[88px]")}>Tipo</th>
+      <th className={cn(th, "w-[150px]")}>No ciclo</th>
+      <th className={cn(th, "w-[160px]")}>Elegibilidade</th>
+      {showAccess && <th className={cn(th, "w-[140px]")}>Acesso</th>}
+      {showActions && <th className={cn(th, "pr-5 w-[120px] rounded-tr-2xl")}><span className="sr-only">Ações</span></th>}
+    </tr>
+  );
   return (
-    <PremiumCard className="overflow-hidden">
-      <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)" }}>
-        <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Grid de Colaboradores</h3>
-        <Filter size={16} style={{ color: "var(--muted-foreground)" }} />
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-              {mergeMode && <th className="px-4 py-3 text-[11px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
-              <th className="px-5 py-3 text-[11px] font-bold uppercase min-w-[210px]" style={{ color: "var(--muted-foreground)" }}>Colaborador</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>No ciclo</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
-              {canBulk && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
-              {canEdit && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
-            </tr>
-          </thead>
+    <div className="space-y-3">
+      <div className={cn(surfaceCls, "overflow-clip")}>
+        <table className="w-full border-collapse text-[14px]" aria-label="Colaboradores">
+          <thead>{head}</thead>
           <tbody>
-            {filtered.map(renderRow)}
-            {filtered.length === 0 && (
-              <tr><td colSpan={colCount} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-                {noScore.length > 0 ? "Ninguém aqui com essa busca — veja abaixo quem ainda não tem nota." : "Ninguém aqui com os filtros atuais."}
-              </td></tr>
-            )}
+            {filtered.map(row)}
+            {emptyTop && <tr><td colSpan={colCount}>{emptyTop}</td></tr>}
           </tbody>
           {noScore.length > 0 && (
             <tbody data-testid="section-no-score" aria-label="Sem nota no ciclo">
-              <tr style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                <th scope="rowgroup" colSpan={colCount} className="py-2.5 text-left">
-                  {/* Preso à esquerda: no celular a tabela rola na horizontal e o texto ficava cortado. */}
-                  <div className="sticky left-0 px-5 max-w-[calc(100vw-3rem)] md:max-w-none">
-                    <span className="text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED }}>Sem nota no ciclo <span className="tabular-nums" style={{ color: "var(--muted-foreground)" }}>({noScore.length})</span></span>
-                    <span className="block md:inline md:ml-2 text-xs font-normal normal-case" style={{ color: "var(--muted-foreground)" }}>Achados pela busca. Entram em “No ciclo” quando tiverem nota em algum evento.</span>
-                  </div>
-                </th>
+              <tr className="border-t border-border bg-secondary/45">
+                <th scope="rowgroup" colSpan={colCount} className="pl-5 pr-4 py-2.5 text-left font-normal"><NoScoreHeading count={noScore.length} /></th>
               </tr>
-              {noScore.map(renderRow)}
+              {noScore.map(row)}
             </tbody>
           )}
         </table>
       </div>
-      <div className="px-5 py-3.5" style={{ borderTop: "1px solid var(--border)" }}>
-        <span className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-          Mostrando {filtered.length} de {total} colaboradores{noScore.length > 0 ? ` · + ${noScore.length} sem nota no ciclo` : ""}
-        </span>
-      </div>
-    </PremiumCard>
-  );
-}
-
-/** Coluna "No ciclo": eventos com nota, "Fora do ciclo" com o motivo, ou "Sem nota". */
-function CycleCell({ emp }: { emp: EmployeeWithCycle }) {
-  const status = cycleStatus(emp);
-  if (status === "out") {
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--status-danger-bg)", color: "var(--status-danger-text)" }}>Fora do ciclo</span>
-        {emp.cycleExcludedReason && <span className="text-[11px] max-w-[180px] truncate" title={emp.cycleExcludedReason} style={{ color: "var(--muted-foreground)" }}>{emp.cycleExcludedReason}</span>}
-      </div>
-    );
-  }
-  if (status === "none") {
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase whitespace-nowrap" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>Sem nota</span>
-        {!emp.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cadastro inativo</span>}
-      </div>
-    );
-  }
-  // Ciclo novo: quem estava no ciclo anterior aparece já, ainda sem nota.
-  if (fromPreviousCycleOnly(emp)) {
-    return (
-      <div className="flex flex-col items-center gap-1" data-testid={`cycle-previous-${emp.id}`}>
-        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>Do ciclo anterior</span>
-        <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>sem nota neste ciclo ainda</span>
-        {!emp.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cadastro inativo</span>}
-      </div>
-    );
-  }
-  // Na aba "No ciclo" os demais têm nota: o selo "Com nota" repetido não dizia nada.
-  const n = emp.cycleEventsCount ?? 0;
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-sm font-bold tabular-nums whitespace-nowrap">{n} {n === 1 ? "evento" : "eventos"}</span>
-      <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>com nota</span>
-      {!emp.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cadastro inativo</span>}
+      {footer}
     </div>
-  );
-}
-
-/** Coluna "Elegibilidade": status do ciclo atual + contagem de eventos quando houver. */
-function EligibilityCell({ emp }: { emp: EmployeeWithCycle }) {
-  const count = emp.participatedEventsCount;
-  const events = count !== null && (
-    <span className="text-[11px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{count} {count === 1 ? "evento" : "eventos"}</span>
-  );
-  return (
-    <div className="flex flex-col items-center justify-center gap-0.5 font-bold uppercase text-sm">
-      {(() => {
-        // Ainda sem nota no ciclo novo: elegibilidade ainda não se aplica ("—", não "inelegível").
-        if (fromPreviousCycleOnly(emp)) return <span style={{ color: "var(--muted-foreground)" }} title="Sem nota neste ciclo ainda">—</span>;
-        const status = getEligibilityStatus(emp);
-        if (status === "freela") return (
-          <span className="flex items-center gap-1.5 opacity-60" style={{ color: "var(--muted-foreground)" }}>— Não pontua</span>
-        );
-        if (status === "eligible") return (
-          <>
-            <span className="flex items-center gap-1.5" style={{ color: GOOD_TEXT }}><CheckCircle2 size={16} /> Elegível</span>
-            {events}
-          </>
-        );
-        if (status === "not_eligible") return (
-          <>
-            <span className="flex items-center gap-1.5 opacity-70" style={{ color: "var(--muted-foreground)" }}><XCircle size={16} /> Não Elegível</span>
-            {events}
-          </>
-        );
-        return (
-          <span className="flex items-center gap-1.5 opacity-60" style={{ color: "var(--muted-foreground)" }}>— Sem dados</span>
-        );
-      })()}
-    </div>
-  );
-}
-
-/** Coluna "Acesso": com/sem acesso, "Ver visão" (só admin) e "Gerar PIN" (só casa). */
-function AccessCell({
-  emp,
-  isAdmin,
-  previewingId,
-  generatingPinId,
-  onPreviewAs,
-  onGeneratePin,
-}: {
-  emp: EmployeeWithCycle;
-  isAdmin: boolean;
-  previewingId: number | null;
-  generatingPinId: number | null;
-  onPreviewAs: (emp: EmployeeWithCycle) => void;
-  onGeneratePin: (emp: EmployeeWithCycle) => void;
-}) {
-  if (emp.hasAccess) {
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: GOOD_TEXT }}>
-          <Wifi size={11} /> Com acesso
-        </span>
-        {isAdmin && (
-          <button
-            type="button"
-            title={`Visualizar app como ${emp.name}`}
-            disabled={previewingId === emp.id}
-            onClick={() => onPreviewAs(emp)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-          >
-            {previewingId === emp.id
-              ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
-              : <><Eye size={11} /> Ver visão</>}
-          </button>
-        )}
-        {emp.employmentType === "casa" && (
-          <button
-            type="button"
-            title={`Gerar novo PIN para ${emp.name}`}
-            disabled={generatingPinId === emp.id}
-            onClick={() => onGeneratePin(emp)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
-          >
-            {generatingPinId === emp.id
-              ? <><Hash size={11} className="animate-spin" /> Gerando…</>
-              : <><Hash size={11} /> Gerar PIN</>}
-          </button>
-        )}
-      </div>
-    );
-  }
-  if (emp.employmentType === "casa") {
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
-          <WifiOff size={11} /> Sem acesso
-        </span>
-        <button
-          type="button"
-          title={`Criar acesso com PIN para ${emp.name}`}
-          disabled={generatingPinId === emp.id}
-          onClick={() => onGeneratePin(emp)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
-          style={{ backgroundColor: "var(--accent)", color: "#000" }}
-        >
-          {generatingPinId === emp.id
-            ? <><Hash size={11} className="animate-spin" /> Gerando…</>
-            : <><Hash size={11} /> Gerar PIN</>}
-        </button>
-      </div>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
-      <WifiOff size={11} /> Sem acesso
-    </span>
   );
 }

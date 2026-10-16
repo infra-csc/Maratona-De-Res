@@ -1,13 +1,13 @@
-import { CheckCircle, Link2, Copy } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { CheckCircle2, Link2, Loader2, Check } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import type { PublicToken } from "@/lib/routing-api";
-import { CONDENSED } from "@/lib/premium-theme";
 import { fmtDT, publicEvalBaseUrl } from "./helpers";
 import { cenografiaItemsLabel } from "./constants";
 import type { ConformityLinkType, ToastFn } from "./types";
-import { LinkEventLine, type LinkEventInfo } from "./public-link-dialog";
+import { LinkEventLine, GeneratedLinkBox, type LinkEventInfo } from "./public-link-dialog";
+import { LinkHistoryRow } from "./conformity-link-history";
+import { DialogHeading, Eyebrow, btnPrimary, btnSecondary, dialogCls, inputCls } from "./ui";
 
 interface ConformityPublicLinkDialogProps {
   linkType: ConformityLinkType | null;
@@ -28,143 +28,97 @@ interface ConformityPublicLinkDialogProps {
   withoutConduta: boolean;
 }
 
-// ── Dialog: Link Público de Conformidade (Cenografia / Ferramentas) ──
+// ── Dialog: Link para freela da Matriz de Conformidade (Cenografia / Ferramentas) ──
 export function ConformityPublicLinkDialog({
   linkType, event, recipientName, setRecipientName, generatedUrl, linkCopied, setLinkCopied,
   conformityHistory, ferramentasHistory, isGenerating, onGenerate, onClose, toast, withoutConduta,
 }: ConformityPublicLinkDialogProps) {
+  // Um link só por formulário: se já existe um pendente, mostramos o
+  // MESMO link pra reenviar; se já foi respondido, não há o que gerar.
+  const hist = linkType === "cenografia" ? (conformityHistory ?? []) : (ferramentasHistory ?? []);
+  const answered = hist.find(t => t.usedAt != null);
+  const pending = hist.find(t => t.usedAt == null);
+  const base = publicEvalBaseUrl();
+  const existingUrl = pending ? `${base}/eval/${pending.id}` : null;
+  const shownUrl = generatedUrl ?? existingUrl;
+  const canGenerate = !!recipientName.trim() && !isGenerating;
+  const formName = linkType === "cenografia" ? "Matriz de Conformidade — Cenografia" : "Matriz de Conformidade — Ferramentas e case";
+
   return (
-    <Dialog open={linkType !== null} onOpenChange={o => { if (!o) { onClose(); } }}>
-      <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-            <Link2 size={18} />
-            {linkType === "cenografia" ? "Link para freela — Cenografia" : "Link para freela — Ferramentas"}
-          </DialogTitle>
-        </DialogHeader>
-        <LinkEventLine event={event} />
+    <Dialog open={linkType !== null} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className={dialogCls}>
+        <DialogHeading
+          icon={shownUrl && !answered ? Check : Link2}
+          tone={generatedUrl ? "brand" : "neutral"}
+          Title={DialogTitle}
+          Description={DialogDescription}
+          title={linkType === "cenografia" ? "Link para freela — Cenografia" : "Link para freela — Ferramentas"}
+          description={answered
+            ? "Este formulário já foi respondido pelo link."
+            : shownUrl
+              ? (pending && !generatedUrl
+                ? <>Já existe um link enviado para <b className="font-semibold text-foreground">{pending.recipientName ?? "—"}</b> aguardando resposta. Se a pessoa perdeu, copie e reenvie o mesmo link.</>
+                : "Link gerado. Copie e envie ao freela — ele vale para um único envio.")
+              : linkType === "cenografia"
+                ? `Um freela preenche a matriz da Cenografia (${cenografiaItemsLabel(withoutConduta)}). Só pode existir um link por evento.`
+                : "Um freela responde a guarda de equipamentos. Só pode existir um link por evento."}
+        />
 
-        {(() => {
-          // Um link só por formulário: se já existe um pendente, mostramos o
-          // MESMO link pra reenviar; se já foi respondido, não há o que gerar.
-          const hist = linkType === "cenografia"
-            ? (conformityHistory ?? [])
-            : (ferramentasHistory ?? []);
-          const answered = hist.find(t => t.usedAt != null);
-          const pending = hist.find(t => t.usedAt == null);
-          const base = publicEvalBaseUrl();
-          const existingUrl = pending ? `${base}/eval/${pending.id}` : null;
-          const shownUrl = generatedUrl ?? existingUrl;
-          return (
-            <>
-              <div className="space-y-4 py-2">
-                {answered ? (
-                  <div className="border border-accent rounded-lg bg-accent/10 p-3 flex items-start gap-2">
-                    <CheckCircle size={16} className="text-accent-text shrink-0 mt-0.5" />
-                    <p className="text-xs font-bold text-accent-text">
-                      Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freela"}</span>
-                      {answered.usedAt ? ` em ${fmtDT(answered.usedAt)}` : ""}. Não é possível gerar outro link.
-                    </p>
-                  </div>
-                ) : shownUrl ? (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      {pending && !generatedUrl
-                        ? <>Já existe um link enviado para <strong>{pending.recipientName ?? "—"}</strong> aguardando resposta. Se a pessoa perdeu, copie e reenvie o mesmo link.</>
-                        : "Link gerado com sucesso! Copie e envie ao freela."}
-                    </p>
-                    <div className="border border-border rounded-lg bg-secondary px-3 py-2 flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-bold text-muted-foreground truncate flex-1">{shownUrl}</span>
-                      <button type="button"
-                        onClick={async () => { if (await copyToClipboard(shownUrl)) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); } else toast(COPY_FAILED_TOAST); }}
-                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase bg-primary text-primary-foreground border border-primary rounded-lg hover:opacity-90 transition-colors"
-                      >
-                        <Copy size={12} />{linkCopied ? "Copiado!" : "Copiar"}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Este link é de uso único e expira depois que o freela envia o formulário.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      {linkType === "cenografia"
-                        ? `Gere um link único para um freela preencher o formulário de conformidade de Cenografia (${cenografiaItemsLabel(withoutConduta)}). Só pode existir um link por evento.`
-                        : "Gere um link único para um freela preencher o formulário de Guarda de Equipamentos. Só pode existir um link por evento."}
-                    </p>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase">Nome do destinatário</Label>
-                      <input
-                        type="text"
-                        value={recipientName}
-                        onChange={e => setRecipientName(e.target.value)}
-                        placeholder="Ex.: Fred Ribeiro"
-                        className="w-full border border-border rounded-lg px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                    </div>
-                  </>
-                )}
+        <div className="space-y-4">
+          <LinkEventLine event={event} formName={formName} />
 
-                {/* Registro do envio */}
-                {hist.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-black uppercase text-muted-foreground mb-2">Registro</p>
-                    <div className="border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
-                      {hist.map(t => (
-                        <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold truncate">
-                              {t.usedAt ? (t.submitterName ?? t.recipientName ?? "—") : (t.recipientName ?? "—")}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              Enviado: {fmtDT(t.createdAt)}
-                            </p>
-                            {t.usedAt && (
-                              <p className="text-[11px] font-bold text-accent-text">
-                                Respondido: {fmtDT(t.usedAt)}
-                              </p>
-                            )}
-                          </div>
-                          {t.usedAt ? (
-                            <span className="shrink-0 text-[11px] font-bold uppercase bg-primary text-primary-foreground border border-primary rounded-lg px-2 py-0.5 flex items-center gap-1">
-                              <CheckCircle size={10} /> Respondido
-                            </span>
-                          ) : (
-                            <span className="shrink-0 text-[11px] font-bold uppercase bg-secondary text-muted-foreground border border-border rounded-lg px-2 py-0.5">
-                              Pendente
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+          {answered ? (
+            <div className="rounded-xl bg-[var(--status-ok-bg)] px-4 py-3 flex items-start gap-2.5">
+              <CheckCircle2 size={16} aria-hidden className="text-[var(--status-ok-text)] shrink-0 mt-0.5" />
+              <p className="text-[14px] text-[var(--status-ok-text)] font-semibold">
+                Respondido por {answered.submitterName ?? answered.recipientName ?? "freela"}
+                {answered.usedAt ? ` em ${fmtDT(answered.usedAt)}` : ""}. Não é possível gerar outro link.
+              </p>
+            </div>
+          ) : shownUrl ? (
+            <GeneratedLinkBox
+              url={shownUrl}
+              copied={linkCopied}
+              onCopy={async () => { if (await copyToClipboard(shownUrl)) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); } else toast(COPY_FAILED_TOAST); }}
+            />
+          ) : (
+            <div>
+              <label htmlFor="conformity-recipient" className="font-condensed block text-[12px] font-bold uppercase tracking-[0.08em] text-foreground mb-1.5">
+                Para quem é o link <span className="text-[var(--status-danger-text)]">· obrigatório</span>
+              </label>
+              <input
+                id="conformity-recipient"
+                type="text"
+                autoComplete="off"
+                value={recipientName}
+                onChange={e => setRecipientName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && canGenerate) onGenerate(base); }}
+                placeholder="Nome do freela — ex.: Fred Ribeiro"
+                className={inputCls}
+              />
+            </div>
+          )}
 
-              <DialogFooter className="gap-2 pt-4">
-                <button type="button"
-                  onClick={onClose}
-                  className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-                >
-                  {shownUrl || answered ? "Fechar" : "Cancelar"}
-                </button>
-                {!shownUrl && !answered && (
-                  <button type="button"
-                    disabled={!recipientName.trim() || isGenerating}
-                    onClick={() => {
-                      if (!recipientName.trim()) return;
-                      onGenerate(base);
-                    }}
-                    className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50"
-                  >
-                    {isGenerating ? "Gerando..." : "Gerar Link"}
-                  </button>
-                )}
-              </DialogFooter>
-            </>
-          );
-        })()}
+          {hist.length > 0 && (
+            <div>
+              <Eyebrow className="mb-2">Registro</Eyebrow>
+              <ul className="rounded-xl border border-border divide-y divide-border max-h-44 overflow-y-auto">
+                {hist.map(t => <LinkHistoryRow key={t.id} t={t} />)}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <button type="button" onClick={onClose} className={btnSecondary}>
+            {shownUrl || answered ? "Fechar" : "Cancelar"}
+          </button>
+          {!shownUrl && !answered && (
+            <button type="button" disabled={!canGenerate} onClick={() => { if (canGenerate) onGenerate(base); }} className={btnPrimary}>
+              {isGenerating ? <><Loader2 size={15} className="animate-spin" aria-hidden /> Gerando...</> : <><Link2 size={15} aria-hidden /> Gerar link</>}
+            </button>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

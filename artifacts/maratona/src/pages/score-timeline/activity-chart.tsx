@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 import type { DayGroup } from "./describe";
 import { shortDay, dayTitle } from "./describe";
+import { VizTooltipBox } from "./tl-ui";
 
 const UP = "var(--status-ok)";
 const DOWN = "var(--status-danger)";
@@ -49,45 +50,44 @@ export function ActivityChart({ days, from, to, onPick, height = 180 }: {
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const r = payload[0].payload as (typeof rows)[number];
-                const line = (label: string, n: number) => <div className="flex justify-between gap-6"><span>{label}</span><strong className="tabular-nums">{n}</strong></div>;
                 return (
-                  <div className="rounded-lg px-3 py-2 text-[12px] shadow-md" style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)" }}>
-                    <div className="font-bold mb-1">{dayTitle(r.key)}</div>
-                    {line("Notas que subiram", r.ups)}
-                    {line("Notas que caíram", -r.downs)}
-                    {r.entered > 0 && line("Entraram na nota", r.entered)}
-                    {r.left < 0 && line("Saíram do ciclo", -r.left)}
-                    {r.faixas > 0 && line("Mudanças de faixa", r.faixas)}
-                    <div className="mt-1 text-[11px]" style={{ color: "var(--muted-foreground)" }}>Clique para ver o dia</div>
-                  </div>
+                  <VizTooltipBox
+                    title={<>{dayTitle(r.key)}<span className="block text-[11px] font-normal text-muted-foreground">Clique para ver só este dia</span></>}
+                    lines={[
+                      { label: "Notas que subiram", value: r.ups },
+                      { label: "Notas que caíram", value: -r.downs },
+                      ...(r.entered > 0 ? [{ label: "Entraram na nota", value: r.entered }] : []),
+                      ...(r.left < 0 ? [{ label: "Saíram do ciclo", value: -r.left }] : []),
+                      ...(r.faixas > 0 ? [{ label: "Mudanças de faixa", value: r.faixas }] : []),
+                    ]} />
                 );
               }}
             />
-            <Bar dataKey="ups" stackId="d" radius={[2, 2, 0, 0]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
+            <Bar dataKey="ups" stackId="d" radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
               {rows.map(r => <Cell key={r.key} fill={UP} fillOpacity={op(r.key)} />)}
             </Bar>
             {has.entered && (
-              <Bar dataKey="entered" stackId="d" radius={[2, 2, 0, 0]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
+              <Bar dataKey="entered" stackId="d" radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
                 {rows.map(r => <Cell key={r.key} fill={UP} fillOpacity={op(r.key, SOFT)} />)}
               </Bar>
             )}
-            <Bar dataKey="downs" stackId="d" radius={[0, 0, 2, 2]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
+            <Bar dataKey="downs" stackId="d" radius={[0, 0, 4, 4]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
               {rows.map(r => <Cell key={r.key} fill={DOWN} fillOpacity={op(r.key)} />)}
             </Bar>
             {has.left && (
-              <Bar dataKey="left" stackId="d" radius={[0, 0, 2, 2]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
+              <Bar dataKey="left" stackId="d" radius={[0, 0, 4, 4]} maxBarSize={22} isAnimationActive={false} style={{ cursor: "pointer" }}>
                 {rows.map(r => <Cell key={r.key} fill={DOWN} fillOpacity={op(r.key, SOFT)} />)}
               </Bar>
             )}
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12px]" style={{ color: "var(--muted-foreground)" }}>
+      <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-muted-foreground">
         <Swatch color={UP} label="Notas que subiram" />
         {has.entered && <Swatch color={UP} soft label="Entraram na nota" />}
         <Swatch color={DOWN} label="Notas que caíram" />
         {has.left && <Swatch color={DOWN} soft label="Saíram do ciclo" />}
-        <span>Clique num dia para filtrar.</span>
+
       </figcaption>
     </figure>
   );
@@ -96,7 +96,7 @@ export function ActivityChart({ days, from, to, onPick, height = 180 }: {
 function Swatch({ color, label, soft }: { color: string; label: string; soft?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color, opacity: soft ? SOFT : 1 }} /> {label}
+      <span aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: color, opacity: soft ? SOFT : 1 }} /> {label}
     </span>
   );
 }

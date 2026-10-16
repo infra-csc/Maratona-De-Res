@@ -7,16 +7,18 @@ import {
   useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventParticipant, useGetEventConformity,
   useConfirmEventResults, useUnconfirmEventResults,
   getGetEventQueryKey, getGetEventResultQueryKey, getGetEvaluationsQueryKey, getGetEventConformityQueryKey,
-  getGetQuarterlyResultsQueryKey, getGetRankingQueryKey, getGetEventsQueryKey,
+  getGetQuarterlyResultsQueryKey, getGetRankingQueryKey, getGetEventsQueryKey, ApiError,
   useListCycleOptions, getListCycleOptionsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { BODY } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 import { eventPeriodPosition } from "@/lib/utils";
-import { isNextCycleEvent, opensLabelFor } from "./events/rules";
+import { isNextCycleEvent, opensLabelFor, areaResponseCounts } from "./events/rules";
+import { Link } from "wouter";
+import { ArrowLeft, SearchX } from "lucide-react";
+import { Bone, EmptyBlock, ErrorBlock, btnGhost, btnSmall } from "./event-detail/detail-ui";
 import { matchCriterionByName, parseImportedConformityRatio, parseImportedCriteriaScores } from "./event-detail/helpers";
 import type { ConformityForm, ImportedCriterionScore, ResultsDialogMode } from "./event-detail/types";
 import { EventHeader } from "./event-detail/event-header";
@@ -42,7 +44,7 @@ export default function EventDetailPage() {
   const { user } = useAuth();
   const canViewResult = !!user && ["admin", "rh", "diretoria"].includes(user.role);
 
-  const { data: event, isLoading } = useGetEvent(id, {
+  const { data: event, isLoading, isError, error, refetch } = useGetEvent(id, {
     query: { enabled: !!id, queryKey: getGetEventQueryKey(id) },
   });
 
@@ -195,35 +197,38 @@ export default function EventDetailPage() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-full p-6 md:p-10 max-w-6xl mx-auto space-y-6" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-        <div className="h-8 w-32 rounded-lg animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-        <div className="h-40 rounded-xl animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-        <div className="grid grid-cols-3 gap-4">
-          <div className="h-24 rounded-xl animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-          <div className="h-24 rounded-xl animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-          <div className="h-24 rounded-xl animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <EventDetailSkeleton />;
 
   if (!event) {
+    const notFound = !isError || (error instanceof ApiError && error.status === 404);
     return (
-      <div className="min-h-full p-6 md:p-10 max-w-4xl mx-auto text-center" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-        <div className="py-24 rounded-xl font-bold uppercase" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
-          Evento não encontrado ou indisponível.
+      <div className="min-h-full">
+        <div className="md:sticky md:top-0 z-30 bg-card border-b border-border px-4 md:px-6 min-h-14 lg:h-16 flex items-center">
+          <Link href="/events" className={`${btnGhost} -ml-3`}><ArrowLeft size={15} aria-hidden /> Eventos</Link>
+        </div>
+        <div className="px-4 md:px-6 py-8 max-w-3xl mx-auto">
+          <h1 className="sr-only">{notFound ? "Evento não encontrado" : "Erro ao carregar o evento"}</h1>
+          {notFound ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card">
+              <EmptyBlock icon={SearchX} title="Evento não encontrado" testId="event-not-found"
+                action={<Link href="/events" className={btnSmall}><ArrowLeft size={14} aria-hidden /> Voltar para Eventos</Link>}>
+                O evento não existe mais (pode ter sido mesclado ou excluído) ou você não tem acesso a ele.
+              </EmptyBlock>
+            </div>
+          ) : (
+            <ErrorBlock title="Não foi possível carregar o evento" onRetry={() => { void refetch(); }} />
+          )}
         </div>
       </div>
     );
   }
 
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
+  // Ciclo por área: respostas por área (a mesma conta da lista de Eventos e da Central).
+  const areaCounts = canViewResult && eventCycle?.areaEvaluation && evaluations ? areaResponseCounts(event.criteria ?? [], evaluations) : null;
 
   return (
-    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
-
+    <div className="min-h-full">
       <EventHeader
         event={event}
         canManage={canManage}
@@ -235,61 +240,104 @@ export default function EventDetailPage() {
         resultsDialog={resultsDialog}
         setResultsDialog={setResultsDialog}
         onSubmitResultsDialog={submitResultsDialog}
+        placar={
+          <SummaryCards event={event} result={result} conformityForm={conformityForm} activeCriteriaCount={activeCriteriaCount}
+            canViewResult={canViewResult} showMatrix={!isOperador} areaCounts={areaCounts} />
+        }
       />
 
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Celular/tablet: uma coluna, na ordem de leitura. Desktop largo: o que
+          se avalia à esquerda; equipe, comentários e o log à direita. */}
+      <div className="px-4 md:px-6 py-5 max-w-[1440px] mx-auto flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
+        <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0">
+          {/* ── Critérios de Avaliação (leitura — gestão de critérios agora em Avaliações) ── */}
+          {canViewResult && result && result.criteriaDetails && result.criteriaDetails.length > 0 && (
+            <div className="order-1 xl:order-none">
+              <CriteriaSection criteriaDetails={result.criteriaDetails} evaluations={evaluations} importedCriteriaMap={importedCriteriaMap} />
+            </div>
+          )}
 
-        <SummaryCards event={event} result={result} conformityForm={conformityForm} activeCriteriaCount={activeCriteriaCount} />
+          {/* Eventos históricos: observações importadas */}
+          {event.isHistorical && (
+            <div className="order-2 xl:order-none">
+              <ImportedNotesSection eventId={event.id} currentScore={event.importedScore} currentNotes={event.importedNotes} canManage={canManage} canView={canViewResult} />
+            </div>
+          )}
 
-        {/* ── Critérios de Avaliação (leitura — gestão de critérios agora em Avaliações) ── */}
-        {canViewResult && result && result.criteriaDetails && result.criteriaDetails.length > 0 && (
-          <CriteriaSection criteriaDetails={result.criteriaDetails} evaluations={evaluations} importedCriteriaMap={importedCriteriaMap} />
-        )}
+          {/* ── Matriz de Conformidade — não visível para "operador" (não vê notas/respostas) ── */}
+          {!isOperador && (
+            <div className="order-4 xl:order-none">
+              <ConformitySection
+                id={id}
+                event={event}
+                canManage={canManage}
+                canManageConformity={canManageConformity}
+                conformityData={conformityData}
+                conformityForm={conformityForm}
+                setConformityForm={setConformityForm}
+                importedConformityRatio={importedConformityRatio}
+                importedConformityAllValue={importedConformityAllValue}
+                conformityPenalty={result?.conformityPenalty}
+                readOnly={readOnlyCycle}
+                nextCycle={nextCycle && !readOnlyCycle}
+              />
+            </div>
+          )}
 
-        {/* Eventos históricos: observações importadas */}
-        {event.isHistorical && (
-          <ImportedNotesSection eventId={event.id} currentScore={event.importedScore} currentNotes={event.importedNotes} canManage={canManage} />
-        )}
+          {/* ── Performance Individual ── */}
+          {hasPerformanceTable && <div className="order-5 xl:order-none"><PerformanceSection participants={participantResults} /></div>}
+        </div>
 
-        {/* ── Equipe Alocada ── */}
-        {((event.participants && event.participants.length > 0) || canManageTeam) && (
-          <TeamSection
-            id={id}
-            event={event}
-            canManageTeam={canManageTeam}
-            updateParticipant={updateParticipant}
-            onAddParticipant={() => setAddParticipantOpen(true)}
-            onRequestRemoveParticipant={setPendingRemoveParticipant}
-          />
-        )}
+        <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0 xl:col-start-2 xl:row-start-1">
+          {/* ── Equipe Alocada ── */}
+          {((event.participants && event.participants.length > 0) || canManageTeam) && (
+            <div className="order-3 xl:order-none">
+              <TeamSection
+                id={id}
+                event={event}
+                canManageTeam={canManageTeam}
+                updateParticipant={updateParticipant}
+                onAddParticipant={() => setAddParticipantOpen(true)}
+                onRequestRemoveParticipant={setPendingRemoveParticipant}
+              />
+            </div>
+          )}
 
-        <RemoveParticipantDialog id={id} event={event} pendingParticipantId={pendingRemoveParticipant} onClose={() => setPendingRemoveParticipant(null)} />
-        <AddParticipantDialog id={id} event={event} canManageTeam={canManageTeam} open={addParticipantOpen} onOpenChange={setAddParticipantOpen} />
-
-        {/* ── Matriz de Conformidade — não visível para "operador" (não vê notas/respostas) ── */}
-        {!isOperador && (
-          <ConformitySection
-            id={id}
-            event={event}
-            canManage={canManage}
-            canManageConformity={canManageConformity}
-            conformityData={conformityData}
-            conformityForm={conformityForm}
-            setConformityForm={setConformityForm}
-            importedConformityRatio={importedConformityRatio}
-            importedConformityAllValue={importedConformityAllValue}
-            conformityPenalty={result?.conformityPenalty}
-            readOnly={readOnlyCycle}
-            nextCycle={nextCycle && !readOnlyCycle}
-          />
-        )}
-
-        {/* ── Performance Individual ── */}
-        {hasPerformanceTable && <PerformanceSection participants={participantResults} />}
-
-        {!event.isHistorical && <EventCommentsPanel eventId={id} readOnly={readOnlyCycle} />}
-        <EventActivityLog eventId={id} />
+          {!event.isHistorical && <div className="order-6 xl:order-none"><EventCommentsPanel eventId={id} readOnly={readOnlyCycle} /></div>}
+          <div className="order-7 xl:order-none"><EventActivityLog eventId={id} /></div>
+        </div>
       </div>
+
+      <RemoveParticipantDialog id={id} event={event} pendingParticipantId={pendingRemoveParticipant} onClose={() => setPendingRemoveParticipant(null)} />
+      <AddParticipantDialog id={id} event={event} canManageTeam={canManageTeam} open={addParticipantOpen} onOpenChange={setAddParticipantOpen} />
+    </div>
+  );
+}
+
+/** Carregando: barra do topo, cartão do evento e duas seções. */
+function EventDetailSkeleton() {
+  return (
+    <div className="min-h-full" role="status" aria-label="Carregando o evento">
+      <div className="bg-card border-b border-border px-4 md:px-6 min-h-14 lg:h-16 flex items-center gap-3">
+        <Bone className="h-4 w-24" /><Bone className="h-4 w-48 hidden sm:block" />
+        <div className="ml-auto hidden lg:flex gap-2"><Bone className="h-9 w-28 rounded-lg" /><Bone className="h-9 w-28 rounded-lg" /><Bone className="h-9 w-44 rounded-lg" /></div>
+      </div>
+      <div className="px-4 md:px-6 pt-5 max-w-[1440px] mx-auto space-y-5">
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="px-4 sm:px-6 py-5 space-y-3">
+            <Bone className="h-3 w-32" /><Bone className="h-9 w-2/3 max-w-[460px]" /><Bone className="h-4 w-72 max-w-full" />
+            <div className="flex gap-2"><Bone className="h-6 w-28 rounded-md" /><Bone className="h-6 w-24 rounded-md" /></div>
+          </div>
+          <div className="border-t border-border grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
+            {[0, 1, 2, 3].map(i => <div key={i} className="bg-card px-4 sm:px-6 py-4 space-y-2.5"><Bone className="h-3 w-20" /><Bone className="h-8 w-16" /><Bone className="h-3 w-32" /></div>)}
+          </div>
+        </div>
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_400px] gap-5">
+          <Bone className="h-64 w-full rounded-2xl" />
+          <Bone className="h-64 w-full rounded-2xl hidden xl:block" />
+        </div>
+      </div>
+      <span className="sr-only">Carregando o evento…</span>
     </div>
   );
 }

@@ -72,6 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // Token expired or invalid — clear everything
+          if (r.status === 401) {
+            try { sessionStorage.setItem("maratona_sessao_expirou", "1"); } catch { /* sem storage */ }
+          }
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
           localStorage.removeItem(REAL_TOKEN_KEY);

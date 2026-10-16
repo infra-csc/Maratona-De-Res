@@ -13,6 +13,7 @@ async function init() {
   const ssoToken = params.get("portal_sso");
 
   if (ssoToken) {
+    let ssoOk = false;
     try {
       const r = await fetch(`${apiBase}/auth/portal-sso`, {
         method: "POST",
@@ -24,10 +25,15 @@ async function init() {
         if (data?.token && data?.user) {
           localStorage.setItem("maratona_token", data.token);
           localStorage.setItem("maratona_user", JSON.stringify(data.user));
+          ssoOk = true;
         }
       }
     } catch {
-      // falha silenciosa — app abre normalmente na tela de login
+      // falha de rede — app abre normalmente na tela de login
+    }
+    // A tela de login explica que o link do portal não entrou (antes: silêncio).
+    if (!ssoOk) {
+      try { sessionStorage.setItem("maratona_sso_falhou", "1"); } catch { /* sem storage */ }
     }
     // Só os parâmetros do SSO saem da URL: o caminho e os demais parâmetros
     // (ex.: /evaluations?evento=123, o evento que o portal mandou abrir) ficam.

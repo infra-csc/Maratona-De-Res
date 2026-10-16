@@ -1,28 +1,67 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowLeft, Compass, Home } from "lucide-react";
+import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth-context";
+import { AppLayout } from "@/components/layout/app-layout";
+import { StateLink, StatePanel, savedDark, stateBtnSecondary } from "@/components/layout/shell-states";
+import { BrandMark, Wordmark } from "@/components/layout/shell-ui";
+import { cn } from "@/lib/utils";
+
+function NotFoundPanel({ loggedIn }: { loggedIn: boolean }) {
+  const [location] = useLocation();
+  useEffect(() => { document.title = "Página não encontrada · Maratona de Resultados"; }, []);
+  return (
+    <StatePanel
+      icon={Compass}
+      eyebrow="Erro 404"
+      title="Página não encontrada"
+      actions={
+        <>
+          <StateLink href={loggedIn ? "/" : "/login"} primary>
+            <Home size={16} aria-hidden /> {loggedIn ? "Ir para o início" : "Ir para o login"}
+          </StateLink>
+          {window.history.length > 1 && (
+            <button type="button" onClick={() => window.history.back()} className={stateBtnSecondary}>
+              <ArrowLeft size={16} aria-hidden /> Voltar
+            </button>
+          )}
+        </>
+      }
+      detail={
+        <p className="text-[13px] text-muted-foreground">
+          Endereço aberto:{" "}
+          <code className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[12px] text-foreground break-all">{location}</code>
+        </p>
+      }
+    >
+      {loggedIn
+        ? "O endereço não existe ou foi movido. Se chegou aqui por um link salvo, comece pelo início e siga pelo menu."
+        : "O endereço não existe ou foi movido. Entre no sistema e siga pelo menu até a tela que procura."}
+    </StatePanel>
+  );
+}
 
 export default function NotFound() {
-  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-
+  const { user } = useAuth();
+  // Logado: dentro da casca (menu à mão). Sem sessão: só a marca.
+  if (user) {
+    return (
+      <AppLayout>
+        <NotFoundPanel loggedIn />
+      </AppLayout>
+    );
+  }
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background text-foreground px-4">
-      <Card className="w-full max-w-md">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3 mb-3">
-            <AlertCircle className="h-8 w-8 shrink-0 text-destructive" aria-hidden="true" />
-            <h1 className="text-2xl font-bold">Página não encontrada</h1>
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            O endereço que você abriu não existe ou foi movido.
-          </p>
-
-          <Button asChild className="mt-6">
-            <a href={`${base}/`}>Voltar ao início</a>
-          </Button>
-        </CardContent>
-      </Card>
+    <div className={cn(savedDark() && "dark")}>
+      <div className="font-body flex min-h-dvh flex-col bg-background text-foreground">
+        <header className="flex items-center gap-3 px-5 py-5 sm:px-8">
+          <BrandMark size={32} />
+          <Wordmark />
+        </header>
+        <main className="flex flex-1 items-center">
+          <NotFoundPanel loggedIn={false} />
+        </main>
+      </div>
     </div>
   );
 }

@@ -4537,6 +4537,7 @@ export const ListCyclesResponseItem = zod.object({
   "stats": zod.object({
   "eventsTotal": zod.int().describe('Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo)'),
   "eventsAfterEnd": zod.int().optional().describe('Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)'),
+  "evaluationsSubmitted": zod.int().optional().describe('Avaliações enviadas nos eventos do ciclo. Com alguma, a avaliação por área não pode mais ser ligada/desligada (409 CYCLE_HAS_EVALUATIONS).'),
   "eventsStored": zod.int().optional().describe('TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista\n(e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);\n"fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.\n'),
   "eventsConfirmed": zod.int(),
   "eventsOpen": zod.int().describe('Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,\nstatus "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.\n'),
@@ -4695,6 +4696,7 @@ export const GetCycleHistoryResponse = zod.object({
   "stats": zod.object({
   "eventsTotal": zod.int().describe('Eventos DO PERÍODO do ciclo (data de início até o fim do ciclo)'),
   "eventsAfterEnd": zod.int().optional().describe('Eventos guardados no ciclo que começam depois do fim dele ("fora do período"; vão para o próximo ciclo)'),
+  "evaluationsSubmitted": zod.int().optional().describe('Avaliações enviadas nos eventos do ciclo. Com alguma, a avaliação por área não pode mais ser ligada/desligada (409 CYCLE_HAS_EVALUATIONS).'),
   "eventsStored": zod.int().optional().describe('TODOS os eventos guardados no ciclo = eventsTotal + eventsAfterEnd = o que GET /events?cycleId= lista\n(e a Central de Avaliações usa). Contagem única: "eventos do ciclo" = eventsTotal (contam no resultado);\n"fora do período" = eventsAfterEnd; a lista mostra eventsStored, com o selo nos de fora.\n'),
   "eventsConfirmed": zod.int(),
   "eventsOpen": zod.int().describe('Eventos ABERTOS PARA AVALIAÇÃO (mesma regra de Event.openForEvaluation e do Dashboard): não histórico,\nstatus "open", dentro do período, ciclo não fechado e já no dia seguinte ao fim do evento.\n'),

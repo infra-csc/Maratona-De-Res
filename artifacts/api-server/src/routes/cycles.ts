@@ -53,6 +53,8 @@ async function loadCycleStats(cycleIds: number[]) {
   const empty = {
     eventsTotal: 0, eventsAfterEnd: 0, eventsStored: 0, eventsConfirmed: 0, eventsOpen: 0, firstEventDate: null as string | null, lastEventDate: null as string | null,
     collaborators: 0, eligible: 0, withBonus: 0, bonusTotal: 0, bonusPaid: 0, avgFinalResult: null as number | null,
+    // Avaliações enviadas no ciclo: com alguma, a avaliação por área não muda mais (D3).
+    evaluationsSubmitted: 0,
   };
   const stats = new Map<number, typeof empty>(cycleIds.map(id => [id, { ...empty }]));
   if (cycleIds.length === 0) return stats;
@@ -115,6 +117,15 @@ async function loadCycleStats(cycleIds: number[]) {
     s.bonusTotal = num(r.bonusTotal);
     s.bonusPaid = num(r.bonusPaid);
     s.avgFinalResult = numOrNull(r.avgFinal);
+  }
+  const submittedRows = await db.select({ cycleId: eventsTable.cycleId, n: sql<number>`count(*)::int` })
+    .from(evaluationsTable)
+    .innerJoin(eventsTable, eq(evaluationsTable.eventId, eventsTable.id))
+    .where(and(inArray(eventsTable.cycleId, cycleIds), eq(evaluationsTable.status, "submitted")))
+    .groupBy(eventsTable.cycleId);
+  for (const r of submittedRows) {
+    const s = r.cycleId != null ? stats.get(r.cycleId) : undefined;
+    if (s) s.evaluationsSubmitted = Number(r.n);
   }
   return stats;
 }
@@ -196,7 +207,7 @@ router.get("/cycles/:id/history", requireRole(...MANAGERS), async (req, res) => 
   ]);
 
   res.json({
-    cycle: { ...toCycle(cycle), stats: stats.get(id)! },
+    cycle: { ...toCycle(cycle, await getGlobalMinEvents()), stats: stats.get(id)! },
     ranking: rows.map((r, i) => {
       const eligible = r.eligible;
       return {

@@ -28,15 +28,6 @@ export function useSort<T extends object>(items: T[], key: keyof T | null, dir: 
   }, [items, key, dir]);
 }
 
-/** Enter/Espaço acionam elementos com role="button" (linhas clicáveis das tabelas). */
-export function onKeyActivate(fn: () => void) {
-  return (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      fn();
-    }
-  };
-}
 
 export function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
@@ -46,7 +37,6 @@ export const fmtScore = (v: number) => fmtNum(v, 1);
 export const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const fmtBRLShort = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 /** Preto ou branco conforme a luminância do fundo — faixas são cores livres cadastradas em Regras do Sistema, muitas claras/pastel. */
 export function contrastingTextColor(hex: string): string {

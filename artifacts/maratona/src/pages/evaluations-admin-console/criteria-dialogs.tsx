@@ -1,16 +1,20 @@
 import type { EventDetail } from "@workspace/api-client-react";
-import { Copy, Trash2, Users, AlertTriangle } from "lucide-react";
-import { CONDENSED, WARNING, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
-import { Input } from "@/components/ui/input";
+import { Copy, Trash2, Users, AlertTriangle, GitCompareArrows, Loader2, MinusCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { fieldStyle } from "./helpers";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
+import { displayCriterionName } from "@/lib/criterion-name";
+import { DialogHeading, Eyebrow, Notice, btnPrimary, btnSecondary, dialogCls, fieldCls, inputCls } from "./console-ui";
 import type { CriteriaManagement } from "./use-criteria-management";
 import type { EnrichedEvent } from "./types";
-import { displayCriterionName } from "@/lib/criterion-name";
 
-/** Aba Critérios — diálogos de duplicar, excluir cópia, remover critério e corrigir origem. */
+const labelCls = "font-condensed block text-[12px] font-bold uppercase tracking-[0.08em] text-foreground mb-1.5";
+const dangerBtn = cn(btnSecondary, "bg-[var(--destructive)] text-[var(--destructive-foreground)] border-transparent enabled:hover:bg-[var(--destructive)] enabled:hover:opacity-90");
+const footerCls = "gap-2 sm:gap-2 sm:space-x-0";
+const spin = <Loader2 size={15} className="animate-spin" aria-hidden />;
+
+/** Aba Critérios — diálogos de duplicar, excluir cópia, remover critério, corrigir origem e áreas. */
 export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
   mgmt: CriteriaManagement;
   selected: EnrichedEvent;
@@ -29,195 +33,161 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
   return (
     <>
       <Dialog open={duplicateDialog !== null} onOpenChange={o => { if (!o) setDuplicateDialog(null); }}>
-        <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="uppercase font-black tracking-tight text-lg" style={{ fontFamily: CONDENSED }}>Duplicar Quesito</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label htmlFor="duplicate-event-criterion-name" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Nome do novo quesito</label>
-              <Input id="duplicate-event-criterion-name" value={duplicateName} onChange={e => setDuplicateName(e.target.value)} className="rounded-lg font-black text-sm h-10" style={fieldStyle} autoFocus />
+        <DialogContent className={dialogCls} data-testid="dialog-duplicate-criterion">
+          <DialogHeading icon={Copy} Title={DialogTitle} Description={DialogDescription}
+            title="Duplicar quesito"
+            description="Cria uma cópia deste critério só neste evento — por exemplo, para outra área responder." />
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="duplicate-event-criterion-name" className={labelCls}>Nome do novo quesito</label>
+              <input id="duplicate-event-criterion-name" value={duplicateName} onChange={e => setDuplicateName(e.target.value)} className={inputCls} autoFocus autoComplete="off" />
+              {!duplicateName.trim() && <p className="mt-1.5 text-[12.5px] text-[var(--status-danger-text)]">Dê um nome ao quesito.</p>}
             </div>
-            <div className="space-y-1.5">
-              <label htmlFor="duplicate-event-criterion-area" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>
-                Área responsável <span className="font-normal normal-case" style={{ color: "var(--muted-foreground)" }}>(opcional — padrão: mesma área de origem)</span>
+            <div>
+              <label htmlFor="duplicate-event-criterion-area" className={labelCls}>
+                Área responsável <span className="font-body normal-case tracking-normal font-normal text-muted-foreground">(opcional — padrão: a mesma do original)</span>
               </label>
               <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
-                <SelectTrigger id="duplicate-event-criterion-area" className="rounded-lg font-bold text-sm h-10" style={fieldStyle}>
-                  <SelectValue placeholder="Manter área original..." />
+                <SelectTrigger id="duplicate-event-criterion-area" className={cn(fieldCls, "h-11 text-[15px]")}>
+                  <SelectValue placeholder="Manter a área original" />
                 </SelectTrigger>
                 <SelectContent>
                   {(areasList ?? []).map(a => (
-                    <SelectItem key={a.id} value={a.id.toString()} className="font-bold">{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {duplicateAreaId && (
+                <p className="mt-1.5 text-[12.5px] text-muted-foreground">O novo quesito fica com a área escolhida; os avaliadores dela aparecem para atribuição.</p>
+              )}
             </div>
-            {duplicateAreaId && (
-              <p className="text-[11px] font-bold" style={{ color: GOOD_TEXT }}>
-                O novo quesito será vinculado à área selecionada. Os avaliadores da nova área aparecerão para atribuição.
-              </p>
-            )}
           </div>
-          <DialogFooter className="gap-2">
-            <button type="button" onClick={() => setDuplicateDialog(null)} className="px-4 py-2 rounded-lg font-bold uppercase text-xs transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
-            <button
-              type="button"
-              disabled={duplicateCriterion.isPending || !duplicateName.trim()}
-              onClick={handleConfirmDuplicate}
-              className="px-4 py-2 rounded-lg font-black uppercase text-xs disabled:opacity-40 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              <Copy size={13} className="inline mr-1.5" />
-              {duplicateCriterion.isPending ? "Duplicando..." : "Duplicar"}
+          <DialogFooter className={footerCls}>
+            <button type="button" onClick={() => setDuplicateDialog(null)} className={btnSecondary}>Cancelar</button>
+            <button type="button" disabled={duplicateCriterion.isPending || !duplicateName.trim()} onClick={handleConfirmDuplicate} className={btnPrimary}>
+              {duplicateCriterion.isPending ? spin : <Copy size={15} aria-hidden />} {duplicateCriterion.isPending ? "Duplicando..." : "Duplicar"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={pendingDelete !== null} onOpenChange={o => { if (!o) setPendingDelete(null); }}>
-        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="uppercase font-black tracking-tight">Excluir cópia?</AlertDialogTitle>
-            <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
-              Esta cópia será <strong>removida permanentemente</strong> deste evento.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-criterion" className="rounded-lg uppercase font-bold" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+        <AlertDialogContent className={dialogCls}>
+          <DialogHeading icon={Trash2} tone="danger" Title={AlertDialogTitle} Description={AlertDialogDescription}
+            title="Excluir cópia?"
+            description={<>Esta cópia será <b className="font-semibold text-foreground">removida permanentemente</b> deste evento.</>} />
+          <AlertDialogFooter className={footerCls}>
+            <AlertDialogCancel data-testid="button-cancel-delete-criterion" className={cn(btnSecondary, "mt-0")}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               data-testid="button-confirm-delete-criterion"
               onClick={() => { if (pendingDelete !== null && selected) deleteCriterion.mutate({ id: selected.id, eventCriterionId: pendingDelete }); setPendingDelete(null); }}
-              className="rounded-lg uppercase font-bold"
-              style={{ backgroundColor: WARNING, color: "#fff" }}
+              className={dangerBtn}
             >
-              <Trash2 size={16} className="mr-1.5" /> Excluir
+              <Trash2 size={15} aria-hidden /> Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
-        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
-            <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
-              O critério <strong>{displayCriterionName(critMeta.get(pendingRemoval ?? -1)?.criterionName)}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmtW(targetWeightSum)}</strong> antes de salvar ou confirmar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-remove-criterion" className="rounded-lg uppercase font-bold" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+        <AlertDialogContent className={dialogCls}>
+          <DialogHeading icon={MinusCircle} tone="danger" Title={AlertDialogTitle} Description={AlertDialogDescription}
+            title="Remover critério?"
+            description={<><b className="font-semibold text-foreground">{displayCriterionName(critMeta.get(pendingRemoval ?? -1)?.criterionName)}</b> deixa de ser avaliado neste evento. Redistribua o peso dele entre os demais para a soma voltar a <b className="font-semibold text-foreground">{fmtW(targetWeightSum)}</b> antes de salvar ou confirmar.</>} />
+          <AlertDialogFooter className={footerCls}>
+            <AlertDialogCancel data-testid="button-cancel-remove-criterion" className={cn(btnSecondary, "mt-0")}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               data-testid="button-confirm-remove-criterion"
               onClick={() => { if (pendingRemoval !== null) { setCriterionActive(pendingRemoval, false); setPendingRemoval(null); } }}
-              className="rounded-lg uppercase font-bold"
-              style={{ backgroundColor: WARNING, color: "#fff" }}
+              className={dangerBtn}
             >
-              <Trash2 size={16} className="mr-1.5" /> Remover
+              <MinusCircle size={15} aria-hidden /> Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={swapDialog !== null} onOpenChange={o => { if (!o) { setSwapDialog(null); setSwapSourceId(""); } }}>
-        <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="uppercase font-black tracking-tight text-lg" style={{ fontFamily: CONDENSED }}>Corrigir Origem do Duplicado</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-              Quesito duplicado: <span style={{ color: "var(--foreground)" }}>{swapDialog?.currentName}</span>
-            </p>
-            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              As avaliações existentes permanecem vinculadas — só o critério de origem muda. A calibração passará a mesclar este duplicado com o novo critério escolhido.
-            </p>
-            <div className="space-y-1.5">
-              <label htmlFor="swap-source-criterion" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Novo critério de origem *</label>
+        <DialogContent className={dialogCls} data-testid="dialog-swap-source">
+          <DialogHeading icon={GitCompareArrows} tone="danger" Title={DialogTitle} Description={DialogDescription}
+            title="Corrigir origem do duplicado"
+            description={<>Quesito duplicado: <b className="font-semibold text-foreground">{swapDialog?.currentName}</b>.</>} />
+          <div className="space-y-4">
+            <Notice icon={AlertTriangle} tone="warn">
+              As avaliações existentes continuam ligadas — só o critério de origem muda. A calibração passa a mesclar este duplicado com o critério escolhido.
+            </Notice>
+            <div>
+              <label htmlFor="swap-source-criterion" className={labelCls}>Novo critério de origem <span className="text-[var(--status-danger-text)]">· obrigatório</span></label>
               <Select value={swapSourceId} onValueChange={setSwapSourceId}>
-                <SelectTrigger id="swap-source-criterion" className="h-9 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--border)" }}>
-                  <SelectValue placeholder="Selecionar..." />
+                <SelectTrigger id="swap-source-criterion" className={cn(fieldCls, "h-11 text-[15px]")}>
+                  <SelectValue placeholder="Escolha o critério" />
                 </SelectTrigger>
                 <SelectContent>
                   {(selectedDetail?.criteria ?? [])
                     .filter(c => !c.eventScoped && c.active)
                     .map(c => (
-                      <SelectItem key={c.criterionId} value={c.criterionId.toString()} className="text-sm font-bold">
-                        {displayCriterionName(c.criterionName)}
-                      </SelectItem>
+                      <SelectItem key={c.criterionId} value={c.criterionId.toString()}>{displayCriterionName(c.criterionName)}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <button type="button" onClick={() => { setSwapDialog(null); setSwapSourceId(""); }} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
-            <button type="button" disabled={!swapSourceId || swapPending} onClick={handleSwapSource} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 transition-colors hover:opacity-90" style={{ backgroundColor: WARNING, color: "#fff" }}>
-              {swapPending ? "Salvando..." : "Confirmar correção"}
+          <DialogFooter className={footerCls}>
+            <button type="button" onClick={() => { setSwapDialog(null); setSwapSourceId(""); }} className={btnSecondary}>Cancelar</button>
+            <button type="button" disabled={!swapSourceId || swapPending} onClick={handleSwapSource} className={dangerBtn}>
+              {swapPending ? spin : null} {swapPending ? "Salvando..." : "Confirmar correção"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={areasDialog !== null} onOpenChange={o => { if (!o && !setCriterionAreas.isPending) setAreasDialog(null); }}>
-        <DialogContent className="rounded-xl max-w-md max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="uppercase font-black tracking-tight text-lg flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Users size={18} aria-hidden="true" /> Áreas que avaliam
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className={dialogCls} data-testid="dialog-criterion-areas">
+          <DialogHeading icon={Users} Title={DialogTitle} Description={DialogDescription}
+            title="Áreas que avaliam"
+            description={areasDialog ? <><b className="font-semibold text-foreground">{areasDialog.name}</b> neste evento. Cada área marcada responde o critério e a nota é a média das áreas. O padrão do catálogo não muda.</> : null} />
           {areasDialog && (
-            <div className="space-y-4 py-1">
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                <span className="font-bold" style={{ color: "var(--foreground)" }}>{areasDialog.name}</span> neste evento. Cada área marcada responde o critério e a nota é a média das áreas. O padrão do catálogo não muda.
-              </p>
-              <fieldset className="rounded-lg p-3 space-y-2 max-h-72 overflow-y-auto" style={{ border: "1px solid var(--border)" }} disabled={setCriterionAreas.isPending}>
-                <legend className="px-1 text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Áreas</legend>
+            <div className="space-y-3">
+              <fieldset className="rounded-xl border border-border divide-y divide-border max-h-72 overflow-y-auto" disabled={setCriterionAreas.isPending}>
+                <legend className="sr-only">Áreas</legend>
                 {areasDialog.responsibleAreaId != null && (
-                  <label htmlFor="event-criterion-area-responsible" className="flex items-center gap-2 text-xs font-bold uppercase opacity-70">
-                    <input id="event-criterion-area-responsible" type="checkbox" checked disabled readOnly className="h-4 w-4 shrink-0" />
-                    {areasDialog.responsibleAreaName ?? `Área ${areasDialog.responsibleAreaId}`}
-                    <span className="normal-case font-normal">(responsável)</span>
+                  <label htmlFor="event-criterion-area-responsible" className="flex items-center gap-3 px-3.5 min-h-11 text-[14px] text-muted-foreground">
+                    <input id="event-criterion-area-responsible" type="checkbox" checked disabled readOnly className="h-[18px] w-[18px] accent-[var(--primary)] shrink-0" />
+                    <span className="font-semibold text-foreground">{areasDialog.responsibleAreaName ?? `Área ${areasDialog.responsibleAreaId}`}</span>
+                    <Eyebrow as="span" className="ml-auto">Responsável</Eyebrow>
                   </label>
                 )}
                 {areaOptions.map(a => {
                   const id = `event-criterion-area-${a.id}`;
                   return (
-                    <label key={a.id} htmlFor={id} className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer">
+                    <label key={a.id} htmlFor={id} className="flex items-center gap-3 px-3.5 min-h-11 text-[14px] cursor-pointer transition-colors duration-150 hover:bg-secondary/50">
                       <input
                         id={id}
                         type="checkbox"
                         data-testid={`checkbox-event-criterion-area-${a.id}`}
                         checked={areasSelection.includes(a.id)}
                         onChange={e => setAreasSelection(prev => e.target.checked ? [...prev, a.id] : prev.filter(x => x !== a.id))}
-                        className="h-4 w-4 shrink-0"
+                        className="h-[18px] w-[18px] accent-[var(--primary)] shrink-0"
                       />
-                      {a.name}
+                      <span className="text-foreground">{a.name}</span>
                     </label>
                   );
                 })}
                 {areaOptions.length === 0 && (
-                  <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não há outras áreas ativas.</p>
+                  <p className="px-3.5 py-3 text-[13px] text-muted-foreground">Não há outras áreas ativas.</p>
                 )}
               </fieldset>
               {doomedCopies.length > 0 && (
-                <p role="note" className="flex items-start gap-2 text-xs font-bold" style={{ color: AMBER_TEXT }}>
-                  <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+                <Notice icon={AlertTriangle} tone="warn">
                   Ao salvar, sai também a cópia feita à mão na mesma área: {doomedCopies.map(c => displayCriterionName(c.criterionName)).join(", ")}.
-                </p>
+                </Notice>
               )}
             </div>
           )}
-          <DialogFooter className="gap-2">
-            <button type="button" disabled={setCriterionAreas.isPending} onClick={() => setAreasDialog(null)} className="px-4 py-2 rounded-lg font-bold uppercase text-xs disabled:opacity-40 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
-            <button
-              type="button"
-              data-testid="button-save-event-criterion-areas"
-              disabled={setCriterionAreas.isPending}
-              onClick={handleSaveAreas}
-              className="px-4 py-2 rounded-lg font-black uppercase text-xs disabled:opacity-40 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              {setCriterionAreas.isPending ? "Salvando..." : "Salvar áreas"}
+          <DialogFooter className={footerCls}>
+            <button type="button" disabled={setCriterionAreas.isPending} onClick={() => setAreasDialog(null)} className={btnSecondary}>Cancelar</button>
+            <button type="button" data-testid="button-save-event-criterion-areas" disabled={setCriterionAreas.isPending} onClick={handleSaveAreas} className={btnPrimary}>
+              {setCriterionAreas.isPending ? spin : null} {setCriterionAreas.isPending ? "Salvando..." : "Salvar áreas"}
             </button>
           </DialogFooter>
         </DialogContent>

@@ -19,7 +19,7 @@ import type { CritRow, CritState, EnrichedEvent } from "./types";
  * evento selecionado com a lista e com `?eventId=` da URL.
  */
 export function useConsoleData(selectedEventId: number | null, setSelectedEventId: Dispatch<SetStateAction<number | null>>) {
-  const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
+  const { data: events, isLoading: eventsLoading, isError: eventsError, refetch: refetchEvents } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
   const { data: cycle } = useGetCurrentCycle();
   const cycleWeekends = getCycleWeekends(cycle?.startDate, weekendsEnd(cycle?.endDate, events));
@@ -75,7 +75,7 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
   // (/evaluations sem eventId) — antes eram 2 requisições por evento.
   const eventIdsParam = useMemo(() => configuredEvents.map(e => e.id).join(","), [configuredEvents]);
   const qc = useQueryClient();
-  const { data: consoleData, dataUpdatedAt: consoleUpdatedAt } = useQuery({
+  const { data: consoleData, dataUpdatedAt: consoleUpdatedAt, isLoading: consoleLoading, isError: consoleError, refetch: refetchConsole } = useQuery({
     queryKey: getGetEvaluationConsoleQueryKey({ eventIds: eventIdsParam }),
     queryFn: () => getEvaluationConsole({ eventIds: eventIdsParam }),
     enabled: eventIdsParam !== "",
@@ -247,5 +247,10 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
   // Ciclo com avaliação por área: a Central acompanha (não atribui) — títulos,
   // aba e indicadores mudam (console-header.tsx, evaluators-view.tsx).
   const cycleAreaMode = !!cycle?.areaEvaluation;
-  return { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode };
+  // Estado da carga (esqueleto/erro da tela): a lista de eventos e o lote de
+  // critérios/atribuições — sem eles a fila mostraria "0/0" em tudo.
+  const loading = eventsLoading || (eventIdsParam !== "" && consoleLoading);
+  const loadError = eventsError || consoleError;
+  const retry = () => { void refetchEvents(); void refetchConsole(); };
+  return { allUsers, cycleWeekends, evalIndex, enrichedEvents, cycleAreaMode, cycle, loading, loadError, retry };
 }
