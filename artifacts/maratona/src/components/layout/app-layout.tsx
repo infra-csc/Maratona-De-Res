@@ -22,7 +22,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   // Aba do navegador com o nome da tela (várias abas abertas deixam de ser iguais).
   useEffect(() => {
     const label = navLabelFor(location);
-    document.title = label ? `${label} · Maratona de Resultados` : "Maratona de Resultados";
+    document.title = label ? `${label} · Maratona` : "Maratona de Resultados";
   }, [location]);
 
   // Menu do celular como diálogo: Esc fecha, o Tab fica preso dentro dele e,

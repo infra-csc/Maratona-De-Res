@@ -8,7 +8,7 @@ import { ImpersonationBanner } from "./impersonation-banner";
 
 export function AuthShell({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   useEffect(() => {
-    document.title = `${title} · Maratona de Resultados`;
+    document.title = `${title} · Maratona`;
   }, [title]);
 
   return (
