@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { AlertCircle, ArrowRight, Check, Clock, Link2, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Clock, Eye, EyeOff, Link2, Loader2 } from "lucide-react";
 import { login as loginRequest, ApiError } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn, plural } from "@/lib/utils";
@@ -9,11 +9,11 @@ import { AuthNotice, AuthShell, authButtonCls, authInputCls, authLabelCls } from
 /** Traduz a resposta do login para uma frase que o colaborador entende (sem "HTTP 401"). */
 function loginErrorMessage(status: number, serverError: string | undefined): string {
   // 401 do servidor é sempre "Credenciais inválidas": diz o que conferir.
-  if (status === 401) return "CPF não encontrado ou sem acesso. Confira os números — se estiverem certos, fale com o RH.";
+  if (status === 401) return "CPF ou senha não conferem. Se esqueceu a senha, peça ao RH para redefinir.";
   if (status === 403 || status === 404) return serverError ?? "CPF não encontrado ou sem acesso à plataforma.";
   if (status === 429) return "Muitas tentativas seguidas. Aguarde um instante e tente de novo.";
   if (status >= 500) return "O sistema está indisponível no momento. Tente novamente em alguns minutos.";
-  return serverError ?? "Não foi possível entrar. Verifique o CPF e tente novamente.";
+  return serverError ?? "Não foi possível entrar. Verifique o CPF e a senha e tente novamente.";
 }
 
 /** 11144477735 → 111.444.777-35 (só na tela; o estado guarda os dígitos). */
@@ -41,6 +41,8 @@ function readArrival() {
 
 export default function LoginPage() {
   const [cpf, setCpf] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [arrival] = useState(readArrival);
@@ -54,7 +56,8 @@ export default function LoginPage() {
     } catch { /* sem storage */ }
   }, []);
 
-  const isReady = /^\d{11}$/.test(cpf);
+  const cpfComplete = /^\d{11}$/.test(cpf);
+  const isReady = cpfComplete && password.length > 0;
   const missing = 11 - cpf.length;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -65,7 +68,7 @@ export default function LoginPage() {
     try {
       let data: Awaited<ReturnType<typeof loginRequest>>;
       try {
-        data = await loginRequest({ identifier: cpf, password: cpf });
+        data = await loginRequest({ identifier: cpf, password });
       } catch (err) {
         // O corpo pode não ser JSON (proxy, queda do servidor): o ApiError guarda o
         // corpo já lido em `data` (ou texto/null) — nunca deixar isso quebrar a mensagem.
@@ -88,7 +91,7 @@ export default function LoginPage() {
     <AuthShell title="Entrar">
       <h1 className="font-condensed text-[32px] font-black uppercase leading-none tracking-[-0.01em] sm:text-[36px]">Entrar</h1>
       <p className="mt-2.5 text-[14px] leading-relaxed text-muted-foreground">
-        Use o CPF cadastrado no RH. Quem chega pelo portal NORTE entra direto, sem digitar nada.
+        Use o CPF cadastrado no RH e a sua senha. Quem chega pelo portal NORTE entra direto, sem digitar nada.
       </p>
 
       {(arrival.expired || arrival.ssoFailed || arrival.resumesEvent) && (
@@ -135,12 +138,47 @@ export default function LoginPage() {
               error && "border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]/25",
             )}
           />
-          <p id="login-cpf-hint" aria-live="polite" className={cn("mt-2 flex min-h-5 items-center gap-1.5 text-[13px]", isReady ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}>
+          <p id="login-cpf-hint" aria-live="polite" className={cn("mt-2 flex min-h-5 items-center gap-1.5 text-[13px]", cpfComplete ? "text-[var(--status-ok-text)]" : "text-muted-foreground")}>
             {cpf.length === 0
               ? "Só os 11 números — os pontos entram sozinhos."
-              : isReady
+              : cpfComplete
               ? <><Check size={14} aria-hidden /> CPF completo</>
               : `Faltam ${plural(missing, "dígito")}`}
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="login-password" className={authLabelCls}>Senha</label>
+          <div className="relative mt-2">
+            <input
+              id="login-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              aria-describedby="login-password-hint"
+              aria-invalid={!!error || undefined}
+              value={password}
+              onChange={e => { setPassword(e.target.value); if (error) setError(null); }}
+              readOnly={loading}
+              required
+              autoComplete="current-password"
+              className={cn(
+                authInputCls,
+                "pr-12 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden",
+                error && "border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]/25",
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+              aria-pressed={showPassword}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff00]/40"
+            >
+              {showPassword ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
+            </button>
+          </div>
+          <p id="login-password-hint" className="mt-2 min-h-5 text-[13px] text-muted-foreground">
+            No primeiro acesso, a senha é o seu CPF (só os números).
           </p>
         </div>
 

@@ -81,6 +81,7 @@ test("avaliador da área responde sem atribuição e o segundo vê 'respondido p
       await page.goto(`/evaluations?evento=${AREA_EVENT.id}`);
       await expect(page).toHaveURL(/\/login$/);
       await page.getByLabel("CPF").fill(AREA_BETO.cpf);
+      await page.getByLabel("Senha", { exact: true }).fill(AREA_BETO.cpf);
       await page.getByRole("button", { name: "Acessar" }).click();
       await expect(page).toHaveURL(new RegExp(`/evaluations\\?evento=${AREA_EVENT.id}$`));
       await expect(page.getByRole("heading", { level: 2, name: AREA_EVENT.name })).toBeVisible();

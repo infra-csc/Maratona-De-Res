@@ -24,6 +24,7 @@ async function loginPelaTela(page: Page, cpf: string, testInfo: TestInfo, { chec
   await expect(cpfInput).toBeVisible();
   if (checarA11y) await checkA11y(page, "login", testInfo);
   await cpfInput.fill(cpf);
+  await page.getByLabel("Senha", { exact: true }).fill(cpf);
   await page.getByRole("button", { name: "Acessar" }).click();
 }
 
