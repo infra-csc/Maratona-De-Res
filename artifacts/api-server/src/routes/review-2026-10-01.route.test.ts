@@ -52,6 +52,31 @@ test("calibração (rascunho) só para quem calibra", async () => {
   assert.equal(ok.data[0].pendingPublish, true);
 });
 
+test("operador confirma resultados, mas não desfaz, não usa o lote nem recebe aviso de bônus", async () => {
+  const s = await scenario("operador");
+  await h.sql("update events set imported_score = 77, imported_notes = 'nota importada' where id = $1", [s.eventId]);
+  await h.sql("update quarterly_results set bonus_value = 12345, bonus_status = 'paid', paid_at = now() where employee_id = $1 and cycle_id = $2", [s.emp, s.cycleId]);
+
+  const doAdmin = await h.api("POST", `/events/${s.eventId}/confirm-results`, { role: "admin" });
+  assert.ok(doAdmin.data.warnings.some((w: string) => w.includes("R$")), JSON.stringify(doAdmin.data.warnings));
+  assert.equal((await h.api("POST", `/events/${s.eventId}/unconfirm-results`, { role: "admin" })).status, 200);
+  await h.api("POST", "/calibrations", { role: "rh", body: { eventId: s.eventId, criterionId: s.c, calibratedScore: 9 } });
+
+  const conf = await h.api("POST", `/events/${s.eventId}/confirm-results`, { role: "operador" });
+  assert.equal(conf.status, 200);
+  assert.equal(conf.data.resultsConfirmed, true);
+  assert.equal(conf.data.importedScore, null);
+  assert.equal(conf.data.importedNotes, null);
+  assert.ok(conf.data.warnings.some((w: string) => w.includes("não publicada")), JSON.stringify(conf.data.warnings));
+  assert.ok(!conf.data.warnings.some((w: string) => w.includes("R$")), JSON.stringify(conf.data.warnings));
+
+  assert.equal((await h.api("POST", `/events/${s.eventId}/unconfirm-results`, { role: "operador" })).status, 403);
+  assert.equal((await h.api("POST", "/events/confirm-results-bulk", { role: "operador", body: { eventIds: [s.eventId] } })).status, 403);
+  for (const role of ["avaliador", "visualizador"] as const) {
+    assert.equal((await h.api("POST", `/events/${s.eventId}/confirm-results`, { role })).status, 403, role);
+  }
+});
+
 test("re-salvar calibração ANTIGA nunca publicada mantém a nota que valia", async () => {
   const s = await scenario("antiga");
   const rh = await h.ensureUser("rh");

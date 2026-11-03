@@ -71,8 +71,8 @@ const navGroups: NavGroup[] = [
 function canSee(user: User | null, item: NavItem): boolean {
   if (user?.role === "avaliador") return item.path === "/evaluations";
   if (user?.role === "visualizador") return ["/meu-desempenho", "/como-funciona"].includes(item.path);
-  // "operador": confirma equipes por evento, envia avaliação (Atribuição)
-  // e cadastra/edita colaboradores — nada de bônus, regras, auditoria,
+  // "operador": confirma equipes e resultados por evento, envia avaliação
+  // (Atribuição) e cadastra/edita colaboradores — nada de bônus, regras, auditoria,
   // critérios, calibrações, ranking ou o guia "Como Funciona" (voltado
   // a colaborador, não a este papel operacional).
   if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees"].includes(item.path);

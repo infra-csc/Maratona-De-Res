@@ -73,10 +73,12 @@ export default function EventDetailPage() {
 
   const canManage = !readOnlyCycle && !!user && ["admin", "rh"].includes(user.role);
   const isOperador = hasRole(user, "operador");
-  // Gestão de equipe (adicionar/remover participante) também é permitida ao
-  // papel "operador" — que NÃO pode confirmar resultados financeiros, editar
-  // nota histórica, nem ver/gerenciar a Matriz de Conformidade (só canManage).
+  // Gestão de equipe (adicionar/remover participante) e confirmar resultados
+  // também são permitidas ao papel "operador" — que NÃO pode desfazer a
+  // confirmação, editar nota histórica, nem ver/gerenciar a Matriz de
+  // Conformidade (só canManage).
   const canManageTeam = !readOnlyCycle && (canManage || isOperador);
+  const canConfirmResults = canManageTeam;
   // Evento do PRÓXIMO ciclo: a API recusa respostas da Matriz (409 EVENT_NEXT_CYCLE)
   // até o ciclo novo existir — a Matriz fica só leitura; o responsável pode ser escolhido.
   const nextCycle = !!event && !event.isHistorical && isNextCycleEvent(event, eventCycle);
@@ -232,6 +234,7 @@ export default function EventDetailPage() {
       <EventHeader
         event={event}
         canManage={canManage}
+        canConfirmResults={canConfirmResults}
         readOnlyCycle={readOnlyCycle ? (eventCycle ?? null) : null}
         nextCycle={nextCycle}
         opensLabel={event.isHistorical ? null : opensLabelFor(event, eventCycle)}

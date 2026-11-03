@@ -25,7 +25,7 @@ export const ROLE_META: RoleMeta[] = [
   { value: "admin", label: "Administrador", tone: "brand", icon: ShieldCheck, hint: "Tudo, inclusive outros admins, integração e auditoria." },
   { value: "rh", label: "RH", tone: "ok", icon: UserCog, hint: "Cadastros, calibração e resultados. Não altera admins." },
   { value: "diretoria", label: "Diretoria", tone: "info", icon: Briefcase, hint: "Consulta calibração, resultados, análises e ciclos." },
-  { value: "operador", label: "Operador", tone: "neutral", icon: Wrench, hint: "Confirma equipes e envia avaliações; nunca vê notas." },
+  { value: "operador", label: "Operador", tone: "neutral", icon: Wrench, hint: "Confirma equipes e resultados e envia avaliações; nunca vê notas." },
   { value: "avaliador", label: "Avaliador", tone: "neutral", icon: ClipboardCheck, hint: "Responde os critérios da própria área." },
   { value: "visualizador", label: "Visualizador", tone: "neutral", icon: Eye, hint: "Colaborador: vê só o próprio desempenho." },
 ];

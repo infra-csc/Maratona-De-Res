@@ -2,7 +2,7 @@
 // o cartão do evento (nome, selos, data/local, avisos e o placar) e o diálogo
 // de confirmar/desconfirmar resultados. Estado do diálogo e mutações ficam na
 // página; aqui só a apresentação.
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Link } from "wouter";
 import type { Cycle } from "@workspace/api-client-react";
 import { ArrowLeft, CalendarClock, CalendarDays, CheckCircle2, ClipboardList, History, Info, Loader2, Lock, MapPin, ShieldAlert, SlidersHorizontal, Unlock, Users } from "lucide-react";
@@ -17,6 +17,8 @@ import type { EventDetail, ResultsDialogMode, SetState } from "./types";
 export type EventHeaderProps = {
   event: EventDetail;
   canManage: boolean;
+  /** Confirmar resultados (admin, RH e operador); desconfirmar segue só com canManage. */
+  canConfirmResults: boolean;
   /** Evento de ciclo fechado/anterior: só consulta (sem atalhos de edição nem confirmar). */
   readOnlyCycle?: Cycle | null;
   /** Evento do PRÓXIMO ciclo (começa depois do fim do ciclo): não aceita avaliação nem confirmação até o ciclo novo ser criado. */
@@ -36,8 +38,13 @@ export type EventHeaderProps = {
 
 const FULL: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
 
-export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle = false, opensLabel = null, canSeeTimeline = canManage, resultsConfirmBusy, resultsDialog, setResultsDialog, onSubmitResultsDialog, placar }: EventHeaderProps) {
+export function EventHeader({ event, canManage, canConfirmResults, readOnlyCycle = null, nextCycle = false, opensLabel = null, canSeeTimeline = canManage, resultsConfirmBusy, resultsDialog, setResultsDialog, onSubmitResultsDialog, placar }: EventHeaderProps) {
   const wide = useWideScreen();
+  // O diálogo anima ao fechar com resultsDialog já null: mantém o último modo
+  // para não piscar a versão "Desconfirmar" depois de confirmar.
+  const lastDialogMode = useRef<ResultsDialogMode>(null);
+  if (resultsDialog) lastDialogMode.current = resultsDialog;
+  const dialogMode = resultsDialog ?? lastDialogMode.current;
   const readOnly = !!readOnlyCycle;
   // Volta para a lista do ciclo do evento (consulta), não para o atual.
   const backHref = readOnly && readOnlyCycle && !readOnlyCycle.isCurrent ? `/events?ciclo=${readOnlyCycle.id}` : "/events";
@@ -78,7 +85,7 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
       )}
     </>
   );
-  const confirm = canManage && (
+  const confirm = (event.resultsConfirmed ? canManage : canConfirmResults) && (
     event.resultsConfirmed ? (
       <button
         type="button"
@@ -191,12 +198,12 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
       <Dialog open={resultsDialog !== null} onOpenChange={(o) => { if (!o && !resultsConfirmBusy) setResultsDialog(null); }}>
         <DialogContent className={dialogCls}>
           <DialogHeading
-            icon={resultsDialog === "unconfirm" ? Unlock : CheckCircle2}
-            tone={resultsDialog === "unconfirm" ? "danger" : "brand"}
+            icon={dialogMode === "unconfirm" ? Unlock : CheckCircle2}
+            tone={dialogMode === "unconfirm" ? "danger" : "brand"}
             Title={DialogTitle}
             Description={DialogDescription}
-            title={resultsDialog === "confirm" ? "Confirmar resultados" : "Desconfirmar resultados"}
-            description={resultsDialog === "confirm"
+            title={dialogMode === "confirm" ? "Confirmar resultados" : "Desconfirmar resultados"}
+            description={dialogMode === "confirm"
               ? "Este evento passa a contar na elegibilidade e na nota de todos os participantes. O ciclo é recalculado agora."
               : "Este evento deixa de contar na elegibilidade e na nota dos participantes. O ciclo é recalculado agora e o bônus projetado pode mudar."}
           />
@@ -211,10 +218,10 @@ export function EventHeader({ event, canManage, readOnlyCycle = null, nextCycle 
               disabled={resultsConfirmBusy}
               aria-busy={resultsConfirmBusy || undefined}
               onClick={onSubmitResultsDialog}
-              className={resultsDialog === "confirm" ? btnPrimary : cn(btnPrimary, "bg-destructive text-destructive-foreground")}
+              className={dialogMode === "confirm" ? btnPrimary : cn(btnPrimary, "bg-destructive text-destructive-foreground")}
             >
               {resultsConfirmBusy && <Loader2 size={15} aria-hidden className="motion-safe:animate-spin" />}
-              {resultsConfirmBusy ? "Aguarde…" : resultsDialog === "confirm" ? "Confirmar" : "Desconfirmar"}
+              {resultsConfirmBusy ? "Aguarde…" : dialogMode === "confirm" ? "Confirmar" : "Desconfirmar"}
             </button>
           </div>
         </DialogContent>
