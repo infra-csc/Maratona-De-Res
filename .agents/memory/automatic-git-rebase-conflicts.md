@@ -14,3 +14,9 @@ Setting `pull.rebase=false` does not prevent this project's observed automatic c
 **Why:** The reflog has shown automatic `pull --quiet --no-edit --rebase origin main` even while the local configuration is `pull.rebase=false`; command-line options take precedence.
 
 **How to apply:** After recovery, distinguish a clean working tree from a synchronized remote: local commits may still be ahead. Offer a normal, non-force push with user authorization to align the current histories. If the remote advances first, integrate that work before retrying; never force-push merely to clear this warning.
+
+Use `git pull --no-rebase --no-edit` for authorized, noninteractive synchronization. A plain `git pull` can leave a conflict-free merge waiting for the workspace editor.
+
+**Why:** The workspace Git editor waits for the `.git/MERGE_MSG` tab to close. Repeated screenshots of an in-progress merge have represented a new editor wait, not necessarily unresolved conflicts or a stale panel.
+
+**How to apply:** Inspect live merge state and running processes before acting. Preserve unrelated unstaged files, finish only the prepared merge, and distinguish successful integration from a successful push.
