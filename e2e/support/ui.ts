@@ -5,13 +5,14 @@ import { expect, type Browser, type Page, type TestInfo } from "@playwright/test
 import { checkA11y } from "./a11y";
 import { WEB_URL } from "./env";
 
-/** Entra pela tela de login (CPF = senha, ver pages/login.tsx). */
+/** Entra pela tela de login (na semente a senha é o próprio CPF). */
 export async function loginPelaTela(page: Page, cpf: string, testInfo: TestInfo, { checarA11y = false } = {}) {
   await page.goto("/login");
   const cpfInput = page.getByLabel("CPF");
   await expect(cpfInput).toBeVisible();
   if (checarA11y) await checkA11y(page, "login", testInfo);
   await cpfInput.fill(cpf);
+  await page.getByLabel("Senha", { exact: true }).fill(cpf);
   await page.getByRole("button", { name: "Acessar" }).click();
   // Sai da tela de login (cada papel cai numa página diferente).
   await expect(page).not.toHaveURL(/\/login$/);

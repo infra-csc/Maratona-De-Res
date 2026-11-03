@@ -931,6 +931,7 @@ export default function EvaluationsPage() {
                   matrixByArea={matrixByArea}
                   matrixOrphans={orphans.length > 0 ? <>{orphans}</> : undefined}
                   matrixProgress={matrixProgress}
+                  onOpenMatrixLink={(areaId) => openConformityLinkDialog(areaId === FERRAMENTAS_AREA_ID ? "ferramentas" : "cenografia")}
                   myCriteria={myCriteria}
                   myAreaGroups={myAreaGroups}
                   areaMode={areaMode}

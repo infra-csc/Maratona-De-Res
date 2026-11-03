@@ -42,6 +42,12 @@ interface CriteriaColumnProps extends CriterionCardHandlers {
   matrixOrphans?: ReactNode;
   /** Progresso da matriz por área (índice do formulário). */
   matrixProgress?: Map<number, MatrixProgress>;
+  /**
+   * Link para freela só da Matriz: quando os critérios da área já fecharam
+   * (outra pessoa da área respondeu primeiro) mas a Matriz segue pendente com
+   * quem é o responsável — o botão do topo continua e manda a Matriz.
+   */
+  onOpenMatrixLink?: (areaId: number) => void;
 }
 
 type ItemState = "todo" | "ready" | "done" | "locked";
@@ -83,7 +89,7 @@ export function CriteriaColumn({
   myCriteria, myAreaGroups, areaMode, publicLinkEligibleCriteria, criterionAssignments, sharedCriterionIds, comments,
   getEval, currentScore, currentAudio, savingCriterionId, criterionInfo, closingEval, onRedirectArea, onOpenPublicLink,
   onScoreClick, onCommentChange, onAudioChange, onSaveDraft, onDiscardDraft, isDiscarding,
-  matrixByArea, matrixOrphans, matrixProgress,
+  matrixByArea, matrixOrphans, matrixProgress, onOpenMatrixLink,
 }: CriteriaColumnProps) {
   if (myCriteria.length === 0 && !matrixOrphans) {
     return (
@@ -113,6 +119,7 @@ export function CriteriaColumn({
         const canRedirect = g.criteria.some(c => criterionInfo(c.criterionId)?.access === "assigned" && criterionInfo(c.criterionId)?.state === "open");
         const matrix = matrixByArea?.get(g.areaId);
         const mp = matrixProgress?.get(g.areaId);
+        const matrixLinkOnly = !!onOpenMatrixLink && !!matrix && !!mp && !mp.readOnly && mp.completed < mp.total && areaEligible.length === 0;
         const titleId = `form-title-${g.areaId}`;
         return (
           <section key={g.areaId} aria-labelledby={titleId} className="rounded-2xl border border-border bg-card">
@@ -132,7 +139,7 @@ export function CriteriaColumn({
                     </p>
                   )}
                 </div>
-                {!allGroupDone && (canRedirect || areaEligible.length > 0) && (
+                {((!allGroupDone && (canRedirect || areaEligible.length > 0)) || matrixLinkOnly) && (
                   <div className="flex items-center gap-2 flex-wrap sm:justify-end sm:shrink-0">
                     {canRedirect && (
                       <button type="button" onClick={() => onRedirectArea(g)} className={btnSmall}>
@@ -147,6 +154,17 @@ export function CriteriaColumn({
                         className={btnSmall}
                       >
                         <Link2 size={14} aria-hidden /> Link para freela
+                      </button>
+                    )}
+                    {matrixLinkOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenMatrixLink!(g.areaId)}
+                        data-testid={`button-freela-link-matrix-${g.areaId}`}
+                        title="Os critérios da área já foram respondidos; o link leva só a Matriz de Conformidade."
+                        className={btnSmall}
+                      >
+                        <Link2 size={14} aria-hidden /> Link para freela · Matriz
                       </button>
                     )}
                   </div>
