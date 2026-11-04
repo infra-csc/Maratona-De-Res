@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import path from "path";
+import { existsSync } from "fs";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -9,19 +11,17 @@ const app: Express = express();
 
 // ---------------------------------------------------------------------------
 // CORS — permitir apenas origens conhecidas.
-// ALLOWED_ORIGINS: lista separada por vírgula de origens adicionais (ex: deploy).
-// REPLIT_DEV_DOMAIN / REPLIT_DOMAINS: injetados automaticamente pelo Replit.
+// ALLOWED_ORIGINS: lista separada por vírgula das origens permitidas
+// (ex: https://maratona.suaempresa.com.br). Vazio = qualquer origem.
 // ---------------------------------------------------------------------------
-const allowedOriginSet = new Set<string>([
-  ...(process.env.ALLOWED_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
-  ...(process.env.REPLIT_DEV_DOMAIN ? [`https://${process.env.REPLIT_DEV_DOMAIN}`] : []),
-  ...(process.env.REPLIT_DOMAINS ? process.env.REPLIT_DOMAINS.split(",").map((d) => `https://${d.trim()}`) : []),
-]);
+const allowedOriginSet = new Set<string>(
+  (process.env.ALLOWED_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
+);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Sem Origin → mesmo domínio, curl, Replit preview iframe → permitir
+      // Sem Origin → mesmo domínio, curl → permitir
       if (!origin) return callback(null, true);
       if (allowedOriginSet.size === 0 || allowedOriginSet.has(origin)) {
         return callback(null, true);
@@ -73,6 +73,23 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Front-end estático (opcional). No Replit o build do web era servido pela
+// plataforma; na VPS, defina STATIC_DIR (ex: artifacts/maratona/dist/public)
+// para a própria API servir o SPA, ou deixe vazio e sirva pelo Nginx.
+const staticDir = process.env.STATIC_DIR ? path.resolve(process.env.STATIC_DIR) : "";
+if (staticDir) {
+  if (!existsSync(path.join(staticDir, "index.html"))) {
+    logger.warn({ staticDir }, "STATIC_DIR sem index.html: front-end não será servido");
+  } else {
+    app.use(express.static(staticDir, { index: false, maxAge: "1h" }));
+    // Fallback do SPA: qualquer GET fora de /api devolve o index.html.
+    app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(path.join(staticDir, "index.html"));
+    });
+  }
+}
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err }, "Unhandled error");

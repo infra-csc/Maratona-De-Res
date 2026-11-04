@@ -5378,9 +5378,9 @@ export const ExportPendingEvaluationsResponse = zod.object({
 
 
 /**
- * Returns a presigned GCS URL for direct upload. The client sends JSON
- * metadata here, then uploads the file directly to the returned URL.
- * @summary Request a presigned URL for file upload
+ * Returns a signed upload URL served by this API (PUT /storage/uploads/{objectId}).
+ * The client sends JSON metadata here, then uploads the file to the returned URL.
+ * @summary Request a signed URL for file upload
  */
 
 
@@ -5399,7 +5399,7 @@ export const RequestUploadUrlBody = zod.object({
 
 
 export const RequestUploadUrlResponse = zod.object({
-  "uploadURL": zod.url().describe('Presigned GCS URL for PUT upload.'),
+  "uploadURL": zod.string().describe('URL assinada (relativa à origem da API) para o PUT do arquivo; vale 15 min e uso único.'),
   "objectPath": zod.string().describe('Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.'),
   "metadata": zod.object({
   "name": zod.string().min(1).describe('Original file name.'),
@@ -5410,7 +5410,22 @@ export const RequestUploadUrlResponse = zod.object({
 
 
 /**
- * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ * Use a uploadURL devolvida por request-url sem alterá-la: ela já traz
+ * os parâmetros de consulta `expires` e `sig` (HMAC), que autorizam o PUT.
+ * @summary Recebe os bytes de um upload na URL assinada (sem Bearer; autorizado pela assinatura)
+ */
+export const PutUploadObjectParams = zod.object({
+  "objectId": zod.coerce.string()
+})
+
+export const PutUploadObjectResponse = zod.object({
+  "objectPath": zod.string(),
+  "size": zod.int()
+})
+
+
+/**
+ * @summary Serve a public asset from STORAGE_DIR/public
  */
 export const GetPublicObjectParams = zod.object({
   "filePath": zod.coerce.string()
@@ -5420,7 +5435,7 @@ export const GetPublicObjectResponse = zod.unknown()
 
 
 /**
- * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ * @summary Serve an object entity from STORAGE_DIR/private
  */
 export const GetStorageObjectParams = zod.object({
   "objectPath": zod.coerce.string()

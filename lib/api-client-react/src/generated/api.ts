@@ -187,6 +187,7 @@ import type {
   PublishAllCriteriaFinalFeedback200,
   PublishAllCriteriaPartialFeedback200,
   PublishCriterionFinalFeedback200,
+  PutUploadObject200,
   QuarterCloseResult,
   QuarterEligibility,
   QuarterEligibilityInput,
@@ -11664,9 +11665,9 @@ export const getRequestUploadUrlUrl = () => {
 }
 
 /**
- * Returns a presigned GCS URL for direct upload. The client sends JSON
- * metadata here, then uploads the file directly to the returned URL.
- * @summary Request a presigned URL for file upload
+ * Returns a signed upload URL served by this API (PUT /storage/uploads/{objectId}).
+ * The client sends JSON metadata here, then uploads the file to the returned URL.
+ * @summary Request a signed URL for file upload
  */
 export const requestUploadUrl = async (uploadUrlRequest: UploadUrlRequest, options?: Parameters<typeof customFetch>[1]): Promise<UploadUrlResponse> => {
 
@@ -11732,7 +11733,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RequestUploadUrlMutationVariables = {data: BodyType<UploadUrlRequest>}
 
     /**
- * @summary Request a presigned URL for file upload
+ * @summary Request a signed URL for file upload
  */
 export const useRequestUploadUrl = <TError = ErrorType<ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,RequestUploadUrlMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -11745,6 +11746,97 @@ export const useRequestUploadUrl = <TError = ErrorType<ErrorEnvelope>,
       return useMutation(getRequestUploadUrlMutationOptions(options));
     }
 
+export const getPutUploadObjectUrl = (objectId: string,) => {
+
+
+
+
+  return `/storage/uploads/${objectId}`
+}
+
+/**
+ * Use a uploadURL devolvida por request-url sem alterá-la: ela já traz
+ * os parâmetros de consulta `expires` e `sig` (HMAC), que autorizam o PUT.
+ * @summary Recebe os bytes de um upload na URL assinada (sem Bearer; autorizado pela assinatura)
+ */
+export const putUploadObject = async (objectId: string,
+    putUploadObjectBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<PutUploadObject200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PutUploadObject200>(getPutUploadObjectUrl(objectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': '*/*', ...getHeaders(options?.headers) },
+    body: putUploadObjectBody
+  }
+);}
+
+
+
+
+
+export const getPutUploadObjectMutationKey = () => ['putUploadObject'] as const;
+
+export const getPutUploadObjectMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUploadObject>>, TError,PutUploadObjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putUploadObject>>, TError,PutUploadObjectMutationVariables, TContext> => {
+
+const mutationKey = getPutUploadObjectMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putUploadObject>>, PutUploadObjectMutationVariables> = (props) => {
+          const {objectId,data} = props ?? {};
+
+          return  putUploadObject(objectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutUploadObjectMutationResult = NonNullable<Awaited<ReturnType<typeof putUploadObject>>>
+    export type PutUploadObjectMutationBody = BodyType<Blob>
+    export type PutUploadObjectMutationError = ErrorType<ErrorEnvelope>
+    export type PutUploadObjectMutationVariables = {objectId: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Recebe os bytes de um upload na URL assinada (sem Bearer; autorizado pela assinatura)
+ */
+export const usePutUploadObject = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUploadObject>>, TError,PutUploadObjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putUploadObject>>,
+        TError,
+        PutUploadObjectMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutUploadObjectMutationOptions(options));
+    }
+
 export const getGetPublicObjectUrl = (filePath: string,) => {
 
 
@@ -11754,7 +11846,7 @@ export const getGetPublicObjectUrl = (filePath: string,) => {
 }
 
 /**
- * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ * @summary Serve a public asset from STORAGE_DIR/public
  */
 export const getPublicObject = async (filePath: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
 
@@ -11801,7 +11893,7 @@ export type GetPublicObjectQueryError = ErrorType<ErrorEnvelope>
 
 
 /**
- * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ * @summary Serve a public asset from STORAGE_DIR/public
  */
 
 export function useGetPublicObject<TData = Awaited<ReturnType<typeof getPublicObject>>, TError = ErrorType<ErrorEnvelope>>(
@@ -11831,7 +11923,7 @@ export const getGetStorageObjectUrl = (objectPath: string,) => {
 }
 
 /**
- * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ * @summary Serve an object entity from STORAGE_DIR/private
  */
 export const getStorageObject = async (objectPath: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
 
@@ -11878,7 +11970,7 @@ export type GetStorageObjectQueryError = ErrorType<ErrorEnvelope>
 
 
 /**
- * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ * @summary Serve an object entity from STORAGE_DIR/private
  */
 
 export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<ErrorEnvelope>>(

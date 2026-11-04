@@ -24,7 +24,7 @@ export interface UploadUrlRequest {
 }
 
 export interface UploadUrlResponse {
-  /** Presigned GCS URL for PUT upload. */
+  /** URL assinada (relativa à origem da API) para o PUT do arquivo; vale 15 min e uso único. */
   uploadURL: string;
   /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
   objectPath: string;
@@ -3962,6 +3962,11 @@ export type ExportAbsencesParams = {
  * @pattern ^[1-9][0-9]*$
  */
 cycleId?: string;
+};
+
+export type PutUploadObject200 = {
+  objectPath: string;
+  size: number;
 };
 
 export type GetCalibrationAuditParams = {

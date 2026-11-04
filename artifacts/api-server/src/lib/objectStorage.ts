@@ -1,33 +1,30 @@
-import { Storage, File } from "@google-cloud/storage";
+// Armazenamento de objetos em disco local (substitui o Object Storage do
+// Replit, que dependia do sidecar em 127.0.0.1:1106 e de um bucket GCS).
+//
+// Layout em STORAGE_DIR (padrão ./data/storage, relativo ao diretório em que a
+// API sobe):
+//   private/uploads/<uuid>            bytes do objeto privado (áudio)
+//   private/uploads/<uuid>.meta.json  { contentType, size, createdAt }
+//   public/<caminho>                  arquivos públicos (GET /storage/public-objects/*)
+//
+// O caminho lógico que vai para o banco continua igual ao do Replit:
+// /objects/uploads/<uuid>. Para migrar, basta copiar os arquivos do bucket
+// antigo para STORAGE_DIR/private/uploads/ (ver scripts/replit-export-audios.mjs).
+//
+// Upload: a API devolve uma URL própria assinada com HMAC (PUT
+// /api/storage/uploads/<uuid>?expires=...&sig=...), válida por 15 min e de uso
+// único (não sobrescreve um objeto que já existe). O navegador continua
+// fazendo o mesmo PUT direto que fazia para o GCS.
+
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { createReadStream, createWriteStream } from "fs";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
+import path from "path";
 import { Readable } from "stream";
-import { randomUUID } from "crypto";
-import {
-  ObjectAclPolicy,
-  ObjectPermission,
-  canAccessObject,
-  getObjectAclPolicy,
-  setObjectAclPolicy,
-} from "./objectAcl";
+import { pipeline } from "stream/promises";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+const UPLOAD_TTL_SEC = 900;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -37,231 +34,188 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
-export class ObjectStorageService {
-  constructor() {}
-
-  getPublicObjectSearchPaths(): Array<string> {
-    const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
-    const paths = Array.from(
-      new Set(
-        pathsStr
-          .split(",")
-          .map((path) => path.trim())
-          .filter((path) => path.length > 0)
-      )
-    );
-    if (paths.length === 0) {
-      throw new Error(
-        "PUBLIC_OBJECT_SEARCH_PATHS not set. Create a bucket in 'Object Storage' " +
-          "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var (comma-separated paths)."
-      );
-    }
-    return paths;
+export class InvalidUploadError extends Error {
+  constructor(message: string, public readonly status: number = 400) {
+    super(message);
+    this.name = "InvalidUploadError";
+    Object.setPrototypeOf(this, InvalidUploadError.prototype);
   }
+}
 
-  getPrivateObjectDir(): string {
-    const dir = process.env.PRIVATE_OBJECT_DIR || "";
-    if (!dir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
-    return dir;
+/** Arquivo resolvido em disco, pronto para ser servido. */
+export interface StoredObject {
+  filePath: string;
+  contentType: string;
+  size: number;
+  isPublic: boolean;
+}
+
+function storageRoot(): string {
+  return path.resolve(process.env.STORAGE_DIR || "./data/storage");
+}
+
+function signingSecret(): string {
+  const secret = process.env.STORAGE_SIGNING_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("STORAGE_SIGNING_SECRET (ou JWT_SECRET) não configurado.");
   }
+  return secret;
+}
 
-  async searchPublicObject(filePath: string): Promise<File | null> {
-    for (const searchPath of this.getPublicObjectSearchPaths()) {
-      const fullPath = `${searchPath}/${filePath}`;
+function sign(objectId: string, expires: number): string {
+  return createHmac("sha256", signingSecret())
+    .update(`PUT\n${objectId}\n${expires}`)
+    .digest("hex");
+}
 
-      const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
+/** Junta `rel` a `base` e garante que o resultado não escapa de `base`. */
+function safeJoin(base: string, rel: string): string | null {
+  const full = path.resolve(base, rel);
+  if (full !== base && !full.startsWith(base + path.sep)) return null;
+  return full;
+}
 
-      const [exists] = await file.exists();
-      if (exists) {
-        return file;
-      }
-    }
+async function readMeta(filePath: string): Promise<{ contentType?: string }> {
+  try {
+    return JSON.parse(await readFile(`${filePath}.meta.json`, "utf8"));
+  } catch {
+    return {};
+  }
+}
 
+function guessContentType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const map: Record<string, string> = {
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".wav": "audio/wav",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".svg": "image/svg+xml",
+    ".pdf": "application/pdf",
+  };
+  // Os áudios do Replit não têm extensão; o app só grava audio/webm.
+  return map[ext] ?? "audio/webm";
+}
+
+async function toStoredObject(filePath: string, isPublic: boolean): Promise<StoredObject | null> {
+  try {
+    const st = await stat(filePath);
+    if (!st.isFile()) return null;
+    const meta = await readMeta(filePath);
+    return {
+      filePath,
+      size: st.size,
+      contentType: meta.contentType || guessContentType(filePath),
+      isPublic,
+    };
+  } catch {
     return null;
   }
+}
 
-  async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<Response> {
-    const [metadata] = await file.getMetadata();
-    const aclPolicy = await getObjectAclPolicy(file);
-    const isPublic = aclPolicy?.visibility === "public";
-
-    const nodeStream = file.createReadStream();
-    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
-
-    const headers: Record<string, string> = {
-      "Content-Type": (metadata.contentType as string) || "application/octet-stream",
-      "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
-    };
-    if (metadata.size) {
-      headers["Content-Length"] = String(metadata.size);
-    }
-
-    return new Response(webStream, { headers });
+export class ObjectStorageService {
+  privateDir(): string {
+    return path.join(storageRoot(), "private");
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    if (!privateObjectDir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
+  publicDir(): string {
+    return path.join(storageRoot(), "public");
+  }
 
+  /**
+   * Gera um id novo e a URL assinada para o navegador enviar os bytes.
+   * `apiBase` é o prefixo público da API (padrão "/api").
+   */
+  createUpload(apiBase = process.env.API_PUBLIC_BASE || "/api"): { uploadURL: string; objectPath: string } {
     const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const expires = Math.floor(Date.now() / 1000) + UPLOAD_TTL_SEC;
+    const sig = sign(objectId, expires);
+    const base = apiBase.replace(/\/+$/, "");
+    return {
+      uploadURL: `${base}/storage/uploads/${objectId}?expires=${expires}&sig=${sig}`,
+      objectPath: `/objects/uploads/${objectId}`,
+    };
+  }
 
-    const { bucketName, objectName } = parseObjectPath(fullPath);
+  /** Confere a assinatura de um PUT de upload. Lança InvalidUploadError. */
+  verifyUpload(objectId: string, expiresRaw: unknown, sigRaw: unknown): void {
+    if (!UUID_RE.test(objectId)) throw new InvalidUploadError("Identificador de upload inválido.");
+    const expires = Number(expiresRaw);
+    if (!Number.isInteger(expires) || typeof sigRaw !== "string") {
+      throw new InvalidUploadError("Assinatura de upload ausente.", 403);
+    }
+    if (expires < Math.floor(Date.now() / 1000)) {
+      throw new InvalidUploadError("Link de upload expirado. Grave de novo.", 403);
+    }
+    const expected = Buffer.from(sign(objectId, expires), "hex");
+    const given = Buffer.from(sigRaw, "hex");
+    if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
+      throw new InvalidUploadError("Assinatura de upload inválida.", 403);
+    }
+  }
 
-    return signObjectURL({
-      bucketName,
-      objectName,
-      method: "PUT",
-      ttlSec: 900,
+  /**
+   * Grava o corpo do PUT em disco. Uso único: se o objeto já existe, recusa.
+   * Grava num arquivo temporário e renomeia, para não deixar arquivo pela metade.
+   */
+  async saveUpload(objectId: string, body: Readable, contentType: string, maxBytes: number): Promise<number> {
+    const dir = path.join(this.privateDir(), "uploads");
+    await mkdir(dir, { recursive: true });
+    const finalPath = path.join(dir, objectId);
+    if (await toStoredObject(finalPath, false)) {
+      throw new InvalidUploadError("Este link de upload já foi usado.", 409);
+    }
+    const tmpPath = `${finalPath}.${process.pid}.${Date.now()}.tmp`;
+    let size = 0;
+    body.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) body.destroy(new InvalidUploadError("Arquivo grande demais.", 413));
     });
+    try {
+      await pipeline(body, createWriteStream(tmpPath, { flags: "wx" }));
+      await writeFile(
+        `${finalPath}.meta.json`,
+        JSON.stringify({ contentType, size, createdAt: new Date().toISOString() }),
+      );
+      await rename(tmpPath, finalPath);
+    } catch (err) {
+      await unlink(tmpPath).catch(() => {});
+      throw err;
+    }
+    return size;
   }
 
-  async getObjectEntityFile(objectPath: string): Promise<File> {
-    if (!objectPath.startsWith("/objects/")) {
-      throw new ObjectNotFoundError();
-    }
-
-    const parts = objectPath.slice(1).split("/");
-    if (parts.length < 2) {
-      throw new ObjectNotFoundError();
-    }
-
-    const entityId = parts.slice(1).join("/");
-    let entityDir = this.getPrivateObjectDir();
-    if (!entityDir.endsWith("/")) {
-      entityDir = `${entityDir}/`;
-    }
-    const objectEntityPath = `${entityDir}${entityId}`;
-    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
-    const [exists] = await objectFile.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
-    }
-    return objectFile;
+  async searchPublicObject(filePath: string): Promise<StoredObject | null> {
+    const full = safeJoin(this.publicDir(), filePath);
+    if (!full) return null;
+    return toStoredObject(full, true);
   }
 
-  normalizeObjectEntityPath(rawPath: string): string {
-    if (!rawPath.startsWith("https://storage.googleapis.com/")) {
-      return rawPath;
-    }
-
-    const url = new URL(rawPath);
-    const rawObjectPath = url.pathname;
-
-    let objectEntityDir = this.getPrivateObjectDir();
-    if (!objectEntityDir.endsWith("/")) {
-      objectEntityDir = `${objectEntityDir}/`;
-    }
-
-    if (!rawObjectPath.startsWith(objectEntityDir)) {
-      return rawObjectPath;
-    }
-
-    const entityId = rawObjectPath.slice(objectEntityDir.length);
-    return `/objects/${entityId}`;
+  /** Resolve "/objects/<id...>" para o arquivo privado em disco. */
+  async getObjectEntityFile(objectPath: string): Promise<StoredObject> {
+    if (!objectPath.startsWith("/objects/")) throw new ObjectNotFoundError();
+    const entityId = objectPath.slice("/objects/".length);
+    if (!entityId || entityId.endsWith(".meta.json")) throw new ObjectNotFoundError();
+    const full = safeJoin(this.privateDir(), entityId);
+    if (!full) throw new ObjectNotFoundError();
+    const obj = await toStoredObject(full, false);
+    if (!obj) throw new ObjectNotFoundError();
+    return obj;
   }
 
-  async trySetObjectEntityAclPolicy(
-    rawPath: string,
-    aclPolicy: ObjectAclPolicy
-  ): Promise<string> {
-    const normalizedPath = this.normalizeObjectEntityPath(rawPath);
-    if (!normalizedPath.startsWith("/")) {
-      return normalizedPath;
-    }
-
-    const objectFile = await this.getObjectEntityFile(normalizedPath);
-    await setObjectAclPolicy(objectFile, aclPolicy);
-    return normalizedPath;
-  }
-
-  async canAccessObjectEntity({
-    userId,
-    objectFile,
-    requestedPermission,
-  }: {
-    userId?: string;
-    objectFile: File;
-    requestedPermission?: ObjectPermission;
-  }): Promise<boolean> {
-    return canAccessObject({
-      userId,
-      objectFile,
-      requestedPermission: requestedPermission ?? ObjectPermission.READ,
-    });
-  }
-}
-
-function parseObjectPath(path: string): {
-  bucketName: string;
-  objectName: string;
-} {
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
-  }
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    throw new Error("Invalid path: must contain at least a bucket name");
-  }
-
-  const bucketName = pathParts[1];
-  const objectName = pathParts.slice(2).join("/");
-
-  return {
-    bucketName,
-    objectName,
-  };
-}
-
-async function signObjectURL({
-  bucketName,
-  objectName,
-  method,
-  ttlSec,
-}: {
-  bucketName: string;
-  objectName: string;
-  method: "GET" | "PUT" | "DELETE" | "HEAD";
-  ttlSec: number;
-}): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: "POST",
+  /** Stream + cabeçalhos para responder um GET. */
+  openObject(obj: StoredObject, cacheTtlSec = 3600): { stream: Readable; headers: Record<string, string> } {
+    return {
+      stream: createReadStream(obj.filePath),
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": obj.contentType,
+        "Content-Length": String(obj.size),
+        "Cache-Control": `${obj.isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
       },
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(30_000),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
-    );
+    };
   }
-
-  const { signed_url: signedURL } = (await response.json()) as { signed_url: string };
-  return signedURL;
 }

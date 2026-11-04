@@ -275,6 +275,7 @@ export * from './publicTokenType';
 export * from './publishAllCriteriaFinalFeedback200';
 export * from './publishAllCriteriaPartialFeedback200';
 export * from './publishCriterionFinalFeedback200';
+export * from './putUploadObject200';
 export * from './quarterCloseResult';
 export * from './quarterEligibility';
 export * from './quarterEligibilityInput';

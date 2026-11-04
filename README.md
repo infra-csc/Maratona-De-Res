@@ -15,15 +15,17 @@ colaborador.
 ## Rodar
 
 ```bash
+cp .env.example .env                            # preencha DATABASE_URL e JWT_SECRET
 pnpm install
-pnpm --filter @workspace/api-server run dev     # API em PORT (8080 no Replit)
-pnpm --filter @workspace/maratona run dev       # Vite com proxy /api → 8080
+pnpm --filter @workspace/api-server run dev     # API em PORT (padrão 8080)
+pnpm --filter @workspace/maratona run dev       # Vite (5173) com proxy /api → 8080
 ```
 
-Variáveis obrigatórias: `DATABASE_URL`, `JWT_SECRET`, `PORT`, `BASE_PATH`.
-Opcionais: `APP_ORIGINS` (CORS, lista separada por vírgula), `PG_POOL_MAX`,
-`SESSION_SECRET` (SSO do portal), `PRIVATE_OBJECT_DIR`/`PUBLIC_OBJECT_SEARCH_PATHS`
-(áudio das avaliações), `LOG_LEVEL`.
+A API lê o `.env` da raiz sozinha. Todas as variáveis estão documentadas em
+`.env.example`. Obrigatórias: `DATABASE_URL`, `JWT_SECRET`, `PORT`.
+Opcionais: `ALLOWED_ORIGINS` (CORS), `PG_POOL_MAX`, `SESSION_SECRET` (SSO do
+portal), `STORAGE_DIR` (áudio das avaliações, em disco), `STATIC_DIR` (a API
+serve o build do web), `EXTERNAL_API_URL`/`EXTERNAL_API_TOKEN`, `LOG_LEVEL`.
 
 ## Portões de qualidade
 
@@ -51,7 +53,7 @@ do spec. Testes de rota usam `scripts/test/api-harness.mjs` (app real de
 - Ciclos (tela `/cycles`, rotas em `routes/cycles.ts`, validação em
   `lib/cycle-rules.ts`): nunca são excluídos; só um é o atual; criar o próximo
   exige fechar o atual se ele tiver eventos; ciclo fechado só muda de nome.
-- Notas de decisões e incidentes passados: `.agents/memory/*.md`.
+- Notas de decisões e incidentes passados: `docs/decisoes/*.md`.
 
 ## Banco
 
@@ -61,9 +63,21 @@ do spec. Testes de rota usam `scripts/test/api-harness.mjs` (app real de
   sozinho num banco criado por push. Detalhes em `lib/db/migrations/README.md`.
 - `seed.ts` apaga tudo: só roda com `ALLOW_DESTRUCTIVE_SEED=true` fora de produção.
 
-## Deploy (Replit)
+## Deploy (VPS)
 
-`git pull` no Shell e Republicar. O hook de pós-merge instala dependências,
-aplica as migrações versionadas e roda `push` (sem --force) como rede de
-segurança. Antes do primeiro pull com índices únicos, rode
-`scripts/sql/check-duplicates.sql` no painel Database.
+Requisitos: Node 24, pnpm 10 (`corepack enable`), acesso ao Postgres (Neon).
+
+```bash
+git clone … /opt/maratona && cd /opt/maratona
+cp .env.example .env        # preencha; STORAGE_DIR fora do código e no backup
+./scripts/deploy.sh         # install, migrações, schema:check e build
+pnpm --filter @workspace/api-server run start   # ou via systemd/PM2
+```
+
+Com `STATIC_DIR` definido, um único processo serve API (`/api`) e web (SPA).
+Antes do primeiro deploy com índices únicos, rode
+`scripts/sql/check-duplicates.sql` no banco.
+
+Áudios que estavam no Object Storage do Replit: rode
+`lib/db/scripts/export-replit-audios.mjs` no Shell do Replit e copie a pasta
+gerada para `STORAGE_DIR` (instruções no topo do script).

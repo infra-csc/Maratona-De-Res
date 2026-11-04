@@ -3193,10 +3193,10 @@ paths:
     post:
       tags: [Storage]
       operationId: requestUploadUrl
-      summary: Request a presigned URL for file upload
+      summary: Request a signed URL for file upload
       description: |
-        Returns a presigned GCS URL for direct upload. The client sends JSON
-        metadata here, then uploads the file directly to the returned URL.
+        Returns a signed upload URL served by this API (PUT /storage/uploads/{objectId}).
+        The client sends JSON metadata here, then uploads the file to the returned URL.
       requestBody:
         required: true
         content:
@@ -3222,11 +3222,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/uploads/{objectId}:
+    put:
+      tags: [Storage]
+      operationId: putUploadObject
+      summary: Recebe os bytes de um upload na URL assinada (sem Bearer; autorizado pela assinatura)
+      description: |
+        Use a uploadURL devolvida por request-url sem alterá-la: ela já traz
+        os parâmetros de consulta `expires` e `sig` (HMAC), que autorizam o PUT.
+      parameters:
+        - name: objectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          "*/*":
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Arquivo gravado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [objectPath, size]
+                properties:
+                  objectPath:
+                    type: string
+                  size:
+                    type: integer
+        "400":
+          description: Identificador inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Assinatura ausente, inválida ou expirada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Link de upload já usado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: Arquivo grande demais.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Falha ao gravar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/public-objects/{filePath}:
     get:
       tags: [Storage]
       operationId: getPublicObject
-      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      summary: Serve a public asset from STORAGE_DIR/public
       parameters:
         - name: filePath
           in: path
@@ -3257,7 +3321,7 @@ paths:
     get:
       tags: [Storage]
       operationId: getStorageObject
-      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      summary: Serve an object entity from STORAGE_DIR/private
       parameters:
         - name: objectPath
           in: path
@@ -4489,8 +4553,7 @@ components:
       properties:
         uploadURL:
           type: string
-          format: uri
-          description: Presigned GCS URL for PUT upload.
+          description: URL assinada (relativa à origem da API) para o PUT do arquivo; vale 15 min e uso único.
         objectPath:
           type: string
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.

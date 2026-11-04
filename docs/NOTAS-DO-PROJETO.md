@@ -4,15 +4,15 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — API na porta `PORT` (8080 no Replit; o Vite faz proxy de `/api`)
+- `pnpm --filter @workspace/api-server run dev` — API na porta `PORT` (padrão 8080; o Vite faz proxy de `/api`)
 - `pnpm --filter @workspace/maratona run dev` — app web
 - `pnpm run typecheck` — libs + api + web
 - `pnpm run test` — unitários + testes de rota (app real contra PGlite, sem serviço externo)
 - `pnpm run check:api-contract` — falha se alguma rota Express não estiver no openapi.yaml
-- `pnpm run build` — typecheck + build de produção (api + web; mockup-sandbox fica de fora)
+- `pnpm run build` — typecheck + build de produção (api + web)
 - `pnpm run codegen` — regenera hooks e Zod a partir de `lib/api-spec/openapi.yaml`
 - `pnpm --filter db generate` / `migrate:deploy` — migrações versionadas (o deploy adota o baseline num banco criado por push); `push` só em dev
-- Env obrigatórias: `DATABASE_URL`, `JWT_SECRET`, `PORT`, `BASE_PATH`. Opcionais: `APP_ORIGINS`, `PG_POOL_MAX`, `SESSION_SECRET`, `PRIVATE_OBJECT_DIR`, `PUBLIC_OBJECT_SEARCH_PATHS`, `LOG_LEVEL`
+- Env: ver `.env.example` na raiz (obrigatórias `DATABASE_URL`, `JWT_SECRET`, `PORT`). Deploy na VPS: `scripts/deploy.sh`.
 
 ## Stack
 
@@ -30,7 +30,7 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 - Auth (JWT, papéis): `artifacts/api-server/src/lib/auth.ts`; ordem de montagem dos routers importa: `routes/index.ts`
 - Tema/tokens do web: `artifacts/maratona/src/index.css` (fonte única, cores completas) e `src/lib/premium-theme.tsx`
 - Componentes compartilhados: `artifacts/maratona/src/components/shared`
-- Decisões e incidentes passados: `.agents/memory/*.md`
+- Decisões e incidentes passados: `docs/decisoes/*.md`
 
 ## Architecture decisions
 
