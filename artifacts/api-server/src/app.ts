@@ -9,6 +9,12 @@ import { apiLimiter } from "./lib/rate-limit.js";
 
 const app: Express = express();
 
+// Atrás do Nginx, req.ip seria sempre 127.0.0.1 e os rate limits (login,
+// links públicos) valeriam para todos juntos. "loopback" confia só no proxy
+// local; TRUST_PROXY=false desliga, um número N confia em N saltos.
+const trustProxy = process.env.TRUST_PROXY ?? "loopback";
+app.set("trust proxy", trustProxy === "false" ? false : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+
 // ---------------------------------------------------------------------------
 // CORS — permitir apenas origens conhecidas.
 // ALLOWED_ORIGINS: lista separada por vírgula das origens permitidas
