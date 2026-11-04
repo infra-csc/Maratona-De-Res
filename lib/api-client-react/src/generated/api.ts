@@ -39,6 +39,7 @@ import type {
   BulkDateSyncResult,
   BulkEmploymentResetInput,
   BulkEmploymentResetResult,
+  BulkEventCriteriaOp,
   BulkGenerateAccessInput,
   BulkGenerateAccessResult,
   BulkGeneratePinsInput,
@@ -47,6 +48,7 @@ import type {
   BulkSetCpfResult,
   BulkUpdateEmailsInput,
   BulkUpdateEmailsResult,
+  BulkUpdateEventCriteria200,
   Calibration,
   CalibrationAuditEntry,
   CalibrationComment,
@@ -12485,6 +12487,94 @@ export const useSaveCriterionRouting = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSaveCriterionRoutingMutationOptions(options));
+    }
+
+export const getBulkUpdateEventCriteriaUrl = () => {
+
+
+
+
+  return `/admin/event-criteria/bulk-update`
+}
+
+/**
+ * @summary Admin — ativa/desativa e muda o peso de event_criteria em lote (eventIds × criterionIds) e recalcula o ciclo atual
+ */
+export const bulkUpdateEventCriteria = async (bulkEventCriteriaOp: BulkEventCriteriaOp[], options?: Parameters<typeof customFetch>[1]): Promise<BulkUpdateEventCriteria200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkUpdateEventCriteria200>(getBulkUpdateEventCriteriaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkEventCriteriaOp)
+  }
+);}
+
+
+
+
+
+export const getBulkUpdateEventCriteriaMutationKey = () => ['bulkUpdateEventCriteria'] as const;
+
+export const getBulkUpdateEventCriteriaMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateEventCriteria>>, TError,BulkUpdateEventCriteriaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateEventCriteria>>, TError,BulkUpdateEventCriteriaMutationVariables, TContext> => {
+
+const mutationKey = getBulkUpdateEventCriteriaMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkUpdateEventCriteria>>, BulkUpdateEventCriteriaMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkUpdateEventCriteria(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkUpdateEventCriteriaMutationResult = NonNullable<Awaited<ReturnType<typeof bulkUpdateEventCriteria>>>
+    export type BulkUpdateEventCriteriaMutationBody = BodyType<BulkEventCriteriaOp[]>
+    export type BulkUpdateEventCriteriaMutationError = ErrorType<ErrorEnvelope>
+    export type BulkUpdateEventCriteriaMutationVariables = {data: BodyType<BulkEventCriteriaOp[]>}
+
+    /**
+ * @summary Admin — ativa/desativa e muda o peso de event_criteria em lote (eventIds × criterionIds) e recalcula o ciclo atual
+ */
+export const useBulkUpdateEventCriteria = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateEventCriteria>>, TError,BulkUpdateEventCriteriaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkUpdateEventCriteria>>,
+        TError,
+        BulkUpdateEventCriteriaMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkUpdateEventCriteriaMutationOptions(options));
     }
 
 export const getSyncCriteriaAreaLabelsUrl = () => {

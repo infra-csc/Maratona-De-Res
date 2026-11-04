@@ -31,6 +31,17 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+/**
+ * Uma operação do bulk-update; omitir active/weightOverride mantém o valor atual.
+ */
+export interface BulkEventCriteriaOp {
+  eventIds: number[];
+  criterionIds: number[];
+  active?: boolean;
+  /** @nullable */
+  weightOverride?: string | null;
+}
+
 export interface ErrorEnvelope {
   error: string;
 }
@@ -3967,6 +3978,28 @@ cycleId?: string;
 export type PutUploadObject200 = {
   objectPath: string;
   size: number;
+};
+
+export type BulkUpdateEventCriteria200SummaryItem = {
+  eventIds: number[];
+  criterionIds: number[];
+  rowsAffected: number;
+};
+
+export type BulkUpdateEventCriteria200ConfirmationItem = {
+  eventId: number;
+  criterionId: number;
+  active: boolean;
+  /** @nullable */
+  weightOverride: string | null;
+};
+
+export type BulkUpdateEventCriteria200 = {
+  summary: BulkUpdateEventCriteria200SummaryItem[];
+  recomputed: boolean;
+  /** @nullable */
+  cycleId: number | null;
+  confirmation: BulkUpdateEventCriteria200ConfirmationItem[];
 };
 
 export type GetCalibrationAuditParams = {

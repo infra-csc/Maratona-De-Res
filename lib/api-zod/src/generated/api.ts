@@ -5584,6 +5584,34 @@ export const SaveCriterionRoutingResponse = zod.object({
 
 
 /**
+ * @summary Admin — ativa/desativa e muda o peso de event_criteria em lote (eventIds × criterionIds) e recalcula o ciclo atual
+ */
+export const BulkUpdateEventCriteriaBodyItem = zod.object({
+  "eventIds": zod.array(zod.int()),
+  "criterionIds": zod.array(zod.int()),
+  "active": zod.boolean().optional(),
+  "weightOverride": zod.string().nullish()
+}).describe('Uma operação do bulk-update; omitir active/weightOverride mantém o valor atual.')
+export const BulkUpdateEventCriteriaBody = zod.array(BulkUpdateEventCriteriaBodyItem).min(1)
+
+export const BulkUpdateEventCriteriaResponse = zod.object({
+  "summary": zod.array(zod.object({
+  "eventIds": zod.array(zod.int()),
+  "criterionIds": zod.array(zod.int()),
+  "rowsAffected": zod.int()
+})),
+  "recomputed": zod.boolean(),
+  "cycleId": zod.int().nullable(),
+  "confirmation": zod.array(zod.object({
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "active": zod.boolean(),
+  "weightOverride": zod.string().nullable()
+}))
+})
+
+
+/**
  * @summary Admin — sincroniza responsibleAreaLabel com o nome real da área (idempotente)
  */
 export const SyncCriteriaAreaLabelsResponse = zod.object({
