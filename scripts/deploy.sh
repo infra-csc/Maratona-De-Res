@@ -11,7 +11,8 @@ if [ ! -f .env ]; then
 fi
 set -a; . ./.env; set +a
 
-pnpm install --frozen-lockfile
+# NODE_ENV=production (do .env) faria o pnpm pular as devDependencies, que o build usa.
+NODE_ENV=development pnpm install --frozen-lockfile
 # Migrações versionadas e revisadas (lib/db/migrations). Na primeira vez num
 # banco criado por push, o script adota o baseline e aplica só o que falta.
 pnpm --filter @workspace/db run migrate:deploy
