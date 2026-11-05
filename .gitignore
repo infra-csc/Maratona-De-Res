@@ -55,7 +55,7 @@ data/
 !.env.example
 
 # Anexos antigos das conversas com o agente do Replit (capturas, planilhas e PDFs com
-# dados pessoais de colaboradores). Nunca versionar; ver replit.md.
+# dados pessoais de colaboradores). Nunca versionar; ver README (Segurança).
 attached_assets/
 
 # Playwright (E2E)

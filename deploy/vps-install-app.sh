@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Fase 2: baixa (ou atualiza) o código, instala, migra, builda e sobe o serviço.
-# Rodar como root depois do vps-bootstrap.sh e de cadastrar a chave de deploy
-# no GitHub. Na primeira vez, cria /opt/maratona/.env a partir do exemplo e
-# para, para você preencher DATABASE_URL, JWT_SECRET etc.
+# Rodar como root depois do vps-bootstrap.sh. Na primeira vez, cria
+# /opt/maratona/.env a partir do exemplo e para, para você preencher
+# DATABASE_URL, JWT_SECRET etc. Atualizações: rode de novo (padrão: main).
 #   BRANCH=main ./vps-install-app.sh
+# O repositório é público, então o clone é por HTTPS (sem chave de deploy).
+# Para um repositório privado: REPO=${REPO:-https://github.com/infra-csc/maratona-de-res.git}
 set -euo pipefail
 APP_USER=maratona
 APP_DIR=/opt/maratona
-REPO=git@github.com:infra-csc/maratona-de-res.git
+REPO=${REPO:-https://github.com/infra-csc/maratona-de-res.git}
 BRANCH=${BRANCH:-main}
 
 as_app() { sudo -u "$APP_USER" -H bash -lc "cd $APP_DIR && $*"; }

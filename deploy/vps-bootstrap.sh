@@ -4,7 +4,8 @@
 #
 # O que faz: atualiza o sistema, swap de 2 GB, firewall (22/80/443), fail2ban,
 # Node 24 + pnpm 10, Nginx, Certbot, usuário de serviço `maratona`, pastas,
-# chave SSH de deploy (somente leitura no GitHub), serviço systemd e site Nginx.
+# chave SSH de deploy (só necessária se o repositório virar privado), serviço
+# systemd e site Nginx HTTP básico (o HTTPS e o Cloudflare estão em docs/DEPLOY-VPS.md).
 # NÃO clona o código nem cria o .env: isso é a fase 2 (deploy/vps-install-app.sh).
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -40,7 +41,7 @@ mkdir -p "$APP_DIR" "$DATA_DIR/storage" /var/log/maratona
 chown -R "$APP_USER:$APP_USER" "$APP_DIR" "$DATA_DIR" /var/log/maratona
 chmod 750 "$DATA_DIR"
 
-echo "==> Chave de deploy (GitHub, somente leitura)"
+echo "==> Chave de deploy (GitHub, somente leitura; opcional enquanto o repositório for público)"
 sudo -u "$APP_USER" bash -c '
   mkdir -p ~/.ssh && chmod 700 ~/.ssh
   [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -C "maratona-vps-deploy" -f ~/.ssh/id_ed25519
@@ -110,5 +111,5 @@ nginx -t && systemctl reload nginx
 echo
 echo "================ PRONTO (fase 1) ================"
 echo "node $(node -v) · pnpm $(pnpm -v) · $(nginx -v 2>&1)"
-echo "Chave pública de deploy (adicionar no GitHub como Deploy key, somente leitura):"
+echo "Chave pública de deploy (só se o repositório for privado: adicionar no GitHub como Deploy key, somente leitura):"
 cat /home/$APP_USER/.ssh/id_ed25519.pub
