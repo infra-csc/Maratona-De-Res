@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, numeric, text, boolean, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, boolean, date, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { timestamptz } from "./columns";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -34,6 +34,7 @@ export const quarterlyResultsTable = pgTable("quarterly_results", {
   closedByUserId: integer("closed_by_user_id").references(() => usersTable.id),
 }, (t) => ({
   employeeCycleUq: uniqueIndex("quarterly_results_employee_cycle_uq").on(t.employeeId, t.cycleId),
+  cycleIdx: index("quarterly_results_cycle_idx").on(t.cycleId),
 }));
 
 export const insertQuarterlyResultSchema = createInsertSchema(quarterlyResultsTable).omit({ id: true });

@@ -16,7 +16,7 @@
 # passed (e.g. an urgent security bugfix), you can add it to the
 # `minimumReleaseAgeExclude` allowlist below. Only consider doing this for
 # packages released by trusted organizations with an impeccable security
-# posture (e.g. Replit packsges, react from Meta, typescript from Microsoft). Even then,
+# posture (e.g. react from Meta, typescript from Microsoft). Even then,
 # remove the exclusion once the 1-day window has passed.
 #
 # Example:
@@ -27,13 +27,6 @@
 # ============================================================================
 minimumReleaseAge: 1440
 
-minimumReleaseAgeExclude:
-  # Exclude @replit scoped packages from the minimum release age check.
-  # These are published by Replit and trusted — the supply-chain attack vector
-  # this setting guards against does not apply to our own packages.
-  - '@replit/*'
-  - stripe-replit-sync
-
 packages:
   - artifacts/*
   - lib/*
@@ -41,9 +34,6 @@ packages:
   - scripts
 
 catalog:
-  '@replit/vite-plugin-cartographer': ^0.5.1
-  '@replit/vite-plugin-dev-banner': ^0.1.1
-  '@replit/vite-plugin-runtime-error-modal': ^0.0.6
   '@tailwindcss/vite': ^4.1.14
   '@tanstack/react-query': ^5.90.21
   '@types/node': ^25.3.3
@@ -75,7 +65,7 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 # pnpm 11 substitui onlyBuiltDependencies por allowBuilds; manter os dois
-# para o pnpm 10 (Replit) e o 11 (máquinas locais) aceitarem os mesmos builds.
+# para o pnpm 10 (CI/VPS) e o 11 (máquinas locais) aceitarem os mesmos builds.
 allowBuilds:
   "@swc/core": true
   esbuild: true
@@ -83,13 +73,13 @@ allowBuilds:
   unrs-resolver: true
 
 overrides:
-  # replit uses linux-x64 only, we can exclude all other platforms
+  # Binários nativos: mantemos só linux-x64 e linux-arm64 (glibc), que cobrem
+  # VPS x86 e ARM. Para rodar no Windows/macOS, ver docs/NOTAS-DO-PROJETO.md.
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
   "esbuild>@esbuild/freebsd-arm64": "-"
   "esbuild>@esbuild/freebsd-x64": "-"
   "esbuild>@esbuild/linux-arm": "-"
-  "esbuild>@esbuild/linux-arm64": "-"
   "esbuild>@esbuild/linux-ia32": "-"
   "esbuild>@esbuild/linux-loong64": "-"
   "esbuild>@esbuild/linux-mips64el": "-"
@@ -114,7 +104,6 @@ overrides:
   "lightningcss>lightningcss-darwin-x64": "-"
   "lightningcss>lightningcss-freebsd-x64": "-"
   "lightningcss>lightningcss-linux-arm-gnueabihf": "-"
-  "lightningcss>lightningcss-linux-arm64-gnu": "-"
   "lightningcss>lightningcss-linux-arm64-musl": "-"
   "lightningcss>lightningcss-linux-x64-musl": "-"
   "lightningcss>lightningcss-win32-arm64-msvc": "-"
@@ -124,7 +113,6 @@ overrides:
   "@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-freebsd-x64": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm-gnueabihf": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc": "-"
   "@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc": "-"
@@ -137,7 +125,6 @@ overrides:
   "rollup>@rollup/rollup-freebsd-x64": "-"
   "rollup>@rollup/rollup-linux-arm-gnueabihf": "-"
   "rollup>@rollup/rollup-linux-arm-musleabihf": "-"
-  "rollup>@rollup/rollup-linux-arm64-gnu": "-"
   "rollup>@rollup/rollup-linux-arm64-musl": "-"
   "rollup>@rollup/rollup-linux-loong64-gnu": "-"
   "rollup>@rollup/rollup-linux-loong64-musl": "-"

@@ -26,6 +26,7 @@ import storageRouter from "./storage.js";
 import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
 import publicEvalRouter from "./public-eval.js";
+import adminRouter from "./admin.js";
 import scoreTimelineRouter from "./score-timeline.js";
 import { evaluatorScope } from "../lib/evaluator-scope.js";
 import { closedCycleWriteGuard } from "../lib/closed-cycle-guard.js";
@@ -81,6 +82,7 @@ router.use(eligibilityRouter);
 // otherwise those guards 403 the non-manager-accessible exports
 // (/exports/ranking, /exports/event-results, /exports/absences).
 router.use(exportsRouter);
+router.use(adminRouter);
 router.use(auditRouter);
 router.use(integrationRouter);
 

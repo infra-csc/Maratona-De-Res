@@ -21,6 +21,7 @@ import { anyEventLockedByClosedCycle, closedCycleBody } from "../lib/closed-cycl
 import { isEventInNextCycle, nextCycleBody } from "../lib/next-cycle.js";
 import type { DbOrTx } from "../lib/db-tx.js";
 import { recomputeCycleResults } from "./results.js";
+import { publicEvalLimiter } from "../lib/rate-limit.js";
 import { eventsWithoutConduta } from "../lib/cycle-data.js";
 
 const router = Router();
@@ -218,7 +219,7 @@ router.get("/public-eval/:token", async (req, res) => {
 // Rota pública (sem autenticação). Submete respostas de critérios.
 // Body: { submitterName: string; evaluations: { criterionId: number; score: number; comments?: string }[] }
 // ---------------------------------------------------------------------------
-router.post("/public-eval/:token/submit", async (req, res) => {
+router.post("/public-eval/:token/submit", publicEvalLimiter, async (req, res) => {
   const tokenId = req.params.token as string;
   const { submitterName, evaluations, ...conformityData } = req.body ?? {};
 
@@ -435,9 +436,11 @@ router.post("/public-eval/:token/submit", async (req, res) => {
         )).limit(1);
       if (existing) {
         // Rascunho de quem gerou o link vira a resposta do freela.
-        await tx.update(evaluationsTable).set({
+          await tx.update(evaluationsTable).set({
           score: item.score.toFixed(2),
           comments: item.comments,
+          audioUrl: null,
+          commentVisibility: "internal",
           status: "submitted",
           submittedAt: now,
           publicTokenId: tokenId,
@@ -540,7 +543,7 @@ router.post("/public-eval/:token/submit", async (req, res) => {
 // Para conformity_ferramentas: { submitterName, guardaEquipamentos,
 //   guardaEquipamentosComment? }
 // ---------------------------------------------------------------------------
-router.post("/public-eval/:token/submit-conformity", async (req, res) => {
+router.post("/public-eval/:token/submit-conformity", publicEvalLimiter, async (req, res) => {
   const tokenId = req.params.token as string;
   const { submitterName, ...answers } = req.body ?? {};
 
@@ -641,72 +644,87 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
     }
   }
 
-  await db.transaction(async (tx) => {
-    // Trava a linha do evento (mesma trava do link combinado e da tela) e
-    // confere de novo: dois envios ao mesmo tempo → só o primeiro grava.
-    await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, token.eventId)).for("update");
-    const answeredNow = await conformityLinkAnswered(token.eventId, tokenType, tx);
-    if (answeredNow.answered) throw new ConformityAlreadyAnsweredError(conformityRejection(answeredNow));
-    const existing = await tx.select({ id: eventConformitiesTable.id })
-      .from(eventConformitiesTable)
-      .where(eq(eventConformitiesTable.eventId, token.eventId));
+  // ── Atomic claim + write (race-condition safe) ───────────────────────────
+  try {
+    await db.transaction(async (tx) => {
+      // Primeiro passo: tentar "claim" atômico do token.
+      const [claimed] = await tx
+        .update(publicEvalTokensTable)
+        .set({ usedAt: new Date(), submitterName: submitterName.trim() })
+        .where(and(
+          eq(publicEvalTokensTable.id, tokenId),
+          isNull(publicEvalTokensTable.usedAt),
+        ))
+        .returning({ id: publicEvalTokensTable.id });
 
-    const trimmedSubmitterName = submitterName.trim();
-    if (existing.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const patch: Record<string, any> = { updatedAt: new Date() };
-      if (isCenografia) {
-        if (answers.epi !== undefined) patch.epi = answers.epi;
-        if (answers.estaiamentos !== undefined) patch.estaiamentos = answers.estaiamentos;
-        if (answers.conduta !== undefined) patch.conduta = answers.conduta;
-        if (answers.epiComment !== undefined) patch.epiComment = answers.epiComment || null;
-        if (answers.estaiamentosComment !== undefined) patch.estaiamentosComment = answers.estaiamentosComment || null;
-        if (answers.condutaComment !== undefined) patch.condutaComment = answers.condutaComment || null;
-        if (answers.absencesResponse !== undefined) patch.absencesResponse = answers.absencesResponse;
-        if (answers.absencesReport !== undefined) patch.absencesReport = answers.absencesReport || null;
-        if (answers.standoutResponse !== undefined) patch.standoutResponse = answers.standoutResponse;
-        if (answers.standoutJustification !== undefined) patch.standoutJustification = answers.standoutJustification || null;
-        patch.cenografiaSubmittedByName = trimmedSubmitterName;
+      if (!claimed) {
+        throw Object.assign(new Error("Este link já foi utilizado"), { code: "ALREADY_USED" });
       }
-      if (isFerramentas) {
-        if (answers.guardaEquipamentos !== undefined) patch.guardaEquipamentos = answers.guardaEquipamentos;
-        if (answers.guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = answers.guardaEquipamentosComment || null;
-        patch.ferramentasSubmittedByName = trimmedSubmitterName;
-      }
-      await tx.update(eventConformitiesTable)
-        .set(patch)
+
+      // Trava a linha do evento (mesma trava do link combinado e da tela) e
+      // confere de novo: dois envios ao mesmo tempo → só o primeiro grava.
+      await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.id, token.eventId)).for("update");
+      const answeredNow = await conformityLinkAnswered(token.eventId, tokenType, tx);
+      if (answeredNow.answered) throw new ConformityAlreadyAnsweredError(conformityRejection(answeredNow));
+
+      const existing = await tx.select({ id: eventConformitiesTable.id })
+        .from(eventConformitiesTable)
         .where(eq(eventConformitiesTable.eventId, token.eventId));
-    } else {
-      const insertValues: typeof eventConformitiesTable.$inferInsert = {
-        eventId: token.eventId,
-        epi: isCenografia ? (answers.epi ?? null) : null,
-        estaiamentos: isCenografia ? (answers.estaiamentos ?? null) : null,
-        conduta: isCenografia ? (answers.conduta ?? null) : null,
-        guardaEquipamentos: isFerramentas ? (answers.guardaEquipamentos ?? null) : null,
-        epiComment: isCenografia ? (answers.epiComment || null) : null,
-        estaiamentosComment: isCenografia ? (answers.estaiamentosComment || null) : null,
-        condutaComment: isCenografia ? (answers.condutaComment || null) : null,
-        guardaEquipamentosComment: isFerramentas ? (answers.guardaEquipamentosComment || null) : null,
-        absencesResponse: isCenografia ? (answers.absencesResponse ?? null) : null,
-        absencesReport: isCenografia ? (answers.absencesReport || null) : null,
-        standoutResponse: isCenografia ? (answers.standoutResponse ?? null) : null,
-        standoutJustification: isCenografia ? (answers.standoutJustification || null) : null,
-        createdByUserId: token.createdByUserId!,
-        cenografiaSubmittedByName: isCenografia ? trimmedSubmitterName : null,
-        ferramentasSubmittedByName: isFerramentas ? trimmedSubmitterName : null,
-      };
-      await tx.insert(eventConformitiesTable).values(insertValues);
-    }
 
-    // Marca o link como usado de forma atômica: dois envios simultâneos
-    // passavam a checagem inicial e o segundo sobrescrevia o primeiro.
-    const claimed = await tx.update(publicEvalTokensTable).set({
-      usedAt: new Date(),
-      submitterName: submitterName.trim(),
-    }).where(and(eq(publicEvalTokensTable.id, tokenId), isNull(publicEvalTokensTable.usedAt)))
-      .returning({ id: publicEvalTokensTable.id });
-    if (claimed.length === 0) throw new TokenAlreadyUsedError();
-  });
+      const trimmedSubmitterName = submitterName.trim();
+      if (existing.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const patch: Record<string, any> = { updatedAt: new Date() };
+        if (isCenografia) {
+          if (answers.epi !== undefined) patch.epi = answers.epi;
+          if (answers.estaiamentos !== undefined) patch.estaiamentos = answers.estaiamentos;
+          if (answers.conduta !== undefined) patch.conduta = answers.conduta;
+          if (answers.epiComment !== undefined) patch.epiComment = answers.epiComment || null;
+          if (answers.estaiamentosComment !== undefined) patch.estaiamentosComment = answers.estaiamentosComment || null;
+          if (answers.condutaComment !== undefined) patch.condutaComment = answers.condutaComment || null;
+          if (answers.absencesResponse !== undefined) patch.absencesResponse = answers.absencesResponse;
+          if (answers.absencesReport !== undefined) patch.absencesReport = answers.absencesReport || null;
+          if (answers.standoutResponse !== undefined) patch.standoutResponse = answers.standoutResponse;
+          if (answers.standoutJustification !== undefined) patch.standoutJustification = answers.standoutJustification || null;
+          patch.cenografiaSubmittedByName = trimmedSubmitterName;
+        }
+        if (isFerramentas) {
+          if (answers.guardaEquipamentos !== undefined) patch.guardaEquipamentos = answers.guardaEquipamentos;
+          if (answers.guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = answers.guardaEquipamentosComment || null;
+          patch.ferramentasSubmittedByName = trimmedSubmitterName;
+        }
+        await tx.update(eventConformitiesTable)
+          .set(patch)
+          .where(eq(eventConformitiesTable.eventId, token.eventId));
+      } else {
+        const insertValues: typeof eventConformitiesTable.$inferInsert = {
+          eventId: token.eventId,
+          epi: isCenografia ? (answers.epi ?? null) : null,
+          estaiamentos: isCenografia ? (answers.estaiamentos ?? null) : null,
+          conduta: isCenografia ? (answers.conduta ?? null) : null,
+          guardaEquipamentos: isFerramentas ? (answers.guardaEquipamentos ?? null) : null,
+          epiComment: isCenografia ? (answers.epiComment || null) : null,
+          estaiamentosComment: isCenografia ? (answers.estaiamentosComment || null) : null,
+          condutaComment: isCenografia ? (answers.condutaComment || null) : null,
+          guardaEquipamentosComment: isFerramentas ? (answers.guardaEquipamentosComment || null) : null,
+          absencesResponse: isCenografia ? (answers.absencesResponse ?? null) : null,
+          absencesReport: isCenografia ? (answers.absencesReport || null) : null,
+          standoutResponse: isCenografia ? (answers.standoutResponse ?? null) : null,
+          standoutJustification: isCenografia ? (answers.standoutJustification || null) : null,
+          createdByUserId: token.createdByUserId!,
+          cenografiaSubmittedByName: isCenografia ? trimmedSubmitterName : null,
+          ferramentasSubmittedByName: isFerramentas ? trimmedSubmitterName : null,
+        };
+        await tx.insert(eventConformitiesTable).values(insertValues);
+      }
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as NodeJS.ErrnoException & { code?: string }).code === "ALREADY_USED") {
+      res.status(409).json({ error: "Este link já foi utilizado" });
+      return;
+    }
+    throw err;
+  }
 
   await recomputeIfEventCounts(token.eventId, token.createdByUserId ?? null);
   res.json({ ok: true });

@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, exists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
+import { parseId } from "../lib/params.js";
 import { getPlatoonByScore, validateCalculationExample, validateConformityCalculationExample } from "../lib/calculations.js";
 import { getCurrentCycle, getGlobalMinEvents, eventWithinItsCycleSql } from "../lib/cycle.js";
 import { resolveCycleScope, sendScopeError } from "../lib/cycle-scope.js";
@@ -285,7 +286,9 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 router.get("/results/quarterly", async (req, res) => {
   try {
     const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
-    const { employeeId, platoon } = req.query;
+    const { platoon } = req.query;
+    const empId = parseId(req.query.employeeId as string | undefined);
+    const platoonStr = platoon as string | undefined;
     // ?cycleId= vazio = ciclo atual; id = aquele ciclo (anterior: só consulta).
     const scoped = await resolveCycleScope(req.query.cycleId, { allowAll: false });
     if (sendScopeError(res, scoped)) return;
@@ -327,6 +330,8 @@ router.get("/results/quarterly", async (req, res) => {
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
+        ...(empId ? [eq(quarterlyResultsTable.employeeId, empId)] : []),
+        ...(platoonStr ? [eq(quarterlyResultsTable.platoon, platoonStr)] : []),
         exists(
           db.select({ one: sql`1` })
             .from(eventParticipantsTable)
@@ -352,11 +357,7 @@ router.get("/results/quarterly", async (req, res) => {
       maxScore: pgNum(p.maxScore),
     }]));
 
-    const filtered = results
-      .filter(r => !employeeId || r.employeeId === parseInt(employeeId as string))
-      .filter(r => !platoon || r.platoon === platoon);
-
-    res.json(filtered.map(r => {
+    res.json(results.map(r => {
       const pRule = r.platoon ? platoonByName.get(r.platoon) : undefined;
       return {
         ...r,

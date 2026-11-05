@@ -3193,10 +3193,10 @@ paths:
     post:
       tags: [Storage]
       operationId: requestUploadUrl
-      summary: Request a presigned URL for file upload
+      summary: Request a signed URL for file upload
       description: |
-        Returns a presigned GCS URL for direct upload. The client sends JSON
-        metadata here, then uploads the file directly to the returned URL.
+        Returns a signed upload URL served by this API (PUT /storage/uploads/{objectId}).
+        The client sends JSON metadata here, then uploads the file to the returned URL.
       requestBody:
         required: true
         content:
@@ -3222,11 +3222,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/uploads/{objectId}:
+    put:
+      tags: [Storage]
+      operationId: putUploadObject
+      summary: Recebe os bytes de um upload na URL assinada (sem Bearer; autorizado pela assinatura)
+      description: |
+        Use a uploadURL devolvida por request-url sem alterá-la: ela já traz
+        os parâmetros de consulta `expires` e `sig` (HMAC), que autorizam o PUT.
+      parameters:
+        - name: objectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          "*/*":
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Arquivo gravado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [objectPath, size]
+                properties:
+                  objectPath:
+                    type: string
+                  size:
+                    type: integer
+        "400":
+          description: Identificador inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Assinatura ausente, inválida ou expirada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Link de upload já usado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: Arquivo grande demais.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Falha ao gravar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/public-objects/{filePath}:
     get:
       tags: [Storage]
       operationId: getPublicObject
-      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      summary: Serve a public asset from STORAGE_DIR/public
       parameters:
         - name: filePath
           in: path
@@ -3257,7 +3321,7 @@ paths:
     get:
       tags: [Storage]
       operationId: getStorageObject
-      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      summary: Serve an object entity from STORAGE_DIR/private
       parameters:
         - name: objectPath
           in: path
@@ -3422,6 +3486,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CriterionRoutingRow"
+
+  /admin/event-criteria/bulk-update:
+    post:
+      operationId: bulkUpdateEventCriteria
+      tags: [admin]
+      summary: Admin — ativa/desativa e muda o peso de event_criteria em lote (eventIds × criterionIds) e recalcula o ciclo atual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/BulkEventCriteriaOp"
+      responses:
+        "200":
+          description: Resumo por operação e estado final das linhas afetadas.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [summary, recomputed, cycleId, confirmation]
+                properties:
+                  summary:
+                    type: array
+                    items:
+                      type: object
+                      required: [eventIds, criterionIds, rowsAffected]
+                      properties:
+                        eventIds:
+                          type: array
+                          items:
+                            type: integer
+                        criterionIds:
+                          type: array
+                          items:
+                            type: integer
+                        rowsAffected:
+                          type: integer
+                  recomputed:
+                    type: boolean
+                  cycleId:
+                    type: integer
+                    nullable: true
+                  confirmation:
+                    type: array
+                    items:
+                      type: object
+                      required: [eventId, criterionId, active, weightOverride]
+                      properties:
+                        eventId:
+                          type: integer
+                        criterionId:
+                          type: integer
+                        active:
+                          type: boolean
+                        weightOverride:
+                          type: string
+                          nullable: true
+        "400":
+          description: Corpo inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /criteria/admin/sync-area-labels:
     post:
@@ -4489,13 +4619,30 @@ components:
       properties:
         uploadURL:
           type: string
-          format: uri
-          description: Presigned GCS URL for PUT upload.
+          description: URL assinada (relativa à origem da API) para o PUT do arquivo; vale 15 min e uso único.
         objectPath:
           type: string
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
         metadata:
           $ref: "#/components/schemas/UploadUrlRequest"
+    BulkEventCriteriaOp:
+      type: object
+      required: [eventIds, criterionIds]
+      description: Uma operação do bulk-update; omitir active/weightOverride mantém o valor atual.
+      properties:
+        eventIds:
+          type: array
+          items:
+            type: integer
+        criterionIds:
+          type: array
+          items:
+            type: integer
+        active:
+          type: boolean
+        weightOverride:
+          type: string
+          nullable: true
     ErrorEnvelope:
       type: object
       required: [error]

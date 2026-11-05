@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarX2, SearchX, X } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { CycleSelect, CycleScopeNotice, useCycleScope } from "@/components/cycle-select";
+import { CONDENSED } from "@/lib/premium-theme";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { readUrlFilters, DEFAULT_SORT } from "./events/url-filters";
 import { filterAndSortEvents, countCycleEvents } from "./events/rules";
 import { Bone, EmptyBlock, ErrorBlock, btnGhost, btnSmall, surfaceCls } from "./events/events-ui";
@@ -19,6 +21,7 @@ import { EventsTable, EventsLegend } from "./events/events-table";
 import { areaCountsOf } from "./events/use-area-counts";
 import { CreateEventDialog, EditEventDialog } from "./events/event-form-dialogs";
 import { MergeEventDialog, DeleteEventDialog, BulkConfirmBanner, NormalizeDatesDialog } from "./events/event-action-dialogs";
+import { ConformityQuickView } from "./events/conformity-quick-view";
 import type { EditingEvent, EventRef } from "./events/types";
 
 export default function EventsPage() {
@@ -52,6 +55,7 @@ export default function EventsPage() {
   const [mergeForEvent, setMergeForEvent] = useState<EventRef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventRef | null>(null);
   const [editingEvent, setEditingEvent] = useState<EditingEvent | null>(null);
+  const [conformityPopup, setConformityPopup] = useState<EventRef | null>(null);
 
   // Seletor de ciclo: atual (padrão, como sempre), anterior ou Total geral —
   // os dois últimos só de consulta (sem criar/editar/excluir/confirmar).
@@ -211,6 +215,7 @@ export default function EventsPage() {
                   onEdit={(ev) => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
                   onMerge={(ev) => setMergeForEvent({ id: ev.id, name: ev.name })}
                   onDelete={(ev) => setDeleteTarget({ id: ev.id, name: ev.name })}
+                  onConformityClick={(ev) => setConformityPopup({ id: ev.id, name: ev.name })}
                 />
                 <EventsLegend shown={filtered.length} total={all.length} scopeLabel={scope.isAll ? "em todos os ciclos" : "no ciclo"} afterEnd={counts.afterEnd} />
               </>
@@ -220,17 +225,24 @@ export default function EventsPage() {
       </div>
 
       <MergeEventDialog event={mergeForEvent} events={all} onClose={() => setMergeForEvent(null)} />
-
       <NormalizeDatesDialog
         preview={normalizePreview}
         onClose={() => setNormalizePreview(null)}
         isPending={normalizeDatesMutation.isPending}
         onApply={() => normalizeDatesMutation.mutate({ data: { confirm: "APLICAR" } })}
       />
-
       <DeleteEventDialog event={deleteTarget} onClose={() => setDeleteTarget(null)} />
-
       <EditEventDialog event={editingEvent} onClose={() => setEditingEvent(null)} />
+      <Dialog open={!!conformityPopup} onOpenChange={(open) => { if (!open) setConformityPopup(null); }}>
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+              Matriz de Conformidade · {conformityPopup?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {conformityPopup && <ConformityQuickView eventId={conformityPopup.id} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -24,11 +24,22 @@ export interface UploadUrlRequest {
 }
 
 export interface UploadUrlResponse {
-  /** Presigned GCS URL for PUT upload. */
+  /** URL assinada (relativa à origem da API) para o PUT do arquivo; vale 15 min e uso único. */
   uploadURL: string;
   /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
   objectPath: string;
   metadata?: UploadUrlRequest;
+}
+
+/**
+ * Uma operação do bulk-update; omitir active/weightOverride mantém o valor atual.
+ */
+export interface BulkEventCriteriaOp {
+  eventIds: number[];
+  criterionIds: number[];
+  active?: boolean;
+  /** @nullable */
+  weightOverride?: string | null;
 }
 
 export interface ErrorEnvelope {
@@ -3962,6 +3973,33 @@ export type ExportAbsencesParams = {
  * @pattern ^[1-9][0-9]*$
  */
 cycleId?: string;
+};
+
+export type PutUploadObject200 = {
+  objectPath: string;
+  size: number;
+};
+
+export type BulkUpdateEventCriteria200SummaryItem = {
+  eventIds: number[];
+  criterionIds: number[];
+  rowsAffected: number;
+};
+
+export type BulkUpdateEventCriteria200ConfirmationItem = {
+  eventId: number;
+  criterionId: number;
+  active: boolean;
+  /** @nullable */
+  weightOverride: string | null;
+};
+
+export type BulkUpdateEventCriteria200 = {
+  summary: BulkUpdateEventCriteria200SummaryItem[];
+  recomputed: boolean;
+  /** @nullable */
+  cycleId: number | null;
+  confirmation: BulkUpdateEventCriteria200ConfirmationItem[];
 };
 
 export type GetCalibrationAuditParams = {

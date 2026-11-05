@@ -6,6 +6,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { signToken, requireAuth, requireRole, invalidateSessionCache } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES } from "../lib/credentials.js";
+import { loginLimiter } from "../lib/rate-limit.js";
 
 const router = Router();
 
@@ -74,7 +75,7 @@ async function buildAuthResponse(
   };
 }
 
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", loginLimiter, async (req, res) => {
   const { identifier, password, pin } = req.body as { identifier?: string; password?: string; pin?: string };
 
   // PIN-only path for casa employees (lookup by stored pinValue)

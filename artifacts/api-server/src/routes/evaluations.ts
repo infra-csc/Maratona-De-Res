@@ -5,6 +5,7 @@ import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { autoReleaseSafely, isOpenForEvaluation, opensLabel } from "../lib/evaluation-release.js";
 import { evaluatorVisibleEvaluationsSql } from "../lib/evaluator-visibility.js";
 import { audit } from "../lib/audit.js";
+import { parseId } from "../lib/params.js";
 import type { DbOrTx } from "../lib/db-tx.js";
 import { recomputeCycleResults } from "./results.js";
 import { pgNum } from "../lib/pg-num.js";
@@ -117,7 +118,8 @@ router.get("/evaluations", async (req, res) => {
   .$dynamic();
 
   const conditions = [];
-  if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
+  const evId = parseId(eventId as string | undefined);
+  if (evId) conditions.push(eq(evaluationsTable.eventId, evId));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
 
   // Avaliador (regra do dono: só vê o que foi avaliado da SUA área): as

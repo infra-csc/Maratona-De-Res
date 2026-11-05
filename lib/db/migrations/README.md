@@ -10,7 +10,7 @@ Histórico versionado do schema (Drizzle). Até 23/09/2026 o schema só existia 
 2. `pnpm --filter db generate` gera o próximo arquivo em `migrations/`.
 3. Revise o SQL (prefira DDL aditivo e idempotente, ex.: `ADD COLUMN IF NOT
    EXISTS`) e commite junto com a mudança de código.
-4. No Replit, o `git pull` roda `scripts/post-merge.sh`, que chama
+4. Na VPS, `scripts/deploy.sh` chama
    `pnpm --filter @workspace/db run migrate:deploy` e aplica só o que falta.
    Para outro banco: `DATABASE_URL=... pnpm --filter @workspace/db run migrate:deploy`.
 
@@ -57,7 +57,7 @@ por evento — e a nota do critério é a média das áreas que avaliaram
 (`mergeEventScopedCriteria`). A 0003 só acrescenta tabela e coluna com padrão:
 aqui a ordem publicar/migrar não importa.
 
-## Publicar no Replit copia a estrutura do banco do Shell (incidente 30/09)
+## (Histórico, da época do Replit) Publicar copiava a estrutura do banco do Shell (incidente 30/09)
 
 Ao publicar, o Replit aplica na produção a estrutura do banco de
 DESENVOLVIMENTO (o do Shell). Se o banco do Shell está atrasado, a publicação

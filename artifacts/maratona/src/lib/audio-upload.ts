@@ -1,10 +1,10 @@
 import { requestUploadUrl } from "@workspace/api-client-react";
 
 /**
- * Uploads an audio Blob (recorded via MediaRecorder) directly to object storage
+ * Uploads an audio Blob (recorded via MediaRecorder) to the API storage
  * using the presigned-URL flow:
  *   1. POST /storage/uploads/request-url  → { uploadURL, objectPath }
- *   2. PUT <uploadURL>                     → bytes go straight to GCS
+ *   2. PUT <uploadURL>                     → URL assinada da própria API (disco da VPS)
  * Returns the normalized objectPath (e.g. "/objects/uploads/uuid") to persist.
  */
 export async function uploadAudioBlob(blob: Blob): Promise<string> {

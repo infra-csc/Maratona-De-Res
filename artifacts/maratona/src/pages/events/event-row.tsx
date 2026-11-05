@@ -19,6 +19,7 @@ export type EventRowActions = {
   onEdit: (ev: EventItem) => void;
   onMerge: (ev: EventItem) => void;
   onDelete: (ev: EventItem) => void;
+  onConformityClick: (ev: EventItem) => void;
 };
 
 type EventRowProps = EventRowActions & {
@@ -166,7 +167,7 @@ function StatusBadgeView({ ev, badge, readOnly, nextCycle = false, cycle = null 
 }
 
 /** Abrir o evento + menu "Mais ações" (mesmos na linha e no cartão). */
-function EventActions({ ev, user, readOnly, evaluationsHref, onEdit, onMerge, onDelete, variant }: EventRowActions & {
+function EventActions({ ev, user, readOnly, evaluationsHref, onEdit, onMerge, onDelete, variant }: Omit<EventRowActions, "onConformityClick"> & {
   ev: EventItem; user: User | null; readOnly: boolean; evaluationsHref: string; variant: "row" | "card";
 }) {
   const canEdit = !!user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador"));
@@ -309,8 +310,9 @@ const matrixTone = (ev: EventItem): BarTone => ev.conformityComplete ? "ok" : (e
 const Dash = ({ title }: { title?: string }) => <span className="font-condensed text-[15px] font-bold text-muted-foreground/60" title={title} aria-label={title ?? "Não se aplica"}>—</span>;
 
 /** As três métricas (barras) — iguais na linha e no cartão. */
-function Metrics({ ev, r, isAdmin, onOpen, wrap }: {
+function Metrics({ ev, r, isAdmin, onOpen, onConformityClick, wrap }: {
   ev: EventItem; r: ReturnType<typeof deriveEventRow>; isAdmin: boolean; onOpen: (k: EventDetailsKind) => void;
+  onConformityClick: (ev: EventItem) => void;
   wrap: (key: string, label: string, node: ReactNode) => ReactNode;
 }) {
   return (
@@ -332,7 +334,7 @@ function Metrics({ ev, r, isAdmin, onOpen, wrap }: {
       {wrap("matrix", "Matriz", !ev.conformityNeeded
         ? <Dash title="Matriz não exigida neste evento" />
         : (
-          <DetailTrigger enabled={isAdmin} label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => onOpen("matrix")}>
+          <DetailTrigger enabled label={`Ver detalhes da matriz de conformidade de ${ev.name}`} onOpen={() => isAdmin ? onOpen("matrix") : onConformityClick(ev)}>
             <MiniBar
               value={ev.conformityFilled ?? 0}
               total={ev.conformityTotal ?? 0}
@@ -368,7 +370,7 @@ function DateText({ ev, dateStr, inline = false }: { ev: EventItem; dateStr: str
   );
 }
 
-export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: EventRowProps) {
+export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, onConformityClick, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: EventRowProps) {
   const r = deriveEventRow(ev, undefined, eventCycle, areaCounts);
   const isAdmin = hasRole(user, "admin");
   const [details, setDetails] = useState<EventDetailsKind | null>(null);
@@ -410,7 +412,7 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOn
         </span>
       </div>
 
-      <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails}
+      <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails} onConformityClick={onConformityClick}
         wrap={(key, _label, node) => (
           <div key={key} role="cell" className="px-3 py-3.5">{node}</div>
         )} />
@@ -438,7 +440,7 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete, readOn
  * Cartão do evento para celular e tablet (no lugar da tabela de 9 colunas,
  * que espremia o nome até sumir e sobrepunha a data). Mesmos dados e ações.
  */
-export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: Omit<EventRowProps, "gridCols">) {
+export function EventCard({ ev, user, onEdit, onMerge, onDelete, onConformityClick, readOnly = false, cycleLabel = null, eventCycle = null, areaCounts = null, showScore = true }: Omit<EventRowProps, "gridCols">) {
   const r = deriveEventRow(ev, undefined, eventCycle, areaCounts);
   const isAdmin = hasRole(user, "admin");
   const [details, setDetails] = useState<EventDetailsKind | null>(null);
@@ -482,7 +484,7 @@ export function EventCard({ ev, user, onEdit, onMerge, onDelete, readOnly = fals
       )}
 
       <div className="mx-4 mt-3.5 pt-3 border-t border-border grid grid-cols-3 gap-4">
-        <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails}
+        <Metrics ev={ev} r={r} isAdmin={isAdmin} onOpen={setDetails} onConformityClick={onConformityClick}
           wrap={(key, label, node) => (
             <div key={key} className="min-w-0">
               <Eyebrow as="span" className="block mb-2 text-[11.5px]">{label}</Eyebrow>
