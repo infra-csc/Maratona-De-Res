@@ -14,9 +14,9 @@ Histórico versionado do schema (Drizzle). Até 23/09/2026 o schema só existia 
    `pnpm --filter @workspace/db run migrate:deploy` e aplica só o que falta.
    Para outro banco: `DATABASE_URL=... pnpm --filter @workspace/db run migrate:deploy`.
 
-`push` continua útil em desenvolvimento local, mas não gera histórico. No
-pós-merge ele roda DEPOIS das migrações só como rede de segurança contra
-divergência: sem `--force`, não apaga coluna nem tabela.
+`push` continua útil em experimentos locais, mas não gera histórico: não use
+para mudanças que vão para produção. Para conferir a estrutura de um banco
+contra as migrações, use `schema:check` (abaixo).
 
 ## Banco que já existia antes das migrações (produção)
 
@@ -44,8 +44,8 @@ app antigo não lê o formato novo (as datas viram inválidas). Entre os dois
 passos o app funciona normalmente.
 
 Nas migrações, prefira SQL idempotente (`IF NOT EXISTS`, blocos `DO` que
-conferem o estado): o mesmo arquivo roda no banco do Shell pelo pós-merge e
-depois, à mão, no de produção.
+conferem o estado): o mesmo arquivo pode rodar em bancos em estados
+diferentes (desenvolvimento, testes e produção) sem quebrar.
 
 ## Critério respondido por várias áreas (migração 0003)
 
@@ -57,6 +57,17 @@ por evento — e a nota do critério é a média das áreas que avaliaram
 (`mergeEventScopedCriteria`). A 0003 só acrescenta tabela e coluna com padrão:
 aqui a ordem publicar/migrar não importa.
 
+## Verificar e reparar a estrutura (`schema:check` / `schema:repair`)
+
+- `pnpm --filter @workspace/db run schema:check` compara o banco de
+  `DATABASE_URL` com a estrutura que as migrações definem (monta a referência
+  em memória) e lista as diferenças. O `scripts/deploy.sh` roda isso a cada
+  deploy e só avisa.
+- `pnpm --filter @workspace/db run schema:repair` reaplica as migrações
+  idempotentes e recria índices que faltam (único só sem duplicatas). Não apaga nada.
+
+Na produção (VPS): `cd /opt/maratona && sudo -u maratona bash -c 'set -a; . ./.env; set +a; pnpm --filter @workspace/db run schema:check'`.
+
 ## (Histórico, da época do Replit) Publicar copiava a estrutura do banco do Shell (incidente 30/09)
 
 Ao publicar, o Replit aplica na produção a estrutura do banco de
@@ -66,11 +77,6 @@ desfaz na produção o que as migrações criaram — e o histórico
 `migrate:deploy` não percebe. Em 30/09 isso tirou 3 índices únicos da produção
 (salvar calibração dava 500) e voltou as datas para sem fuso.
 
-- `pnpm --filter @workspace/db run schema:check` compara o banco de
-  `DATABASE_URL` com a estrutura que as migrações definem (monta a referência
-  em memória) e lista as diferenças.
-- `pnpm --filter @workspace/db run schema:repair` reaplica as migrações
-  idempotentes e recria índices que faltam (único só sem duplicatas). Não apaga nada.
-
-**Antes de publicar:** rodar `schema:repair` no Shell (o pós-merge já roda).
-Depois de publicar: `schema:check` com o `DATABASE_URL` de produção.
+Foi por causa desse incidente que `schema:check` e `schema:repair` foram
+criados. Na VPS esse risco não existe (nada copia estrutura entre bancos), mas
+o `schema:check` continua rodando em todo deploy como alarme.

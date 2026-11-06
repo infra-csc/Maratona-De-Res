@@ -12,13 +12,17 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 - `pnpm run build` — typecheck + build de produção (api + web)
 - `pnpm run codegen` — regenera hooks e Zod a partir de `lib/api-spec/openapi.yaml`
 - `pnpm --filter db generate` / `migrate:deploy` — migrações versionadas (o deploy adota o baseline num banco criado por push); `push` só em dev
-- Env: ver `.env.example` na raiz (obrigatórias `DATABASE_URL`, `JWT_SECRET`, `PORT`). Deploy na VPS: `scripts/deploy.sh`.
+- Env: ver `.env.example` e `docs/VARIAVEIS-DE-AMBIENTE.md` (obrigatórias `DATABASE_URL`, `JWT_SECRET`, `PORT`).
+- Produção: VPS (https://maratonaresultados.appsnorte.com/). Atualizar = merge na `main` + `sudo bash /root/vps-install-app.sh` no servidor; detalhes em `docs/DEPLOY-VPS.md`. O Replit não é mais a produção: não publicar mais por lá.
+
+Documentação completa: `README.md`, `docs/DESENVOLVIMENTO.md`, `docs/ARQUITETURA.md`, `docs/DEPLOY-VPS.md`.
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
+- Web: React 19 + Vite + Tailwind v4 + TanStack Query + wouter
 - API: Express 5 (bundle ESM via esbuild em `artifacts/api-server/build.mjs`)
-- DB: PostgreSQL + Drizzle ORM; schema em `lib/db/src/schema`, migrações em `lib/db/migrations`
+- DB: PostgreSQL (18 em produção) + Drizzle ORM; schema em `lib/db/src/schema`, migrações em `lib/db/migrations`
 - Validação: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (OpenAPI → `lib/api-client-react`, `lib/api-zod`)
 
