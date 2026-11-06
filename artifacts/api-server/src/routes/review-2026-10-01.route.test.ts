@@ -77,6 +77,20 @@ test("operador confirma resultados, mas não desfaz, não usa o lote nem recebe 
   }
 });
 
+test("quem entra na equipe depois de confirmar também ganha a nota (e quem sai perde)", async () => {
+  const s = await scenario("equipe-depois");
+  const resultOf = (emp: number) => h.one("select final_event_score from employee_event_results where event_id = $1 and employee_id = $2", [s.eventId, emp]);
+  assert.ok(await resultOf(s.emp), "participante original tem nota");
+  const novo = await h.fx.employee({ name: "Colab entrou depois" });
+
+  const add = await h.api("POST", `/events/${s.eventId}/participants`, { role: "operador", body: { employeeId: novo } });
+  assert.equal(add.status, 201);
+  assert.ok(await resultOf(novo), "entrou depois da confirmação e já conta");
+
+  assert.equal((await h.api("DELETE", `/events/${s.eventId}/participants/${add.data.id}`, { role: "operador" })).status, 204);
+  assert.equal(await resultOf(novo), undefined, "saiu e deixa de contar");
+});
+
 test("re-salvar calibração ANTIGA nunca publicada mantém a nota que valia", async () => {
   const s = await scenario("antiga");
   const rh = await h.ensureUser("rh");

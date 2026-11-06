@@ -1297,6 +1297,9 @@ router.post("/events/:id/participants", requireRole("admin", "rh", "operador"), 
   const [participant] = await db.insert(eventParticipantsTable).values({
     eventId, employeeId, functionName: functionName ?? emp?.functionName ?? null, teamName: teamName ?? null,
   }).returning();
+  // Mesma regra de remover/editar: equipe mudada depois de confirmar também vale.
+  const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, req.user!.userId);
   const employmentType = emp?.employmentType ?? "casa";
   res.status(201).json({
     ...participant, employeeName: emp?.name ?? "", employmentType,
